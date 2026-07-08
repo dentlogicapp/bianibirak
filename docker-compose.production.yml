@@ -1,0 +1,42 @@
+# BiAniBirak - uretim compose (0A: yalniz frontend)
+# PAYLASILAN Caddy modeli (Yol A):
+#  - Kendi Caddy'miz YOK. Notlar'in caddy'si (notlar_caddy) TLS + proxy yapar.
+#  - Konteynerler host'a PORT PUBLISH ETMEZ (ports: yok).
+#  - Mevcut "notlar_default" agina external olarak katiliriz.
+#  - notlar_caddy, bianibirak-frontend'e KONTEYNER/SERVIS ADIYLA proxy'ler.
+#
+# DIKKAT (alias cakismasi): Notlar Caddy'si upstream'leri CIPLAK adla cagiriyor
+# (reverse_proxy frontend:3000 / backend:8080). Bu yuzden servis adimiz da
+# "frontend"/"backend" OLAMAZ - ayni agda alias cakisir, Notlar'in trafigi bize
+# kayar. Servis adlari "bianibirak-*" ile benzersiz tutulur.
+#
+# 0B notu (uc sinir): backend+postgres eklenince ->
+#  - servis adlari bianibirak-backend / bianibirak-postgres (alias cakismasi yok)
+#  - AG IZOLASYONU: postgres yalniz PRIVATE "bianibirak_ic" aginda; notlar_default'a
+#    KOYULMAZ (Notlar/Caddy DB'yi goremez). frontend/backend hem notlar_default hem
+#    bianibirak_ic'te.
+#  - DB IZOLASYONU: ayri postgres konteyneri + ayri kimlik (bianibirak/bianibirakuser).
+#  - HOST-SCOPED CEREZ: auth cerezi bianibirak.dentlogicapp.com'a host-only; Notlar'in
+#    .dentlogicapp.com parent cerezi KULLANILMAZ (izolasyon). Bunu destekledigi icin
+#    /api ayni-origin path olarak kurulur (ayri api subdomaini DEGIL).
+
+services:
+  bianibirak-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: bianibirak-frontend:latest
+    container_name: bianibirak-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    networks:
+      - paylasilan
+    # "ports:" YOK - host'a acilmaz; erisim yalniz notlar_caddy uzerinden.
+
+networks:
+  paylasilan:
+    external: true
+    name: notlar_default

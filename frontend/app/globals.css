@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --parsomen: #f4ebda;
+  --murekkep: #211a17;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-parsomen text-murekkep font-govde antialiased;
+    font-feature-settings: "kern", "liga";
+  }
+  ::selection {
+    background: #6e2438;
+    color: #f4ebda;
+  }
+  /* Erisilebilirlik: gorunur klavye odagi */
+  :focus-visible {
+    outline: 2px solid #6e2438;
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  /* Ince yaldiz ayrac cizgisi - keepsake/kitap detayi (imza dokunusu) */
+  .yaldiz-cizgi {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      #c4a25e 18%,
+      #a8823c 50%,
+      #c4a25e 82%,
+      transparent
+    );
+  }
+}
+
+/* Hareketi azalt tercihine saygi */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "BiAnıBırak",
+  "short_name": "BiAnıBırak",
+  "description": "Sevdiklerinin sözlerini, çocuklarına kalan bir mirasa dönüştür.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4EBDA",
+  "theme_color": "#6E2438",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
