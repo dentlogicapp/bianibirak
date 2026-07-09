@@ -128,6 +128,36 @@ public static class SemaKurucu
         CREATE INDEX IF NOT EXISTS ix_katki_medyalari_katki ON katki_medyalari ("KatkiId");
         CREATE INDEX IF NOT EXISTS ix_katki_medyalari_etkinlik ON katki_medyalari ("EtkinlikId");
 
+        CREATE TABLE IF NOT EXISTS cihazlar (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NOT NULL REFERENCES kullanicilar ("Id"),
+            "Platform" text NOT NULL DEFAULT 'web',
+            "PushToken" text NOT NULL,
+            "PushP256dh" text NULL,
+            "PushAuth" text NULL,
+            "CihazAdi" text NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            "SonAktiflik" timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_cihazlar_kullanici ON cihazlar ("KullaniciId");
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_cihazlar_pushtoken ON cihazlar ("PushToken");
+
+        CREATE TABLE IF NOT EXISTS ertelenen_bildirimler (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NULL,
+            "KullaniciId" uuid NOT NULL,
+            "Baslik" text NOT NULL,
+            "Govde" text NOT NULL,
+            "Url" text NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_ertelenen_bildirimler_kullanici ON ertelenen_bildirimler ("KullaniciId");
+
+        -- Push: kullanicilara sessiz saat kolonlari (idempotent)
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBaslangic" text NULL;
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBitis" text NULL;
+
         -- 0D.2 gecis: EtkinlikTarihi date -> timestamptz (idempotent; zaten timestamptz ise no-op).
         DO $$
         BEGIN

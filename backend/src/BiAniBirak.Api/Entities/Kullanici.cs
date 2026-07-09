@@ -17,6 +17,11 @@ public class Kullanici
 
     public bool SuperAdmin { get; set; }
 
+    // Sessiz saatler (push ertelemesi) - "HH:mm" TR saati. Aktifse aralikta bildirim ertelenir.
+    public bool SessizSaatAktif { get; set; }
+    public string? SessizSaatBaslangic { get; set; } // "22:00"
+    public string? SessizSaatBitis { get; set; } // "08:00"
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

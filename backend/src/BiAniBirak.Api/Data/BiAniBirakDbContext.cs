@@ -23,6 +23,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<EtkinlikAyari> EtkinlikAyarlari => Set<EtkinlikAyari>();
     public DbSet<Katki> Katkilar => Set<Katki>();
     public DbSet<KatkiMedyasi> KatkiMedyalari => Set<KatkiMedyasi>();
+    public DbSet<Cihaz> Cihazlar => Set<Cihaz>();
+    public DbSet<ErtelenenBildirim> ErtelenenBildirimler => Set<ErtelenenBildirim>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -38,6 +40,9 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.SifreHash).HasColumnName("sifre_hash").IsRequired();
             e.Property(x => x.Ad).HasColumnName("Ad").IsRequired();
             e.Property(x => x.SuperAdmin).HasColumnName("super_admin");
+            e.Property(x => x.SessizSaatAktif).HasColumnName("SessizSaatAktif");
+            e.Property(x => x.SessizSaatBaslangic).HasColumnName("SessizSaatBaslangic");
+            e.Property(x => x.SessizSaatBitis).HasColumnName("SessizSaatBitis");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.Property(x => x.DeletedAt).HasColumnName("deleted_at");
@@ -211,6 +216,40 @@ public class BiAniBirakDbContext : DbContext
             // FK iliskileri
             e.HasOne<Katki>().WithMany().HasForeignKey(x => x.KatkiId);
             e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
+
+        // ---- cihazlar (Web Push abone; native hazir) ----
+        model.Entity<Cihaz>(e =>
+        {
+            e.ToTable("cihazlar");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Platform).HasColumnName("Platform").IsRequired();
+            e.Property(x => x.PushToken).HasColumnName("PushToken").IsRequired();
+            e.Property(x => x.PushP256dh).HasColumnName("PushP256dh");
+            e.Property(x => x.PushAuth).HasColumnName("PushAuth");
+            e.Property(x => x.CihazAdi).HasColumnName("CihazAdi");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.SonAktiflik).HasColumnName("SonAktiflik");
+            e.HasIndex(x => x.KullaniciId);
+            e.HasIndex(x => x.PushToken).IsUnique();
+            e.HasOne<Kullanici>().WithMany().HasForeignKey(x => x.KullaniciId);
+        });
+
+        // ---- ertelenen_bildirimler (sessiz saat kuyrugu) ----
+        model.Entity<ErtelenenBildirim>(e =>
+        {
+            e.ToTable("ertelenen_bildirimler");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Baslik).HasColumnName("Baslik").IsRequired();
+            e.Property(x => x.Govde).HasColumnName("Govde").IsRequired();
+            e.Property(x => x.Url).HasColumnName("Url");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.KullaniciId);
         });
     }
 }

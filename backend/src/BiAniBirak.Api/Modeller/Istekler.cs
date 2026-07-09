@@ -29,6 +29,20 @@ public record KatkiBirakIstek(
     string DavetliTelefon,
     string Mesaj);
 
+// Web Push cihaz kaydi (abone).
+public record CihazKayitIstek(
+    string PushToken,
+    string Platform,
+    string? P256dh,
+    string? Auth,
+    string? CihazAdi);
+
+// Sessiz saat ayari ("HH:mm").
+public record SessizSaatIstek(
+    bool Aktif,
+    string? Baslangic,
+    string? Bitis);
+
 // Etkinlik ayarlarini guncelle. Null alan = degistirme (kismi guncelleme).
 public record EtkinlikAyarGuncelleIstek(
     string? MarkaKapak,

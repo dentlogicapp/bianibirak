@@ -8,6 +8,7 @@ import { api, type Etkinlik, type EtkinlikAyar, type Katki } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
+import { BildirimAyari } from "@/components/site/BildirimAyari";
 
 type Link2 = { es: string; token: string; aktif: boolean };
 
@@ -108,6 +109,9 @@ export default function AktifEtkinlikSayfasi() {
           ))}
         </div>
       </section>
+
+      {/* Bildirimler (push izin + sessiz saat) */}
+      <BildirimAyari />
 
       {/* Onay kuyrugu + ortak defter (Asama 4 moderasyon) */}
       <OnayKuyrugu />

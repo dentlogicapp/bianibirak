@@ -69,7 +69,7 @@ public static class KatkiUclari
     // POST - katki birak. Tum guvenlik katmanlari.
     private static async Task<IResult> KatkiBirak(
         string token, KatkiBirakIstek istek, HttpContext ctx,
-        BiAniBirakDbContext db, HizSiniri hizSiniri)
+        BiAniBirakDbContext db, HizSiniri hizSiniri, PushGonderici push)
     {
         // Rate limit (token + IP)
         var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "bilinmiyor";
@@ -135,6 +135,18 @@ public static class KatkiUclari
             CreatedAt = simdi,
         });
         await db.SaveChangesAsync(); // atomik: katki + audit
+
+        // Push tetigi: KaynakEs sahibi ese "yeni dilek" bildirimi (fire-and-forget).
+        // Davetli deneyimi bloklanmaz; push arka planda gider.
+        var sahipUyelik = await db.EtkinlikUyelikleri.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlik.Id && u.Rol == link.Es);
+        if (sahipUyelik != null)
+        {
+            var baslik = "Yeni bir anı bırakıldı";
+            var govde = $"{ad}, {etkinlik.Es1Ad} & {etkinlik.Es2Ad} defterinize bir dilek bıraktı. Onayını bekliyor.";
+            _ = push.GonderAsync(sahipUyelik.KullaniciId, baslik, govde,
+                url: "/panel/etkinlik", etkinlikId: etkinlik.Id);
+        }
 
         // Teyit (davetliye minimal yanit - okuma yuzeyi yok)
         return Results.Json(new { durum = "alindi", mesaj = "Dilegin iletildi. Tesekkurler." });

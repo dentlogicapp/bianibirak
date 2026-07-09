@@ -183,4 +183,40 @@ export const api = {
     istek<{ durum: string }>(`/api/katki/${id}/onayla`, { method: "POST" }),
   katkiReddet: (id: string) =>
     istek<{ durum: string }>(`/api/katki/${id}/reddet`, { method: "POST" }),
+
+  // --- Push (Asama 10-A; cihaz kaydi + sessiz saat) ---
+  pushAnahtar: () => istek<{ anahtar: string }>("/api/push/anahtar"),
+  cihazKaydet: (v: {
+    pushToken: string;
+    platform: string;
+    p256dh?: string;
+    auth?: string;
+    cihazAdi?: string;
+  }) =>
+    istek<{ durum: string }>("/api/cihaz", {
+      method: "POST",
+      body: JSON.stringify({
+        PushToken: v.pushToken,
+        Platform: v.platform,
+        P256dh: v.p256dh ?? null,
+        Auth: v.auth ?? null,
+        CihazAdi: v.cihazAdi ?? null,
+      }),
+    }),
+  sessizSaatGetir: () =>
+    istek<{ aktif: boolean; baslangic: string | null; bitis: string | null }>(
+      "/api/sessiz-saat"
+    ),
+  sessizSaatGuncelle: (v: { aktif: boolean; baslangic?: string; bitis?: string }) =>
+    istek<{ aktif: boolean; baslangic: string | null; bitis: string | null }>(
+      "/api/sessiz-saat",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          Aktif: v.aktif,
+          Baslangic: v.baslangic ?? null,
+          Bitis: v.bitis ?? null,
+        }),
+      }
+    ),
 };

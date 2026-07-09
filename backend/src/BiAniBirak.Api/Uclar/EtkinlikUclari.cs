@@ -516,17 +516,18 @@ public static class EtkinlikUclari
 
     // Katki onayla: yalniz KENDI KaynakEs'indeki bekleyen katki (sahiplik + izolasyon).
     private static async Task<IResult> KatkiOnayla(
-        string id, HttpContext ctx, BiAniBirakDbContext db)
-        => await KatkiDurumDegistir(id, ctx, db, "onayli", "KATKI_ONAYLANDI");
+        string id, HttpContext ctx, BiAniBirakDbContext db, PushGonderici push)
+        => await KatkiDurumDegistir(id, ctx, db, "onayli", "KATKI_ONAYLANDI", push);
 
     // Katki reddet: yalniz KENDI KaynakEs'indeki bekleyen katki. Icerik degil eylem kaydi.
     private static async Task<IResult> KatkiReddet(
         string id, HttpContext ctx, BiAniBirakDbContext db)
-        => await KatkiDurumDegistir(id, ctx, db, "red", "KATKI_REDDEDILDI");
+        => await KatkiDurumDegistir(id, ctx, db, "red", "KATKI_REDDEDILDI", null);
 
     // Ortak: onayla/reddet. Defense in depth: tenant + KaynakEs sahiplik + beklemede kontrolu.
     private static async Task<IResult> KatkiDurumDegistir(
-        string id, HttpContext ctx, BiAniBirakDbContext db, string yeniDurum, string eylem)
+        string id, HttpContext ctx, BiAniBirakDbContext db, string yeniDurum, string eylem,
+        PushGonderici? push)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
@@ -565,6 +566,21 @@ public static class EtkinlikUclari
             CreatedAt = simdi,
         });
         await db.SaveChangesAsync(); // atomik: durum + audit
+
+        // Onay tetigi: diger ese "ortak deftere eklendi" bildirimi (fire-and-forget).
+        if (yeniDurum == "onayli" && push != null)
+        {
+            var digerRol = rol == "es1" ? "es2" : "es1";
+            var digerUye = await db.EtkinlikUyelikleri.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlikId && u.Rol == digerRol);
+            if (digerUye != null)
+            {
+                _ = push.GonderAsync(digerUye.KullaniciId,
+                    "Ortak deftere bir anı eklendi",
+                    $"{katki.DavetliAd} tarafından bırakılan bir dilek onaylandı ve ortak defterinize eklendi.",
+                    url: "/panel/etkinlik", etkinlikId: etkinlikId);
+            }
+        }
 
         return Results.Json(new { durum = yeniDurum });
     }
