@@ -12,6 +12,10 @@ frontend/next-env.d.ts
 # Uretim
 dist/
 
+# .NET build ciktilari (derleme artigi - repoya girmez)
+backend/**/bin/
+backend/**/obj/
+
 # Ortam degiskenleri - SIR REPOYA GIRMEZ
 .env
 .env.local

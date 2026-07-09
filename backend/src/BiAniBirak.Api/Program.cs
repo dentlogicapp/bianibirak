@@ -78,7 +78,7 @@ if (!string.IsNullOrWhiteSpace(postgresBaglanti))
     using var kapsam = app.Services.CreateScope();
     var db = kapsam.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
     SemaKurucu.Uygula(db);
-    app.Logger.LogInformation("Idempotent sema uygulandi (kullanicilar, denetim_gunlukleri).");
+    app.Logger.LogInformation("Idempotent sema uygulandi (kullanicilar, denetim_gunlukleri, etkinlikler, etkinlik_uyelikleri, uye_davetleri).");
 }
 
 app.UseAuthentication();
