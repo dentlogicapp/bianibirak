@@ -92,6 +92,9 @@ public class BiAniBirakDbContext : DbContext
             e.HasIndex(x => x.KullaniciId);
             // kural: etkinlik basina her rol tek satir
             e.HasIndex(x => new { x.EtkinlikId, x.Rol }).IsUnique();
+            // FK iliskileri (model seviyesinde) -> EF insert sirasini dogru belirler
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+            e.HasOne<Kullanici>().WithMany().HasForeignKey(x => x.KullaniciId);
         });
 
         // ---- uye_davetleri (es2 davet tokeni; Karar 5) ----
@@ -109,6 +112,8 @@ public class BiAniBirakDbContext : DbContext
             e.HasIndex(x => x.EtkinlikId);
             // token ile tekil arama + benzersizlik (Belge 08)
             e.HasIndex(x => x.Token).IsUnique();
+            // FK iliskisi (model seviyesinde) -> EF insert sirasini dogru belirler
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
         });
     }
 }
