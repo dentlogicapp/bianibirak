@@ -16,12 +16,13 @@ namespace BiAniBirak.Api.Uclar;
 public static class EtkinlikUclari
 {
     private static readonly string[] GecerliTurler = { "dugun", "nisan", "nikah" };
-    private const int VarsayilanKapanisPencereGun = 30; // Belge 04/05 - ayar gelene kadar
 
     public static void EtkinlikUclariniEkle(this WebApplication app)
     {
         app.MapPost("/api/etkinlik", EtkinlikOlustur).RequireAuthorization();
         app.MapGet("/api/etkinliklerim", Etkinliklerim).RequireAuthorization();
+        app.MapPut("/api/etkinlik/{id}", EtkinlikGuncelle).RequireAuthorization();
+        app.MapDelete("/api/etkinlik/{id}", EtkinlikSil).RequireAuthorization();
         app.MapPost("/api/etkinlik/{id}/aktif-yap", AktifYap).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif", AktifEtkinlik).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/linkler", AktifLinkler).RequireAuthorization();
@@ -64,7 +65,7 @@ public static class EtkinlikUclari
             tur = e.Tur,
             es1_ad = e.Es1Ad,
             es2_ad = e.Es2Ad,
-            etkinlik_tarihi = e.EtkinlikTarihi.ToString("yyyy-MM-dd"),
+            etkinlik_tarihi = e.EtkinlikTarihi,
             acilis_tarihi = e.AcilisTarihi,
             kapanis_tarihi = e.KapanisTarihi,
             durum = e.Durum,
@@ -85,9 +86,9 @@ public static class EtkinlikUclari
             return Hata(400, "DOGRULAMA_HATASI",
                 "Tur (dugun/nisan/nikah) ve iki es adi gereklidir.");
 
-        if (!DateOnly.TryParse(istek.EtkinlikTarihi, CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var etkinlikTarihi))
-            return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi gereklidir.");
+        if (!DateTimeOffset.TryParse(istek.EtkinlikTarihi, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var etkinlikTarihi))
+            return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi/saati gereklidir.");
 
         // Acilis: verilmezse simdi. Kapanis: verilmezse etkinlik + 30 gun.
         var simdi = DateTimeOffset.UtcNow;
@@ -103,9 +104,7 @@ public static class EtkinlikUclari
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var k))
             kapanis = k;
         else
-            kapanis = new DateTimeOffset(
-                etkinlikTarihi.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
-                .AddDays(VarsayilanKapanisPencereGun);
+            kapanis = etkinlikTarihi.AddDays(Sabitler.VarsayilanKapanisPencereGun);
 
         if (kapanis <= acilis)
             return Hata(400, "DOGRULAMA_HATASI", "Kapanis tarihi acilistan sonra olmalidir.");
@@ -155,12 +154,14 @@ public static class EtkinlikUclari
             CreatedAt = simdi,
         };
 
-        // etkinlik ayari (hardcoded yasak altyapisi; kapanis penceresi burada tutulur)
+        // etkinlik ayari (hardcoded yasak altyapisi; varsayilan metinlerle dolu - 0D.3)
         var ayar = new EtkinlikAyari
         {
             Id = Guid.NewGuid(),
             EtkinlikId = etkinlik.Id,
-            KapanisPencereGun = VarsayilanKapanisPencereGun,
+            KarsilamaMetni = Sabitler.VarsayilanKarsilamaMetni,
+            PromptMetni = Sabitler.VarsayilanPromptMetni,
+            KapanisPencereGun = Sabitler.VarsayilanKapanisPencereGun,
             UpdatedAt = simdi,
         };
 
@@ -199,6 +200,118 @@ public static class EtkinlikUclari
             select new { e, u.Rol }).ToListAsync();
 
         return Results.Json(liste.Select(x => EtkinlikYaniti(x.e, x.Rol)));
+    }
+
+    // Etkinlik duzenle (tur/adlar/tarih). Uyelik zorunlu; kismi guncelleme.
+    private static async Task<IResult> EtkinlikGuncelle(
+        string id, EtkinlikGuncelleIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!Guid.TryParse(id, out var etkinlikId))
+            return Hata(400, "DOGRULAMA_HATASI", "Gecersiz etkinlik kimligi.");
+
+        // Uyelik dogrulamasi (izolasyon)
+        var uye = await db.EtkinlikUyelikleri.AsNoTracking()
+            .AnyAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
+        if (!uye)
+            return Hata(403, "ERISIM_YOK", "Bu etkinlige uye degilsiniz.");
+
+        var etkinlik = await db.Etkinlikler
+            .FirstOrDefaultAsync(e => e.Id == etkinlikId && e.DeletedAt == null);
+        if (etkinlik == null)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadi.");
+
+        // Yalniz gonderilen alanlar (null = degistirme)
+        if (istek.Tur != null)
+        {
+            var tur = istek.Tur.Trim().ToLowerInvariant();
+            if (!GecerliTurler.Contains(tur))
+                return Hata(400, "DOGRULAMA_HATASI", "Gecersiz tur.");
+            etkinlik.Tur = tur;
+        }
+        if (istek.Es1Ad != null)
+        {
+            var v = istek.Es1Ad.Trim();
+            if (v.Length < 2) return Hata(400, "DOGRULAMA_HATASI", "Birinci es adi gecersiz.");
+            etkinlik.Es1Ad = v;
+        }
+        if (istek.Es2Ad != null)
+        {
+            var v = istek.Es2Ad.Trim();
+            if (v.Length < 2) return Hata(400, "DOGRULAMA_HATASI", "Ikinci es adi gecersiz.");
+            etkinlik.Es2Ad = v;
+        }
+        if (istek.EtkinlikTarihi != null)
+        {
+            if (!DateTimeOffset.TryParse(istek.EtkinlikTarihi, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var yeniTarih))
+                return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi/saati gereklidir.");
+            etkinlik.EtkinlikTarihi = yeniTarih;
+            // kapanis penceresi ayardan; tarih degisince kapanisi tutarli tut
+            var ayar = await db.EtkinlikAyarlari.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlikId);
+            var gun = ayar?.KapanisPencereGun ?? Sabitler.VarsayilanKapanisPencereGun;
+            etkinlik.KapanisTarihi = yeniTarih.AddDays(gun);
+        }
+        etkinlik.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kullaniciId,
+            Eylem = "ETKINLIK_GUNCELLENDI",
+            Varlik = "etkinlikler",
+            VarlikId = etkinlikId,
+            DegisenAlanlar = JsonSerializer.Serialize(new
+            {
+                istek.Tur, istek.Es1Ad, istek.Es2Ad, istek.EtkinlikTarihi,
+            }),
+            CreatedAt = etkinlik.UpdatedAt,
+        });
+        await db.SaveChangesAsync();
+
+        return Results.Json(EtkinlikYaniti(etkinlik));
+    }
+
+    // Etkinlik sil (soft-delete: DeletedAt). Uyelik zorunlu.
+    private static async Task<IResult> EtkinlikSil(
+        string id, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!Guid.TryParse(id, out var etkinlikId))
+            return Hata(400, "DOGRULAMA_HATASI", "Gecersiz etkinlik kimligi.");
+
+        var uye = await db.EtkinlikUyelikleri.AsNoTracking()
+            .AnyAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
+        if (!uye)
+            return Hata(403, "ERISIM_YOK", "Bu etkinlige uye degilsiniz.");
+
+        var etkinlik = await db.Etkinlikler
+            .FirstOrDefaultAsync(e => e.Id == etkinlikId && e.DeletedAt == null);
+        if (etkinlik == null)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadi.");
+
+        var simdi = DateTimeOffset.UtcNow;
+        etkinlik.DeletedAt = simdi;
+        etkinlik.UpdatedAt = simdi;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kullaniciId,
+            Eylem = "ETKINLIK_SILINDI",
+            Varlik = "etkinlikler",
+            VarlikId = etkinlikId,
+            DegisenAlanlar = null,
+            CreatedAt = simdi,
+        });
+        await db.SaveChangesAsync();
+
+        return Results.Json(new { durum = "silindi" });
     }
 
     private static async Task<IResult> AktifYap(

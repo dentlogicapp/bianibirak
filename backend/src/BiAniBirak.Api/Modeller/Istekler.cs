@@ -15,6 +15,13 @@ public record EtkinlikOlusturIstek(
     string? AcilisTarihi,
     string? KapanisTarihi);
 
+// Etkinlik duzenleme. Null alan = degistirme (kismi guncelleme).
+public record EtkinlikGuncelleIstek(
+    string? Tur,
+    string? Es1Ad,
+    string? Es2Ad,
+    string? EtkinlikTarihi);
+
 // Etkinlik ayarlarini guncelle. Null alan = degistirme (kismi guncelleme).
 public record EtkinlikAyarGuncelleIstek(
     string? MarkaKapak,

@@ -66,7 +66,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
             e.Property(x => x.Es1Ad).HasColumnName("Es1Ad").IsRequired();
             e.Property(x => x.Es2Ad).HasColumnName("Es2Ad").IsRequired();
-            e.Property(x => x.EtkinlikTarihi).HasColumnName("EtkinlikTarihi").HasColumnType("date");
+            e.Property(x => x.EtkinlikTarihi).HasColumnName("EtkinlikTarihi");
             e.Property(x => x.AcilisTarihi).HasColumnName("AcilisTarihi");
             e.Property(x => x.KapanisTarihi).HasColumnName("KapanisTarihi");
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();

@@ -4,6 +4,7 @@ import "@fontsource-variable/fraunces";
 import "@fontsource-variable/inter";
 import "./globals.css";
 import { MARKA } from "@/lib/marka";
+import { PWARegister } from "@/components/site/PWARegister";
 
 export const metadata: Metadata = {
   title: {
@@ -38,7 +39,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PWARegister />
+      </body>
     </html>
   );
 }

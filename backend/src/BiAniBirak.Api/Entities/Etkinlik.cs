@@ -14,8 +14,8 @@ public class Etkinlik
     public string Es1Ad { get; set; } = string.Empty;
     public string Es2Ad { get; set; } = string.Empty;
 
-    // etkinligin gerceklesecegi gun (yalniz tarih)
-    public DateOnly EtkinlikTarihi { get; set; }
+    // etkinligin gerceklesecegi an (tarih + saat - Musa karari #6)
+    public DateTimeOffset EtkinlikTarihi { get; set; }
 
     // erisim penceresi: acilis -> kapanis
     public DateTimeOffset AcilisTarihi { get; set; }

@@ -90,6 +90,23 @@ export const api = {
       }),
     }),
   etkinliklerim: () => istek<Etkinlik[]>("/api/etkinliklerim"),
+  etkinlikGuncelle: (id: string, v: Partial<{
+    tur: string;
+    es1Ad: string;
+    es2Ad: string;
+    etkinlikTarihi: string;
+  }>) =>
+    istek<Etkinlik>(`/api/etkinlik/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        Tur: v.tur ?? null,
+        Es1Ad: v.es1Ad ?? null,
+        Es2Ad: v.es2Ad ?? null,
+        EtkinlikTarihi: v.etkinlikTarihi ?? null,
+      }),
+    }),
+  etkinlikSil: (id: string) =>
+    istek<{ durum: string }>(`/api/etkinlik/${id}`, { method: "DELETE" }),
   etkinlikAktifYap: (id: string) =>
     istek<{ aktif_etkinlik_id: string; rol: string }>(
       `/api/etkinlik/${id}/aktif-yap`,

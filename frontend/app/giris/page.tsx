@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { api } from "@/lib/api";
 
-// 0B minimal fonksiyonel giris/kayit. Zengin prototip cilasi (KVKK modali, koyu mod,
-// sayac) sonraki cila asamasinda birebir tasinir.
+// KVKK deseni (Planlama/Stripe/Linear/Notion): girişte onay kutusu YOK - sürtünmesiz.
+// KVKK yalnız kayıtta ince onam metni + her iki modda footer'da kanuni erişim linki.
 export default function GirisSayfasi() {
   const router = useRouter();
   const [kayitMi, setKayitMi] = useState(false);
@@ -14,17 +15,12 @@ export default function GirisSayfasi() {
   const [email, setEmail] = useState("");
   const [sifre, setSifre] = useState("");
   const [sifre2, setSifre2] = useState("");
-  const [kvkk, setKvkk] = useState(false);
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
   async function gonder(e: React.FormEvent) {
     e.preventDefault();
     setHata("");
-    if (!kvkk) {
-      setHata("Devam etmek için KVKK Aydınlatma Metni onayı gerekir.");
-      return;
-    }
     if (kayitMi && sifre !== sifre2) {
       setHata("Şifreler eşleşmiyor.");
       return;
@@ -40,7 +36,9 @@ export default function GirisSayfasi() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 py-16">
-      <MarkaKilidi varyant="wordmark" boyut="orta" animasyonlu />
+      <Link href="/" aria-label="Ana sayfa">
+        <MarkaKilidi varyant="wordmark" boyut="orta" animasyonlu />
+      </Link>
       <p className="mt-4 font-govde text-xs uppercase tracking-etiket text-ikincil">
         Senden Bize Kalan
       </p>
@@ -92,21 +90,8 @@ export default function GirisSayfasi() {
           </label>
         )}
 
-        <label className="mt-2 flex items-start gap-2 font-govde text-xs text-ikincil">
-          <input
-            type="checkbox"
-            checked={kvkk}
-            onChange={(e) => setKvkk(e.target.checked)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="font-medium text-sarap">KVKK Aydınlatma Metni</span>&apos;ni okudum,
-            kişisel verilerimin belirtilen amaçlarla işlenmesini kabul ediyorum.
-          </span>
-        </label>
-
         {hata && (
-          <p className="mt-4 font-govde text-xs text-sarap" role="alert">
+          <p className="mt-2 font-govde text-xs text-sarap" role="alert">
             {hata}
           </p>
         )}
@@ -118,6 +103,17 @@ export default function GirisSayfasi() {
         >
           {yukleniyor ? "Lütfen bekleyin..." : kayitMi ? "Kayıt ol" : "Giriş yap"}
         </button>
+
+        {/* Kayıtta ince onam metni (checkbox DEĞİL - kanuni bilgilendirme) */}
+        {kayitMi && (
+          <p className="mt-4 text-center font-govde text-[0.7rem] leading-relaxed text-ikincil">
+            Kayıt olarak{" "}
+            <Link href="/kvkk" className="font-medium text-sarap hover:underline">
+              KVKK Aydınlatma Metni
+            </Link>
+            &apos;ni kabul etmiş olursun.
+          </p>
+        )}
 
         <p className="mt-5 text-center font-govde text-xs text-ikincil">
           {kayitMi ? "Zaten üye misin? " : "Hesabın yok mu? "}
@@ -133,6 +129,17 @@ export default function GirisSayfasi() {
           </button>
         </p>
       </form>
+
+      {/* Footer - kanuni erişim (kimliksiz, sade link; Stripe/Linear deseni) */}
+      <div className="mt-6 flex items-center gap-4 font-govde text-[0.7rem] text-ikincil">
+        <Link href="/kvkk" className="transition-colors hover:text-sarap">
+          KVKK Aydınlatma Metni
+        </Link>
+        <span className="text-ayrac">·</span>
+        <Link href="/gizlilik" className="transition-colors hover:text-sarap">
+          Gizlilik
+        </Link>
+      </div>
     </main>
   );
 }

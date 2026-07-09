@@ -2,18 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import QRCode from "qrcode";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
+import { VARSAYILAN } from "@/lib/varsayilan";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 
-type Link = { es: string; token: string; aktif: boolean };
+type Link2 = { es: string; token: string; aktif: boolean };
 
-// 0C+2 aktif etkinlik ekrani: ozet + cift-link/QR + ayarlar.
-// Tenant guard'li uclardan beslenir. Sureli sayac ve zengin cila sonraki asamada.
+// 0D aktif etkinlik ekrani: ozet + zaman cizelgesi + cift-link/QR + ayarlar.
 export default function AktifEtkinlikSayfasi() {
   const router = useRouter();
   const [etkinlik, setEtkinlik] = useState<Etkinlik | null>(null);
-  const [linkler, setLinkler] = useState<Link[]>([]);
+  const [linkler, setLinkler] = useState<Link2[]>([]);
   const [ayar, setAyar] = useState<EtkinlikAyar | null>(null);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
 
@@ -58,7 +59,9 @@ export default function AktifEtkinlikSayfasi() {
   return (
     <main className="mx-auto max-w-icerik px-6 py-16">
       <div className="flex items-center justify-between">
-        <MarkaKilidi varyant="wordmark" boyut="kucuk" />
+        <Link href="/" aria-label="Ana sayfa">
+          <MarkaKilidi varyant="wordmark" boyut="kucuk" />
+        </Link>
         <button
           onClick={() => router.push("/panel")}
           className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:text-sarap"
@@ -76,27 +79,12 @@ export default function AktifEtkinlikSayfasi() {
           {etkinlik.es1_ad} &amp; {etkinlik.es2_ad}
         </h1>
         <p className="mt-2 font-govde text-sm text-ikincil">
-          Etkinlik tarihi: {etkinlik.etkinlik_tarihi}
+          {tarihSaatMetni(etkinlik.etkinlik_tarihi)}
         </p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-2xl border border-ayrac bg-parsomen p-5">
-            <p className="font-govde text-xs uppercase tracking-etiket text-ikincil">
-              Erişim açılışı
-            </p>
-            <p className="mt-1 font-govde text-sm text-murekkep">
-              {tarihMetni(etkinlik.acilis_tarihi)}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-ayrac bg-parsomen p-5">
-            <p className="font-govde text-xs uppercase tracking-etiket text-ikincil">
-              Erişim kapanışı
-            </p>
-            <p className="mt-1 font-govde text-sm text-murekkep">
-              {tarihMetni(etkinlik.kapanis_tarihi)}
-            </p>
-          </div>
-        </div>
       </div>
+
+      {/* Zaman cizelgesi projeksiyonu (#8 UX; fiyat Asama 7) */}
+      <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
 
       {/* Cift-link + QR */}
       <section className="mt-8">
@@ -120,6 +108,49 @@ export default function AktifEtkinlikSayfasi() {
       {/* Ayarlar */}
       {ayar && <AyarBolumu ilk={ayar} onGuncellendi={setAyar} />}
     </main>
+  );
+}
+
+// ---- Zaman cizelgesi (sureli yasam dongusu projeksiyonu) ----
+function ZamanCizelgesi({ etkinlik, pencereGun }: { etkinlik: Etkinlik; pencereGun: number }) {
+  const acilis = new Date(etkinlik.acilis_tarihi);
+  const ozelGun = new Date(etkinlik.etkinlik_tarihi);
+  const kapanis = new Date(etkinlik.kapanis_tarihi);
+  // Kisisellestirme penceresi: kapanistan sonra 7 gun (kurasyon); ardindan 10 gun indirme.
+  const kisisel = new Date(kapanis.getTime() + 7 * 24 * 3600 * 1000);
+  const silme = new Date(kisisel.getTime() + 10 * 24 * 3600 * 1000);
+
+  const adimlar = [
+    { t: acilis, e: "Davetli girişleri başlar", v: "Bağlantı/QR ile dilekler toplanmaya başlar." },
+    { t: ozelGun, e: "Özel gün", v: "Etkinliğiniz gerçekleşir." },
+    { t: kapanis, e: "Anı girişi sonlanır", v: `Toplama penceresi (${pencereGun} gün) kapanır.` },
+    { t: kisisel, e: "Kişiselleştirme", v: "Anı defteri üzerinde düzenleme yapabilirsiniz." },
+    { t: silme, e: "İndirme ve silme", v: "Veri indirilir; 10 gün sonra kalıcı silinir." },
+  ];
+
+  return (
+    <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
+      <h2 className="font-display text-lg text-murekkep">Süreç zaman çizelgesi</h2>
+      <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
+        Seçtiğiniz tarihe göre canlı önizleme. Anı defterinizi erken tamamlarsanız bu
+        süreci öne çekebilirsiniz.
+      </p>
+      <ol className="mt-6 space-y-4">
+        {adimlar.map((a, i) => (
+          <li key={i} className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <span className="h-3 w-3 rounded-full bg-sarap" />
+              {i < adimlar.length - 1 && <span className="mt-1 h-full w-px flex-1 bg-ayrac" />}
+            </div>
+            <div className="pb-2">
+              <p className="font-govde text-sm font-medium text-murekkep">{a.e}</p>
+              <p className="font-govde text-xs text-yaldiz">{tarihSaatMetni(a.t.toISOString())}</p>
+              <p className="mt-0.5 font-govde text-xs text-ikincil">{a.v}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -173,7 +204,7 @@ function LinkKarti({ es, token, esAdi }: { es: string; token: string; esAdi: str
   );
 }
 
-// ---- Ayar bolumu (karsilama + kapanis penceresi) ----
+// ---- Ayar bolumu (karsilama + kapanis penceresi + varsayilana don) ----
 function AyarBolumu({
   ilk,
   onGuncellendi,
@@ -186,6 +217,8 @@ function AyarBolumu({
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [mesaj, setMesaj] = useState("");
   const [hata, setHata] = useState("");
+
+  const varsayilandaMi = karsilama.trim() === VARSAYILAN.karsilamaMetni;
 
   async function kaydet() {
     setMesaj("");
@@ -219,16 +252,31 @@ function AyarBolumu({
 
       <div className="mt-6 space-y-5">
         <div>
-          <label className="mb-2 block font-govde text-xs uppercase tracking-etiket text-ikincil">
-            Karşılama metni
-          </label>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label className="block font-govde text-xs uppercase tracking-etiket text-ikincil">
+              Karşılama metni
+            </label>
+            {!varsayilandaMi && (
+              <button
+                type="button"
+                onClick={() => setKarsilama(VARSAYILAN.karsilamaMetni)}
+                className="font-govde text-xs text-sarap transition-colors hover:underline"
+              >
+                Varsayılana dön
+              </button>
+            )}
+          </div>
           <textarea
             value={karsilama}
             onChange={(e) => setKarsilama(e.target.value)}
             rows={3}
-            placeholder="Örn. Bu güzel günümüzde bize bir anı bırakır mısın?"
             className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
           />
+          <p className="mt-1 font-govde text-xs text-ikincil">
+            {varsayilandaMi
+              ? "Şu an varsayılan metin kullanılıyor."
+              : "Özel metin. İstersen varsayılana dönebilirsin."}
+          </p>
         </div>
 
         <div>
@@ -244,8 +292,8 @@ function AyarBolumu({
             className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap sm:w-40"
           />
           <p className="mt-2 font-govde text-xs text-ikincil">
-            Etkinlik tarihinden sonra bu kadar gün boyunca dilek toplanır; sonra miras
-            mühürlenir ve dışa aktarım açılır.
+            Etkinlik tarihinden sonra bu kadar gün boyunca dilek toplanır. Minimum 30 gün;
+            üzeri için ücret ödeme ekranında netleşir.
           </p>
         </div>
 
@@ -283,8 +331,14 @@ function durumEtiketi(durum: string): string {
   return durum;
 }
 
-function tarihMetni(iso: string): string {
+function tarihSaatMetni(iso: string): string {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return iso;
-  return t.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  return t.toLocaleString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

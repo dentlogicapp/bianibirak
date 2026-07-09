@@ -35,7 +35,7 @@ public static class SemaKurucu
             "Tur" text NOT NULL,
             "Es1Ad" text NOT NULL,
             "Es2Ad" text NOT NULL,
-            "EtkinlikTarihi" date NOT NULL,
+            "EtkinlikTarihi" timestamptz NOT NULL,
             "AcilisTarihi" timestamptz NOT NULL,
             "KapanisTarihi" timestamptz NOT NULL,
             "Durum" text NOT NULL,
@@ -92,6 +92,21 @@ public static class SemaKurucu
             updated_at timestamptz NOT NULL DEFAULT now()
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_etkinlik_ayarlari_etkinlik ON etkinlik_ayarlari ("EtkinlikId");
+
+        -- 0D.2 gecis: EtkinlikTarihi date -> timestamptz (idempotent; zaten timestamptz ise no-op).
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'etkinlikler'
+                  AND column_name = 'EtkinlikTarihi'
+                  AND data_type = 'date'
+            ) THEN
+                ALTER TABLE etkinlikler
+                    ALTER COLUMN "EtkinlikTarihi" TYPE timestamptz
+                    USING "EtkinlikTarihi"::timestamptz;
+            END IF;
+        END $$;
         """;
 
     public static void Uygula(BiAniBirakDbContext db)
