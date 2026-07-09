@@ -224,8 +224,8 @@ function AyarBolumu({
     setMesaj("");
     setHata("");
     const g = parseInt(gun, 10);
-    if (isNaN(g) || g < 1 || g > 365) {
-      setHata("Kapanış penceresi 1-365 gün aralığında olmalıdır.");
+    if (isNaN(g) || g < VARSAYILAN.minKapanisPencereGun || g > VARSAYILAN.maxKapanisPencereGun) {
+      setHata(`Kapanış penceresi en az ${VARSAYILAN.minKapanisPencereGun} gün olmalıdır (en fazla ${VARSAYILAN.maxKapanisPencereGun}).`);
       return;
     }
     setKaydediliyor(true);
@@ -285,8 +285,8 @@ function AyarBolumu({
           </label>
           <input
             type="number"
-            min={1}
-            max={365}
+            min={VARSAYILAN.minKapanisPencereGun}
+            max={VARSAYILAN.maxKapanisPencereGun}
             value={gun}
             onChange={(e) => setGun(e.target.value)}
             className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap sm:w-40"

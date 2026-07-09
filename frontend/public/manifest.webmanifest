@@ -1,9 +1,12 @@
 {
   "name": "BiAnıBırak",
   "short_name": "BiAnıBırak",
-  "description": "BiAnıBırak",
-  "start_url": "/",
+  "description": "Senden Bize Kalan - anı defteri kürasyon stüdyosu",
+  "id": "/giris",
+  "start_url": "/giris",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F4EBDA",
   "theme_color": "#6E2438",
   "icons": [

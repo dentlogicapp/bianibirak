@@ -422,8 +422,9 @@ public static class EtkinlikUclari
         if (istek.KapanisPencereGun.HasValue)
         {
             var gun = istek.KapanisPencereGun.Value;
-            if (gun < 1 || gun > 365)
-                return Hata(400, "DOGRULAMA_HATASI", "Kapanis penceresi 1-365 gun araliginda olmalidir.");
+            if (gun < Sabitler.MinKapanisPencereGun || gun > Sabitler.MaxKapanisPencereGun)
+                return Hata(400, "DOGRULAMA_HATASI",
+                    $"Kapanis penceresi en az {Sabitler.MinKapanisPencereGun} gun olmalidir (en fazla {Sabitler.MaxKapanisPencereGun}).");
             ayar.KapanisPencereGun = gun;
         }
         ayar.UpdatedAt = DateTimeOffset.UtcNow;

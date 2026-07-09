@@ -15,4 +15,10 @@ public static class Sabitler
 
     // Kapanis penceresi varsayilani (gun) - Karar 4 / Belge 05.
     public const int VarsayilanKapanisPencereGun = 30;
+
+    // Kapanis penceresi minimum (gun) - Belge 05 fiyat politikasi: min 30, uzeri orantili ucret.
+    public const int MinKapanisPencereGun = 30;
+
+    // Kapanis penceresi maksimum (gun).
+    public const int MaxKapanisPencereGun = 365;
 }

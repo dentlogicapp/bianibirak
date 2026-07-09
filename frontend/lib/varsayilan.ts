@@ -5,4 +5,6 @@ export const VARSAYILAN = {
     "Bu ozel gunumuzde bize bir ani birakir misin? Dilegin, defterimizde sonsuza dek yasayacak.",
   promptMetni: "Bize bir dilek, bir ani ya da bir tavsiye birak.",
   kapanisPencereGun: 30,
+  minKapanisPencereGun: 30,
+  maxKapanisPencereGun: 365,
 } as const;
