@@ -16,6 +16,9 @@ public class BiAniBirakDbContext : DbContext
 
     public DbSet<Kullanici> Kullanicilar => Set<Kullanici>();
     public DbSet<DenetimGunlugu> DenetimGunlukleri => Set<DenetimGunlugu>();
+    public DbSet<Etkinlik> Etkinlikler => Set<Etkinlik>();
+    public DbSet<EtkinlikUyeligi> EtkinlikUyelikleri => Set<EtkinlikUyeligi>();
+    public DbSet<UyeDaveti> UyeDavetleri => Set<UyeDaveti>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -50,6 +53,62 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.VarlikId).HasColumnName("VarlikId");
             e.Property(x => x.DegisenAlanlar).HasColumnName("DegisenAlanlar").HasColumnType("jsonb");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        // ---- etkinlikler (TENANT - izolasyon siniri) ----
+        model.Entity<Etkinlik>(e =>
+        {
+            e.ToTable("etkinlikler");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
+            e.Property(x => x.Es1Ad).HasColumnName("Es1Ad").IsRequired();
+            e.Property(x => x.Es2Ad).HasColumnName("Es2Ad").IsRequired();
+            e.Property(x => x.EtkinlikTarihi).HasColumnName("EtkinlikTarihi").HasColumnType("date");
+            e.Property(x => x.AcilisTarihi).HasColumnName("AcilisTarihi");
+            e.Property(x => x.KapanisTarihi).HasColumnName("KapanisTarihi");
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.UstOrganizatorId).HasColumnName("UstOrganizatorId");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.DeletedAt).HasColumnName("deleted_at");
+            // gelecek B2B2C sorgusu icin index (bugun hepsi NULL)
+            e.HasIndex(x => x.UstOrganizatorId);
+        });
+
+        // ---- etkinlik_uyelikleri (cift = iki uye; Karar 5) ----
+        model.Entity<EtkinlikUyeligi>(e =>
+        {
+            e.ToTable("etkinlik_uyelikleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Rol).HasColumnName("Rol").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            // tenant filtresi (WHERE EtkinlikId) icin index
+            e.HasIndex(x => x.EtkinlikId);
+            // kullanicinin uyelikleri sorgusu icin index
+            e.HasIndex(x => x.KullaniciId);
+            // kural: etkinlik basina her rol tek satir
+            e.HasIndex(x => new { x.EtkinlikId, x.Rol }).IsUnique();
+        });
+
+        // ---- uye_davetleri (es2 davet tokeni; Karar 5) ----
+        model.Entity<UyeDaveti>(e =>
+        {
+            e.ToTable("uye_davetleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Token).HasColumnName("Token").IsRequired();
+            e.Property(x => x.HedefRol).HasColumnName("HedefRol").IsRequired();
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            // tenant filtresi icin index
+            e.HasIndex(x => x.EtkinlikId);
+            // token ile tekil arama + benzersizlik (Belge 08)
+            e.HasIndex(x => x.Token).IsUnique();
         });
     }
 }

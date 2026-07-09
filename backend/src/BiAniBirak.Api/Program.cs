@@ -85,6 +85,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.KimlikUclariniEkle();
+app.EtkinlikUclariniEkle();
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

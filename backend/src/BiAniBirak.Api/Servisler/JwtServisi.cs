@@ -24,7 +24,9 @@ public class JwtServisi
 
     public int GecerlilikGun => _gecerlilikGun;
 
-    public string Uret(Kullanici kullanici)
+    // aktifEtkinlikId opsiyonel: kayit/giris'te null (bos claim); aktif-yap ucunda dolu.
+    // Boylece mevcut cagrilar bozulmaz, tenant baglami sonradan JWT'ye gomulur.
+    public string Uret(Kullanici kullanici, Guid? aktifEtkinlikId = null)
     {
         var anahtar = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_gizli));
         var imza = new SigningCredentials(anahtar, SecurityAlgorithms.HmacSha256);
@@ -34,7 +36,7 @@ public class JwtServisi
             new(JwtRegisteredClaimNames.Sub, kullanici.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, kullanici.Email),
             new("super_admin", kullanici.SuperAdmin ? "true" : "false"),
-            new("aktif_etkinlik_id", string.Empty),
+            new("aktif_etkinlik_id", aktifEtkinlikId?.ToString() ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
 

@@ -33,6 +33,19 @@ export type Kullanici = {
   super_admin: boolean;
 };
 
+// Backend EtkinlikYaniti ile birebir (snake_case alanlar).
+export type Etkinlik = {
+  id: string;
+  tur: string;
+  es1_ad: string;
+  es2_ad: string;
+  etkinlik_tarihi: string; // yyyy-MM-dd
+  acilis_tarihi: string; // ISO-8601
+  kapanis_tarihi: string; // ISO-8601
+  durum: string;
+  rol: string | null;
+};
+
 export const api = {
   kayit: (v: { ad: string; email: string; sifre: string }) =>
     istek<Kullanici>("/api/kayit", {
@@ -46,4 +59,32 @@ export const api = {
     }),
   cikis: () => istek<{ durum: string }>("/api/cikis", { method: "POST" }),
   ben: () => istek<Kullanici>("/api/ben"),
+
+  // --- Tenant cekirdegi (Asama 0C) ---
+  etkinlikOlustur: (v: {
+    tur: string;
+    es1Ad: string;
+    es2Ad: string;
+    etkinlikTarihi: string;
+    acilisTarihi?: string;
+    kapanisTarihi?: string;
+  }) =>
+    istek<Etkinlik>("/api/etkinlik", {
+      method: "POST",
+      body: JSON.stringify({
+        Tur: v.tur,
+        Es1Ad: v.es1Ad,
+        Es2Ad: v.es2Ad,
+        EtkinlikTarihi: v.etkinlikTarihi,
+        AcilisTarihi: v.acilisTarihi ?? null,
+        KapanisTarihi: v.kapanisTarihi ?? null,
+      }),
+    }),
+  etkinliklerim: () => istek<Etkinlik[]>("/api/etkinliklerim"),
+  etkinlikAktifYap: (id: string) =>
+    istek<{ aktif_etkinlik_id: string; rol: string }>(
+      `/api/etkinlik/${id}/aktif-yap`,
+      { method: "POST" }
+    ),
+  etkinlikAktif: () => istek<Etkinlik>("/api/etkinlik/aktif"),
 };

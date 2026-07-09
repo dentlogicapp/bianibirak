@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BiAniBirak.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b0def5690f054ffbbca64f38b883124fd8d23dc2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7641378d4fb53b502aa33a7461a61a251c9e7300")]
 [assembly: System.Reflection.AssemblyProductAttribute("BiAniBirak.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BiAniBirak.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
