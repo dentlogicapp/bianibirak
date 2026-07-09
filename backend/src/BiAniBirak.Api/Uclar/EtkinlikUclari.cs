@@ -28,6 +28,10 @@ public static class EtkinlikUclari
         app.MapGet("/api/etkinlik/aktif/linkler", AktifLinkler).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/ayarlar", AktifAyarlar).RequireAuthorization();
         app.MapPut("/api/etkinlik/aktif/ayarlar", AktifAyarlarGuncelle).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/kuyruk", AktifKuyruk).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/defter", AktifDefter).RequireAuthorization();
+        app.MapPost("/api/katki/{id}/onayla", KatkiOnayla).RequireAuthorization();
+        app.MapPost("/api/katki/{id}/reddet", KatkiReddet).RequireAuthorization();
     }
 
     private static IResult Hata(int durum, string kod, string mesaj)
@@ -461,4 +465,107 @@ public static class EtkinlikUclari
             prompt_metni = a.PromptMetni,
             kapanis_pencere_gun = a.KapanisPencereGun,
         };
+
+    private static object KatkiYaniti(Katki k)
+        => new
+        {
+            id = k.Id,
+            kaynak_es = k.KaynakEs,
+            davetli_ad = k.DavetliAd,
+            mesaj = k.Mesaj,
+            durum = k.Durum,
+            created_at = k.CreatedAt,
+        };
+
+    // Onay kuyrugu: YALNIZ oturumdaki esin rolune ait bekleyen katkilar (izolasyon).
+    // Belge 04: WHERE EtkinlikId=@e AND KaynakEs=@rol AND Durum='beklemede'.
+    // Bir es digerinin kuyrugunu ASLA cekemez (wedge - birlesim-oncesi izolasyon).
+    private static async Task<IResult> AktifKuyruk(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var kuyruk = await db.Katkilar.AsNoTracking()
+            .Where(k => k.EtkinlikId == etkinlikId && k.KaynakEs == rol && k.Durum == "beklemede")
+            .OrderBy(k => k.CreatedAt)
+            .ToListAsync();
+
+        return Results.Json(kuyruk.Select(KatkiYaniti));
+    }
+
+    // Ortak defter: HER IKI esin onayli katkilarinin birlesimi. Ikisi de gorur.
+    // KaynakEs metadata korunur (kurasyonda "gelinin/damadin tarafi").
+    private static async Task<IResult> AktifDefter(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var defter = await db.Katkilar.AsNoTracking()
+            .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli")
+            .OrderBy(k => k.CreatedAt)
+            .ToListAsync();
+
+        return Results.Json(defter.Select(KatkiYaniti));
+    }
+
+    // Katki onayla: yalniz KENDI KaynakEs'indeki bekleyen katki (sahiplik + izolasyon).
+    private static async Task<IResult> KatkiOnayla(
+        string id, HttpContext ctx, BiAniBirakDbContext db)
+        => await KatkiDurumDegistir(id, ctx, db, "onayli", "KATKI_ONAYLANDI");
+
+    // Katki reddet: yalniz KENDI KaynakEs'indeki bekleyen katki. Icerik degil eylem kaydi.
+    private static async Task<IResult> KatkiReddet(
+        string id, HttpContext ctx, BiAniBirakDbContext db)
+        => await KatkiDurumDegistir(id, ctx, db, "red", "KATKI_REDDEDILDI");
+
+    // Ortak: onayla/reddet. Defense in depth: tenant + KaynakEs sahiplik + beklemede kontrolu.
+    private static async Task<IResult> KatkiDurumDegistir(
+        string id, HttpContext ctx, BiAniBirakDbContext db, string yeniDurum, string eylem)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!Guid.TryParse(id, out var katkiId))
+            return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
+
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        // Tenant + KaynakEs sahiplik: sadece kendi kuyrugundaki bekleyen katki.
+        var katki = await db.Katkilar
+            .FirstOrDefaultAsync(k => k.Id == katkiId && k.EtkinlikId == etkinlikId);
+        if (katki == null)
+            return Hata(404, "KATKI_BULUNAMADI", "Katki bulunamadi.");
+        if (katki.KaynakEs != rol)
+            return Hata(403, "ERISIM_YOK", "Bu katki sizin onay kuyrugunuzda degil.");
+        if (katki.Durum != "beklemede")
+            return Hata(409, "KATKI_ZATEN_ISLENMIS", "Bu katki zaten islenmis.");
+
+        var simdi = DateTimeOffset.UtcNow;
+        katki.Durum = yeniDurum;
+        katki.OnaylayanKullaniciId = kullaniciId;
+        katki.OnayZamani = simdi;
+        katki.UpdatedAt = simdi;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kullaniciId,
+            Eylem = eylem,
+            Varlik = "katkilar",
+            VarlikId = katkiId,
+            DegisenAlanlar = JsonSerializer.Serialize(new { kaynak_es = katki.KaynakEs }),
+            CreatedAt = simdi,
+        });
+        await db.SaveChangesAsync(); // atomik: durum + audit
+
+        return Results.Json(new { durum = yeniDurum });
+    }
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import QRCode from "qrcode";
-import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
+import { api, type Etkinlik, type EtkinlikAyar, type Katki } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
@@ -108,6 +108,10 @@ export default function AktifEtkinlikSayfasi() {
           ))}
         </div>
       </section>
+
+      {/* Onay kuyrugu + ortak defter (Asama 4 moderasyon) */}
+      <OnayKuyrugu />
+      <OrtakDefter />
 
       {/* Ayarlar */}
       {ayar && <AyarBolumu ilk={ayar} onGuncellendi={setAyar} />}
@@ -315,6 +319,117 @@ function AyarBolumu({
         >
           {kaydediliyor ? "Kaydediliyor..." : "Ayarları kaydet"}
         </button>
+      </div>
+    </section>
+  );
+}
+
+// ---- Onay kuyrugu (esin bekleyen katkilari; izolasyon) ----
+function OnayKuyrugu() {
+  const [kuyruk, setKuyruk] = useState<Katki[]>([]);
+  const [durum, setDurum] = useState<"yukleniyor" | "hazir">("yukleniyor");
+  const [islenen, setIslenen] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.katkiKuyruk().then((c) => {
+      if (c.ok) setKuyruk(c.veri);
+      setDurum("hazir");
+    });
+  }, []);
+
+  async function islem(k: Katki, onay: boolean) {
+    if (islenen) return;
+    setIslenen(k.id);
+    const cevap = onay ? await api.katkiOnayla(k.id) : await api.katkiReddet(k.id);
+    setIslenen(null);
+    if (cevap.ok) setKuyruk((o) => o.filter((x) => x.id !== k.id));
+  }
+
+  if (durum === "yukleniyor") return null;
+
+  return (
+    <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
+      <h2 className="font-display text-lg text-murekkep">Onay kuyruğun</h2>
+      <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
+        Yalnız senin bağlantından gelen dilekler burada. Onayladıkların ortak deftere
+        eklenir; reddettiklerin gizli kalır.
+      </p>
+
+      {kuyruk.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-8 text-center font-govde text-sm text-ikincil">
+          Şu an bekleyen dilek yok. Davet bağlantını paylaştıkça buraya düşecek.
+        </p>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {kuyruk.map((k) => (
+            <div key={k.id} className="rounded-2xl border border-ayrac bg-parsomen p-5">
+              <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
+                {k.davetli_ad}
+              </p>
+              <p className="mt-2 font-govde text-sm leading-relaxed text-murekkep">
+                {k.mesaj}
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => islem(k, true)}
+                  disabled={islenen === k.id}
+                  className="rounded-full bg-sarap px-5 py-2 font-govde text-xs font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-60"
+                >
+                  {islenen === k.id ? "..." : "Onayla"}
+                </button>
+                <button
+                  onClick={() => islem(k, false)}
+                  disabled={islenen === k.id}
+                  className="rounded-full border border-ayrac px-5 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-60"
+                >
+                  Reddet
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---- Ortak defter (her iki esin onayli katkilarinin birlesimi) ----
+function OrtakDefter() {
+  const [defter, setDefter] = useState<Katki[]>([]);
+  const [durum, setDurum] = useState<"yukleniyor" | "hazir">("yukleniyor");
+
+  useEffect(() => {
+    api.katkiDefter().then((c) => {
+      if (c.ok) setDefter(c.veri);
+      setDurum("hazir");
+    });
+  }, []);
+
+  if (durum === "yukleniyor" || defter.length === 0) return null;
+
+  return (
+    <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
+      <h2 className="font-display text-lg text-murekkep">Ortak defter</h2>
+      <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
+        Onaylanan dilekler burada birleşir. Kürasyon aşamasında bu dilekler baskıya hazır
+        bir mirasa dönüşecek.
+      </p>
+      <div className="mt-5 space-y-3">
+        {defter.map((k) => (
+          <div key={k.id} className="rounded-2xl border border-ayrac bg-parsomen p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
+                {k.davetli_ad}
+              </p>
+              <span className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                {k.kaynak_es === "es1" ? "1. eş tarafı" : "2. eş tarafı"}
+              </span>
+            </div>
+            <p className="mt-2 font-govde text-sm leading-relaxed text-murekkep">
+              {k.mesaj}
+            </p>
+          </div>
+        ))}
       </div>
     </section>
   );

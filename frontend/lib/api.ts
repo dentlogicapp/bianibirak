@@ -66,6 +66,16 @@ export type KatkiKarsilama = {
   kapandi: boolean;
 };
 
+// Katki (moderasyon kuyrugu / defter).
+export type Katki = {
+  id: string;
+  kaynak_es: string;
+  davetli_ad: string;
+  mesaj: string;
+  durum: string;
+  created_at: string;
+};
+
 export const api = {
   kayit: (v: { ad: string; email: string; sifre: string }) =>
     istek<Kullanici>("/api/kayit", {
@@ -165,4 +175,12 @@ export const api = {
         Mesaj: v.mesaj,
       }),
     }),
+
+  // --- Moderasyon (Asama 4; izolasyonlu kuyruk + onay/ret + birlesik defter) ---
+  katkiKuyruk: () => istek<Katki[]>("/api/etkinlik/aktif/kuyruk"),
+  katkiDefter: () => istek<Katki[]>("/api/etkinlik/aktif/defter"),
+  katkiOnayla: (id: string) =>
+    istek<{ durum: string }>(`/api/katki/${id}/onayla`, { method: "POST" }),
+  katkiReddet: (id: string) =>
+    istek<{ durum: string }>(`/api/katki/${id}/reddet`, { method: "POST" }),
 };
