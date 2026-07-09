@@ -1,17 +1,17 @@
-# ============================================================================
-# BiAniBirak - paylasilan Caddy icin ADDITIVE site blogu (KANONIK KAYNAK)
-# ----------------------------------------------------------------------------
-# /opt/notlar/deploy/Caddyfile dosyasinin SONUNA eklenir. Mevcut global/notlar/api
-# bloklarinin HICBIR satirina dokunulmaz (yalniz ekleme).
-# Model: Yol A - konteyner adiyla proxy (notlar deseni); host portu yok.
-# Guvenlik basliklari BiAniBirak'a OZGU (notlar CSP'si korlemesine kopyalanmadi):
-#  - font-src 'self'  : fontlar self-host (fontsource); Google Fonts'a cagri YOK (KVKK).
-#  - connect-src 'self': 0B'de /api ayni-origin path (bianibirak.dentlogicapp.com/api).
-#  - unsafe-eval YOK   : Next uretim build'i gerektirmez; CSP daha siki.
-# ============================================================================
+# BiAniBirak - paylasilan notlar_caddy'ye eklenen site blogu (DOKUMAN/REFERANS).
+# Gercek dosya: /opt/notlar/deploy/Caddyfile (Notlar ile paylasilir).
+# 0B: handle /api/* -> bianibirak-backend:8080 (ayni-origin /api, host-scoped cerez).
+#     handle       -> bianibirak-frontend:3000
+# CSP degismedi (connect-src 'self' ayni-origin /api'yi kapsar).
+
 bianibirak.dentlogicapp.com {
     encode gzip zstd
-    reverse_proxy bianibirak-frontend:3000
+    handle /api/* {
+        reverse_proxy bianibirak-backend:8080
+    }
+    handle {
+        reverse_proxy bianibirak-frontend:3000
+    }
     header {
         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';"
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

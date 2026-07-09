@@ -1,24 +1,18 @@
-# BiAniBirak - uretim compose (0A: yalniz frontend)
-# PAYLASILAN Caddy modeli (Yol A):
-#  - Kendi Caddy'miz YOK. Notlar'in caddy'si (notlar_caddy) TLS + proxy yapar.
-#  - Konteynerler host'a PORT PUBLISH ETMEZ (ports: yok).
-#  - Mevcut "notlar_default" agina external olarak katiliriz.
-#  - notlar_caddy, bianibirak-frontend'e KONTEYNER/SERVIS ADIYLA proxy'ler.
+# BiAniBirak - uretim compose (0B: frontend + backend + postgres)
+# PAYLASILAN Caddy modeli (Yol A): kendi Caddy'miz YOK; notlar_caddy TLS + proxy yapar.
+# Konteynerler host'a PORT PUBLISH ETMEZ; Caddy konteyner ADIYLA erisir.
 #
-# DIKKAT (alias cakismasi): Notlar Caddy'si upstream'leri CIPLAK adla cagiriyor
-# (reverse_proxy frontend:3000 / backend:8080). Bu yuzden servis adimiz da
-# "frontend"/"backend" OLAMAZ - ayni agda alias cakisir, Notlar'in trafigi bize
-# kayar. Servis adlari "bianibirak-*" ile benzersiz tutulur.
+# UC SINIR:
+#  - AG IZOLASYONU: postgres YALNIZ private "bianibirak_ic" (internal) aginda; notlar_default'a
+#    KONMAZ -> Notlar da, paylasilan Caddy de DB'yi goremez. backend her iki agda (Caddy erissin
+#    + DB'ye ulassin). frontend yalniz notlar_default'ta.
+#  - DB IZOLASYONU: ayri bianibirak-postgres konteyneri + ayri kimlik + ayri named volume;
+#    host'a port YOK.
+#  - HOST-SCOPED CEREZ: backend auth cerezi host-only (CerezYardimcisi); ayni-origin /api ile
+#    uyumlu (Caddy handle /api/* -> backend; Asama 8).
 #
-# 0B notu (uc sinir): backend+postgres eklenince ->
-#  - servis adlari bianibirak-backend / bianibirak-postgres (alias cakismasi yok)
-#  - AG IZOLASYONU: postgres yalniz PRIVATE "bianibirak_ic" aginda; notlar_default'a
-#    KOYULMAZ (Notlar/Caddy DB'yi goremez). frontend/backend hem notlar_default hem
-#    bianibirak_ic'te.
-#  - DB IZOLASYONU: ayri postgres konteyneri + ayri kimlik (bianibirak/bianibirakuser).
-#  - HOST-SCOPED CEREZ: auth cerezi bianibirak.dentlogicapp.com'a host-only; Notlar'in
-#    .dentlogicapp.com parent cerezi KULLANILMAZ (izolasyon). Bunu destekledigi icin
-#    /api ayni-origin path olarak kurulur (ayri api subdomaini DEGIL).
+# ALIAS CAKISMASI: Notlar Caddy'si upstream'leri CIPLAK adla cagirdigi icin servis adlarimiz
+# "bianibirak-*" ile benzersiz (frontend/backend/postgres alias cakismasi YOK).
 
 services:
   bianibirak-frontend:
@@ -34,9 +28,57 @@ services:
       - HOSTNAME=0.0.0.0
     networks:
       - paylasilan
-    # "ports:" YOK - host'a acilmaz; erisim yalniz notlar_caddy uzerinden.
+    # "ports:" YOK - erisim yalniz notlar_caddy uzerinden.
+
+  bianibirak-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: bianibirak-backend:latest
+    container_name: bianibirak-backend
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__Postgres=Host=bianibirak-postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=bianibirak
+      - Jwt__Audience=bianibirak
+      - Jwt__GecerlilikGun=7
+    depends_on:
+      bianibirak-postgres:
+        condition: service_healthy
+    networks:
+      - paylasilan   # Caddy /api/* -> bianibirak-backend:8080 (Asama 8)
+      - ic           # postgres'e erisim
+    # "ports:" YOK.
+
+  bianibirak-postgres:
+    image: postgres:16-alpine
+    container_name: bianibirak-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - bianibirak_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ic
+    # "ports:" YOK - host'a acilmaz (DB izolasyonu).
 
 networks:
   paylasilan:
     external: true
     name: notlar_default
+  ic:
+    name: bianibirak_ic
+    internal: true
+
+volumes:
+  bianibirak_pgdata:
+    name: bianibirak_pgdata
