@@ -55,6 +55,17 @@ export type EtkinlikAyar = {
   kapanis_pencere_gun: number;
 };
 
+// Public davetli karsilama (GET /api/k/{token}).
+export type KatkiKarsilama = {
+  es1_ad: string;
+  es2_ad: string;
+  tur: string;
+  karsilama_metni: string | null;
+  prompt_metni: string | null;
+  acildi: boolean;
+  kapandi: boolean;
+};
+
 export const api = {
   kayit: (v: { ad: string; email: string; sifre: string }) =>
     istek<Kullanici>("/api/kayit", {
@@ -135,6 +146,23 @@ export const api = {
         KarsilamaMetni: v.karsilamaMetni ?? null,
         PromptMetni: v.promptMetni ?? null,
         KapanisPencereGun: v.kapanisPencereGun ?? null,
+      }),
+    }),
+
+  // --- Public davetli katki (Asama 3; login YOK, token URL'de) ---
+  katkiKarsilama: (token: string) =>
+    istek<KatkiKarsilama>(`/api/k/${encodeURIComponent(token)}`),
+  katkiBirak: (
+    token: string,
+    v: { davetliAd: string; davetliEmail: string; davetliTelefon: string; mesaj: string }
+  ) =>
+    istek<{ durum: string; mesaj: string }>(`/api/k/${encodeURIComponent(token)}`, {
+      method: "POST",
+      body: JSON.stringify({
+        DavetliAd: v.davetliAd,
+        DavetliEmail: v.davetliEmail,
+        DavetliTelefon: v.davetliTelefon,
+        Mesaj: v.mesaj,
       }),
     }),
 };

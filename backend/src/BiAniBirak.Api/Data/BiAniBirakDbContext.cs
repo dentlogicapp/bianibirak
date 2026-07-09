@@ -21,6 +21,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<UyeDaveti> UyeDavetleri => Set<UyeDaveti>();
     public DbSet<PaylasimBaglantisi> PaylasimBaglantilari => Set<PaylasimBaglantisi>();
     public DbSet<EtkinlikAyari> EtkinlikAyarlari => Set<EtkinlikAyari>();
+    public DbSet<Katki> Katkilar => Set<Katki>();
+    public DbSet<KatkiMedyasi> KatkiMedyalari => Set<KatkiMedyasi>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -156,6 +158,58 @@ public class BiAniBirakDbContext : DbContext
             // bire-bir: her etkinlige tek ayar satiri
             e.HasIndex(x => x.EtkinlikId).IsUnique();
             // FK iliskisi (0C dersi: model seviyesinde)
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
+
+        // ---- katkilar (davetli dilekleri; birlesim-oncesi izolasyon) ----
+        model.Entity<Katki>(e =>
+        {
+            e.ToTable("katkilar");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.PaylasimBaglantiId).HasColumnName("PaylasimBaglantiId");
+            e.Property(x => x.KaynakEs).HasColumnName("KaynakEs").IsRequired();
+            e.Property(x => x.DavetliAd).HasColumnName("DavetliAd").IsRequired();
+            e.Property(x => x.DavetliEmail).HasColumnName("DavetliEmail").IsRequired();
+            e.Property(x => x.DavetliTelefon).HasColumnName("DavetliTelefon").IsRequired();
+            e.Property(x => x.Mesaj).HasColumnName("Mesaj").IsRequired();
+            e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.OnaylayanKullaniciId).HasColumnName("OnaylayanKullaniciId");
+            e.Property(x => x.OnayZamani).HasColumnName("OnayZamani");
+            e.Property(x => x.DuzeltmeNotu).HasColumnName("DuzeltmeNotu");
+            e.Property(x => x.DuzeltmeSablonId).HasColumnName("DuzeltmeSablonId");
+            e.Property(x => x.DuzeltmeTokeni).HasColumnName("DuzeltmeTokeni");
+            e.Property(x => x.DuzeltmeTalepZamani).HasColumnName("DuzeltmeTalepZamani");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            // tenant filtresi
+            e.HasIndex(x => x.EtkinlikId);
+            // izolasyon sorgusu: WHERE EtkinlikId=@e AND KaynakEs=@es AND Durum='beklemede'
+            e.HasIndex(x => new { x.EtkinlikId, x.KaynakEs, x.Durum });
+            // hangi linkten geldi
+            e.HasIndex(x => x.PaylasimBaglantiId);
+            // FK iliskileri (0C dersi: model seviyesinde)
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+            e.HasOne<PaylasimBaglantisi>().WithMany().HasForeignKey(x => x.PaylasimBaglantiId);
+        });
+
+        // ---- katki_medyalari (opsiyonel foto; sema hazir, storage Asama 6) ----
+        model.Entity<KatkiMedyasi>(e =>
+        {
+            e.ToTable("katki_medyalari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KatkiId).HasColumnName("KatkiId");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
+            e.Property(x => x.StorageKey).HasColumnName("StorageKey").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.KatkiId);
+            e.HasIndex(x => x.EtkinlikId);
+            // FK iliskileri
+            e.HasOne<Katki>().WithMany().HasForeignKey(x => x.KatkiId);
             e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
         });
     }

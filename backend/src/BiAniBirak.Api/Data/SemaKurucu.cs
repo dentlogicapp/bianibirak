@@ -93,6 +93,41 @@ public static class SemaKurucu
         );
         CREATE UNIQUE INDEX IF NOT EXISTS ux_etkinlik_ayarlari_etkinlik ON etkinlik_ayarlari ("EtkinlikId");
 
+        CREATE TABLE IF NOT EXISTS katkilar (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
+            "PaylasimBaglantiId" uuid NOT NULL REFERENCES paylasim_baglantilari ("Id"),
+            "KaynakEs" text NOT NULL,
+            "DavetliAd" text NOT NULL,
+            "DavetliEmail" text NOT NULL,
+            "DavetliTelefon" text NOT NULL,
+            "Mesaj" text NOT NULL,
+            "Tur" text NOT NULL,
+            "Durum" text NOT NULL,
+            "OnaylayanKullaniciId" uuid NULL,
+            "OnayZamani" timestamptz NULL,
+            "DuzeltmeNotu" text NULL,
+            "DuzeltmeSablonId" uuid NULL,
+            "DuzeltmeTokeni" text NULL,
+            "DuzeltmeTalepZamani" timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_katkilar_etkinlik ON katkilar ("EtkinlikId");
+        CREATE INDEX IF NOT EXISTS ix_katkilar_izolasyon ON katkilar ("EtkinlikId", "KaynakEs", "Durum");
+        CREATE INDEX IF NOT EXISTS ix_katkilar_baglanti ON katkilar ("PaylasimBaglantiId");
+
+        CREATE TABLE IF NOT EXISTS katki_medyalari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KatkiId" uuid NOT NULL REFERENCES katkilar ("Id"),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
+            "Tur" text NOT NULL,
+            "StorageKey" text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_katki_medyalari_katki ON katki_medyalari ("KatkiId");
+        CREATE INDEX IF NOT EXISTS ix_katki_medyalari_etkinlik ON katki_medyalari ("EtkinlikId");
+
         -- 0D.2 gecis: EtkinlikTarihi date -> timestamptz (idempotent; zaten timestamptz ise no-op).
         DO $$
         BEGIN

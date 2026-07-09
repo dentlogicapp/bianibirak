@@ -29,6 +29,7 @@ var jwtGun = int.TryParse(builder.Configuration["Jwt:GecerlilikGun"], out var g)
 
 // --- Servisler ---
 builder.Services.AddSingleton<SifreServisi>();
+builder.Services.AddSingleton<HizSiniri>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 
 // --- Kimlik dogrulama: JwtBearer (Authorization header VEYA host-scoped cerez) ---
@@ -86,6 +87,7 @@ app.UseAuthorization();
 
 app.KimlikUclariniEkle();
 app.EtkinlikUclariniEkle();
+app.KatkiUclariniEkle();
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

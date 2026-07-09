@@ -22,6 +22,13 @@ public record EtkinlikGuncelleIstek(
     string? Es2Ad,
     string? EtkinlikTarihi);
 
+// Davetli katki birakma (public; token URL'de). Ad+email+telefon+mesaj ZORUNLU (Belge 08).
+public record KatkiBirakIstek(
+    string DavetliAd,
+    string DavetliEmail,
+    string DavetliTelefon,
+    string Mesaj);
+
 // Etkinlik ayarlarini guncelle. Null alan = degistirme (kismi guncelleme).
 public record EtkinlikAyarGuncelleIstek(
     string? MarkaKapak,
