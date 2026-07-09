@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "./globals.css";
 import { MARKA } from "@/lib/marka";
 import { PWARegister } from "@/components/site/PWARegister";
+import { TEMA_INLINE_SCRIPT } from "@/lib/tema";
 
 export const metadata: Metadata = {
   title: {
@@ -39,6 +40,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
+      <head>
+        {/* Tema flash-onleme: CSS yuklenmeden html.dark ayarlanir */}
+        <script dangerouslySetInnerHTML={{ __html: TEMA_INLINE_SCRIPT }} />
+      </head>
       <body>
         {children}
         <PWARegister />

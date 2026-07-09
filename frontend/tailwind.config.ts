@@ -10,19 +10,21 @@ const config: Config = {
     "./components/**/*.{ts,tsx}",
     "./lib/**/*.{ts,tsx}",
   ],
+  darkMode: "class", // manuel toggle (UserMenu) - flash-onleme inline script ile
   theme: {
     extend: {
       colors: {
-        parsomen: "#F4EBDA", // zemin (parsomen/kagit)
-        yuzey: "#EFE7D5", // kart yuzeyi
-        yuzeyKoyu: "#E4D8BF", // ikincil yuzey
-        murekkep: "#211A17", // ana metin (sicak siyah)
-        ikincil: "#6C5F50", // ikincil metin
-        sarap: "#6E2438", // birincil aksan (koyu sarap)
-        sarapKoyu: "#571B2C", // hover/pressed
-        yaldiz: "#A8823C", // imza aksani (yaldiz/altin)
-        yaldizAcik: "#C4A25E", // yaldiz vurgu
-        ayrac: "#D8C7A9", // saclanmis ince cizgi
+        // CSS degiskenine bagli -> html.dark'ta deger degisir, class'lar aynen kalir.
+        parsomen: "var(--parsomen)", // zemin (parsomen/kagit)
+        yuzey: "var(--yuzey)", // kart yuzeyi
+        yuzeyKoyu: "var(--yuzey-koyu)", // ikincil yuzey
+        murekkep: "var(--murekkep)", // ana metin
+        ikincil: "var(--ikincil)", // ikincil metin
+        sarap: "var(--sarap)", // birincil aksan (koyu sarap)
+        sarapKoyu: "var(--sarap-koyu)", // hover/pressed
+        yaldiz: "var(--yaldiz)", // imza aksani (yaldiz/altin)
+        yaldizAcik: "var(--yaldiz-acik)", // yaldiz vurgu
+        ayrac: "var(--ayrac)", // saclanmis ince cizgi
       },
       fontFamily: {
         // self-host (fontsource) - Google'a runtime cagri YOK (KVKK dostu)

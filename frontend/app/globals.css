@@ -2,9 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ACIK TEMA (varsayilan) - parsomen/murekkep/sarap/yaldiz */
 :root {
-  --parsomen: #f4ebda;
-  --murekkep: #211a17;
+  --parsomen: #f4ebda; /* zemin */
+  --yuzey: #efe7d5; /* kart yuzeyi */
+  --yuzey-koyu: #e4d8bf; /* ikincil yuzey */
+  --murekkep: #211a17; /* ana metin */
+  --ikincil: #6c5f50; /* ikincil metin */
+  --sarap: #6e2438; /* birincil aksan */
+  --sarap-koyu: #571b2c; /* hover/pressed */
+  --yaldiz: #a8823c; /* imza aksani */
+  --yaldiz-acik: #c4a25e; /* yaldiz vurgu */
+  --ayrac: #d8c7a9; /* ince cizgi */
+}
+
+/* KOYU TEMA - warm-charcoal (miras/parsomen dilinin gece hali) */
+html.dark {
+  --parsomen: #14100c; /* zemin (sicak gece) */
+  --yuzey: #1e1813; /* kart yuzeyi */
+  --yuzey-koyu: #271f18; /* ikincil yuzey */
+  --murekkep: #ede2cf; /* ana metin (parsomen tersi) */
+  --ikincil: #b3a58e; /* ikincil metin */
+  --sarap: #a85a6b; /* aksan (koyuda okunur sarap) */
+  --sarap-koyu: #8a3b4c; /* hover/pressed */
+  --yaldiz: #c4a25e; /* imza aksani (koyuda parlak) */
+  --yaldiz-acik: #d8bd7f; /* yaldiz vurgu */
+  --ayrac: #3a2f24; /* ince cizgi (koyu) */
 }
 
 @layer base {
@@ -14,14 +37,15 @@
   body {
     @apply bg-parsomen text-murekkep font-govde antialiased;
     font-feature-settings: "kern", "liga";
+    transition: background-color 220ms ease, color 220ms ease;
   }
   ::selection {
-    background: #6e2438;
-    color: #f4ebda;
+    background: var(--sarap);
+    color: var(--parsomen);
   }
   /* Erisilebilirlik: gorunur klavye odagi */
   :focus-visible {
-    outline: 2px solid #6e2438;
+    outline: 2px solid var(--sarap);
     outline-offset: 3px;
     border-radius: 2px;
   }

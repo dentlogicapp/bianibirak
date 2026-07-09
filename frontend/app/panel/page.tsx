@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
+import { UserMenu } from "@/components/site/UserMenu";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
 // Zero-friction: cift yalniz isim + tarih girer; gerisi varsayilan (backend Sabitler).
@@ -28,11 +29,6 @@ export default function PanelSayfasi() {
     })();
   }, [router]);
 
-  async function cikis() {
-    await api.cikis();
-    router.push("/giris");
-  }
-
   function etkinlikEklendi(e: Etkinlik) {
     setEtkinlikler((onceki) => [e, ...onceki]);
   }
@@ -55,12 +51,7 @@ export default function PanelSayfasi() {
         <Link href="/" aria-label="Ana sayfa">
           <MarkaKilidi varyant="wordmark" boyut="kucuk" />
         </Link>
-        <button
-          onClick={cikis}
-          className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:text-sarap"
-        >
-          Çıkış yap
-        </button>
+        <UserMenu />
       </div>
 
       <div className="mt-10 rounded-3xl border border-ayrac bg-yuzey p-8">

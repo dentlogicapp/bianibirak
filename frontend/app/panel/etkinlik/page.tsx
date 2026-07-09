@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
+import { UserMenu } from "@/components/site/UserMenu";
 
 type Link2 = { es: string; token: string; aktif: boolean };
 
@@ -62,12 +63,15 @@ export default function AktifEtkinlikSayfasi() {
         <Link href="/" aria-label="Ana sayfa">
           <MarkaKilidi varyant="wordmark" boyut="kucuk" />
         </Link>
-        <button
-          onClick={() => router.push("/panel")}
-          className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:text-sarap"
-        >
-          Panel
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/panel")}
+            className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:text-sarap"
+          >
+            Panel
+          </button>
+          <UserMenu />
+        </div>
       </div>
 
       {/* Ozet */}
