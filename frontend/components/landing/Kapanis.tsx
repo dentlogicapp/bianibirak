@@ -5,14 +5,16 @@ export function Kapanis() {
     <section className="mx-auto max-w-icerik px-6 py-16">
       <div className="rounded-3xl border border-ayrac bg-yuzey px-8 py-16 text-center sm:px-16">
         <h2 className="mx-auto max-w-2xl font-display text-2xl leading-snug text-murekkep sm:text-3xl">
-          Önce kalitesini gör, sonra karar ver.
+          Kusursuzluğu Deneyimleyin
         </h2>
-        <p className="mx-auto mt-4 max-w-lg font-govde text-sm leading-relaxed text-ikincil">
-          Örnek defter salt-okunur bir önizlemedir. Hesap açmadan gezebilirsin.
+        <p className="mx-auto mt-4 max-w-xl font-govde text-base leading-relaxed text-ikincil">
+          Kararınızı vermeden önce sunduğumuz zarafeti yakından inceleyin. Hiçbir üyelik adımıyla
+          vakit kaybetmeden, sizin için hazırladığımız örnek anı defterinin sayfaları arasında
+          dolaşabilir ve arayüzümüzü hemen şimdi keşfedebilirsiniz.
         </p>
         <div className="mt-8">
           <Buton href="/demo" ton="birincil">
-            Örnek defteri aç
+            Örnek Anı Defterini Aç
           </Buton>
         </div>
       </div>

@@ -3,21 +3,19 @@ import Link from "next/link";
 import { Ustbar } from "@/components/site/Ustbar";
 import { Altbilgi } from "@/components/site/Altbilgi";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
-import { Buton } from "@/components/ui/Buton";
 
 export const metadata: Metadata = {
-  title: "Örnek defter",
-  description: "Salt-okunur örnek hatıra defteri önizlemesi.",
+  title: "Örnek Anı Defteri",
+  description: "Salt-okunur örnek anı defteri önizlemesi.",
 };
 
 // 0A: STATIK, salt-okunur "ornek defter kalitesi" yer tutucu.
-// Tam interaktif demo Asama 8'de. Filigran + net "Satin al" siniri.
 const ornekDilekler = [
   {
     ad: "Ayşe Yıldız",
     taraf: "Gelinin tarafı",
     mesaj:
-      "İlk tanıştığınız günü hatırlıyorum. O günden beri yüzündeki gülümseme hiç eksilmedi. Bir ömür böyle kalın.",
+      "İlk tanıştığınız günü hatırlıyorum. O günden beri yüzünüzdeki gülümseme hiç eksilmedi. Bir ömür böyle kalın.",
   },
   {
     ad: "Mehmet Demir",
@@ -38,16 +36,16 @@ export default function DemoSayfasi() {
     <>
       <Ustbar />
       <main className="mx-auto max-w-icerik px-6 py-16">
-        <div className="text-center">
+        <div className="mx-auto max-w-2xl text-center">
           <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-            Salt-okunur önizleme
+            Örnek Anı Defterini Keşfedin
           </p>
-          <h1 className="mt-4 font-display text-3xl text-murekkep sm:text-4xl">
-            Örnek hatıra defteri
-          </h1>
-          <p className="mx-auto mt-4 max-w-lg font-govde text-sm leading-relaxed text-ikincil">
-            Çıktının kalitesini buradan görebilirsin. Bu bir örnektir; gerçek
-            link, toplama ve indirme satın almayla açılır.
+          <p className="mt-5 font-govde text-base leading-relaxed text-ikincil">
+            Kalitemizi hiçbir soru işareti kalmadan, şeffafça inceleyin. Bu önizleme, anılarınızın
+            nasıl ölümsüzleşeceğinin birebir yansımasıdır. Kendi hikayenizi başlatmak; benzersiz
+            bağlantı linkinizi/QR kodunuzu üretmek ve tüm toplama/indirme özelliklerine tam erişim
+            sağlamak için kendi paketinizi aktifleştirerek bu ayrıcalıklı deneyime hemen adım
+            atabilirsiniz.
           </p>
         </div>
 
@@ -55,17 +53,13 @@ export default function DemoSayfasi() {
         <div className="relative mx-auto mt-14 max-w-2xl">
           <div className="rounded-t-3xl border border-b-0 border-ayrac bg-yuzey px-8 py-14 text-center">
             <MarkaKilidi varyant="tam" boyut="orta" />
-            <p className="mt-8 font-display text-xl italic text-sarap">
-              Elif & Kaan
-            </p>
+            <p className="mt-8 font-display text-xl italic text-sarap">Elif &amp; Kaan</p>
             <p className="mt-1 font-govde text-xs uppercase tracking-etiket text-ikincil">
               12 Eylül 2026
             </p>
           </div>
 
-          {/* Ornek dilek sayfalari - filigranli */}
           <div className="relative overflow-hidden rounded-b-3xl border border-ayrac bg-parsomen">
-            {/* Filigran */}
             <div
               className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
               aria-hidden="true"
@@ -74,12 +68,11 @@ export default function DemoSayfasi() {
                 ÖRNEK ÖNİZLEME
               </span>
             </div>
-
             <ul className="divide-y divide-ayrac/70">
               {ornekDilekler.map((d) => (
                 <li key={d.ad} className="px-8 py-8">
                   <p className="font-display text-lg leading-relaxed text-murekkep">
-                    “{d.mesaj}”
+                    &ldquo;{d.mesaj}&rdquo;
                   </p>
                   <p className="mt-4 font-govde text-sm text-murekkep">
                     {d.ad}
@@ -93,19 +86,20 @@ export default function DemoSayfasi() {
           </div>
         </div>
 
-        {/* Paywall siniri - belirgin ama baskici degil */}
+        {/* Paywall - premium CTA */}
         <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-ayrac bg-yuzey px-8 py-10 text-center">
-          <p className="font-display text-xl text-murekkep">
-            Kendi defterini oluşturmaya hazır mısın?
+          <p className="font-display text-2xl text-murekkep">
+            Kendi Hikayenizi Ölümsüzleştirmeye Hazır mısınız?
           </p>
-          <p className="mx-auto mt-3 max-w-md font-govde text-sm leading-relaxed text-ikincil">
-            Gerçek link ve QR üretimi, davetliden dilek toplama, indirme ve baskı
-            satın almayla açılır.
+          <p className="mx-auto mt-4 max-w-xl font-govde text-sm leading-relaxed text-ikincil">
+            Size özel benzersiz bağlantı linkinizi/QR kodunuzu oluşturmak, davetlilerinizin değerli
+            mesajlarını toplamaya başlamak ve bu eşsiz anıları ister dijitalde ister kusursuz bir
+            fiziksel baskıyla taçlandırmak için son bir adım kaldı. Tüm bu ayrıcalıklara premium
+            deneyimle ulaşabilirsiniz.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
-            {/* 0A: satin alma akisi henuz yok - yer tutucu, Asama 7-8 */}
             <span className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-sarap/40 px-7 py-3 font-govde text-sm font-medium text-parsomen">
-              Satın al (yakında)
+              Paketi aktifleştir (yakında)
             </span>
             <Link
               href="/"

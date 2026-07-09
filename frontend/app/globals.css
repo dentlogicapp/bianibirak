@@ -52,3 +52,75 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ====================== MARKA ANIMASYONLARI ====================== */
+/* Wordmark "Ani" - guclu zipla + scale + bukelemun renk (path fill) */
+.marka-ani {
+  fill: #6e2438;
+  transform-box: fill-box;
+  transform-origin: 50% 78%;
+  animation: markaAniRenk 5.5s linear infinite, markaAniZipla 1.5s ease-in-out infinite;
+  will-change: transform;
+}
+.marka-ani path { fill: inherit; }
+@keyframes markaAniRenk {
+  0% { fill: #6e2438; }
+  18% { fill: #b0574e; }
+  36% { fill: #c4a25e; }
+  52% { fill: #a8823c; }
+  70% { fill: #8a3b4c; }
+  86% { fill: #b0574e; }
+  100% { fill: #6e2438; }
+}
+@keyframes markaAniZipla {
+  0% { transform: translateY(0) scale(1) rotate(0); }
+  14% { transform: translateY(-16px) scale(1.26) rotate(-6deg); }
+  28% { transform: translateY(0) scale(1) rotate(0); }
+  42% { transform: translateY(-11px) scale(1.16) rotate(6deg); }
+  56% { transform: translateY(0) scale(1) rotate(0); }
+  70% { transform: translateY(-5px) scale(1.07) rotate(-2deg); }
+  84% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Dilek akisi - kalem soldan saga yazar (reveal + pen) */
+.dilek-sar { position: relative; display: inline-block; }
+.dilek-wrap { overflow: hidden; }
+.dilek-wm { display: block; overflow: visible; }
+.dilek-wm path { fill: #a8823c; }
+.dilek-sar.yaz .dilek-wrap { animation: dilekYaz var(--sure) cubic-bezier(0.6, 0.03, 0.28, 1) forwards; }
+.dilek-sar.yaz .dilek-kalem { animation: dilekKalem var(--sure) cubic-bezier(0.6, 0.03, 0.28, 1) forwards; }
+@keyframes dilekYaz { 0% { width: 0; } 58% { width: var(--tw); } 100% { width: var(--tw); } }
+@keyframes dilekKalem {
+  0% { left: 0; opacity: 0; }
+  5% { opacity: 1; }
+  58% { left: var(--tw); opacity: 1; }
+  66% { opacity: 0; }
+  100% { left: var(--tw); opacity: 0; }
+}
+.dilek-kalem { position: absolute; bottom: -2px; left: 0; width: 32px; height: 46px; transform: translate(-4px, 10%); pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marka-ani { animation: none; fill: #8a3b4c; }
+  .dilek-sar.yaz .dilek-wrap { animation: none; }
+  .dilek-wrap { overflow: visible; }
+  .dilek-kalem { display: none; }
+}
+
+/* Birlesim denklemi - yatay merge akisi */
+@keyframes birlesimNabiz { 0%, 100% { opacity: 0.45; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes birlesimDefter { 0%, 62%, 100% { transform: scale(1); } 78% { transform: scale(1.09); } }
+@keyframes birlesimAkis { 0% { background-position: -60% 0; } 100% { background-position: 160% 0; } }
+.birlesim-artı { animation: birlesimNabiz 2.4s ease-in-out infinite; }
+.birlesim-esit { animation: birlesimNabiz 2.4s ease-in-out infinite 0.6s; }
+.birlesim-defter { animation: birlesimDefter 2.4s ease-in-out infinite; transform-origin: center; }
+.birlesim-hat {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c4a25e, transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: birlesimAkis 2.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .birlesim-artı, .birlesim-esit, .birlesim-defter, .birlesim-hat { animation: none; }
+}

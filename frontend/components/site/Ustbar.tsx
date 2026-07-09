@@ -11,7 +11,7 @@ export function Ustbar() {
         </Link>
         <nav className="flex items-center gap-6 font-govde text-sm text-ikincil">
           <Link href="/demo" className="transition-colors hover:text-sarap">
-            Demo
+            Örnek Anı Defterini Aç
           </Link>
         </nav>
       </div>

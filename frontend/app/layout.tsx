@@ -15,7 +15,14 @@ export const metadata: Metadata = {
     "Toplayıcı değil, kürasyon stüdyosu.",
   manifest: "/manifest.webmanifest",
   applicationName: MARKA.yasalAd,
-  icons: { icon: "/icon.svg" },
+  appleWebApp: { capable: true, title: MARKA.yasalAd, statusBarStyle: "default" },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

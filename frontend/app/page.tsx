@@ -2,7 +2,7 @@ import { Ustbar } from "@/components/site/Ustbar";
 import { Altbilgi } from "@/components/site/Altbilgi";
 import { Hero } from "@/components/landing/Hero";
 import { Imza } from "@/components/landing/Imza";
-import { DegerOnermesi } from "@/components/landing/DegerOnermesi";
+import { Birlesim } from "@/components/landing/Birlesim";
 import { Kapanis } from "@/components/landing/Kapanis";
 
 export default function AnaSayfa() {
@@ -12,7 +12,7 @@ export default function AnaSayfa() {
       <main>
         <Hero />
         <Imza />
-        <DegerOnermesi />
+        <Birlesim />
         <Kapanis />
       </main>
       <Altbilgi />
