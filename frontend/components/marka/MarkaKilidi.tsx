@@ -8,7 +8,11 @@ import { Wordmark } from "@/components/marka/Wordmark";
 //  ikon     : monogram Bi/Ani (dar alan)
 type Varyant = "tam" | "wordmark" | "ikon";
 
-const wmYukseklik = { kucuk: 28, orta: 44, buyuk: 78 } as const;
+const wmYukseklik = {
+  kucuk: "clamp(20px, 6vw, 28px)",
+  orta: "clamp(30px, 8vw, 44px)",
+  buyuk: "clamp(40px, 12vw, 88px)",
+} as const;
 const taglineBoyut = { kucuk: "text-[0.7rem]", orta: "text-xs", buyuk: "text-sm" } as const;
 const ikonKutu = { kucuk: "h-9 w-9 rounded-lg", orta: "h-12 w-12 rounded-xl", buyuk: "h-16 w-16 rounded-2xl" } as const;
 

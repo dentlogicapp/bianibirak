@@ -124,3 +124,30 @@
 @media (prefers-reduced-motion: reduce) {
   .birlesim-artı, .birlesim-esit, .birlesim-defter, .birlesim-hat { animation: none; }
 }
+
+/* Scroll-giris animasyonu (premium bolum/madde gecisleri) */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.85s cubic-bezier(0.16, 0.8, 0.3, 1),
+    transform 0.85s cubic-bezier(0.16, 0.8, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal.gorundu {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Iki yana yasli metin - Turkce heceleme ile bosluk nehirleri azalir */
+.metin-yasli {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
