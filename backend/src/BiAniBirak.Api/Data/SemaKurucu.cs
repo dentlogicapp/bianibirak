@@ -67,6 +67,31 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_uye_davetleri_etkinlik ON uye_davetleri ("EtkinlikId");
         CREATE UNIQUE INDEX IF NOT EXISTS ux_uye_davetleri_token ON uye_davetleri ("Token");
+
+        CREATE TABLE IF NOT EXISTS paylasim_baglantilari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
+            "Es" text NOT NULL,
+            "Token" text NOT NULL,
+            "Aktif" boolean NOT NULL DEFAULT true,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_paylasim_baglantilari_etkinlik ON paylasim_baglantilari ("EtkinlikId");
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_token ON paylasim_baglantilari ("Token");
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_etkinlik_es ON paylasim_baglantilari ("EtkinlikId", "Es");
+
+        CREATE TABLE IF NOT EXISTS etkinlik_ayarlari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
+            "MarkaKapak" text NULL,
+            "Tema" text NULL,
+            "KarsilamaMetni" text NULL,
+            "PromptMetni" text NULL,
+            "KapanisPencereGun" integer NOT NULL DEFAULT 30,
+            "Ayarlar" jsonb NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_etkinlik_ayarlari_etkinlik ON etkinlik_ayarlari ("EtkinlikId");
         """;
 
     public static void Uygula(BiAniBirakDbContext db)

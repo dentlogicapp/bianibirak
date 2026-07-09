@@ -24,6 +24,9 @@ public static class EtkinlikUclari
         app.MapGet("/api/etkinliklerim", Etkinliklerim).RequireAuthorization();
         app.MapPost("/api/etkinlik/{id}/aktif-yap", AktifYap).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif", AktifEtkinlik).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/linkler", AktifLinkler).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/ayarlar", AktifAyarlar).RequireAuthorization();
+        app.MapPut("/api/etkinlik/aktif/ayarlar", AktifAyarlarGuncelle).RequireAuthorization();
     }
 
     private static IResult Hata(int durum, string kod, string mesaj)
@@ -132,8 +135,40 @@ public static class EtkinlikUclari
             CreatedAt = simdi,
         };
 
+        // cift-link: her ese ayri tahmin edilemez token (Belge 03 Akis 2 / Belge 08)
+        var linkEs1 = new PaylasimBaglantisi
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlik.Id,
+            Es = "es1",
+            Token = TokenUreteci.Uret(),
+            Aktif = true,
+            CreatedAt = simdi,
+        };
+        var linkEs2 = new PaylasimBaglantisi
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlik.Id,
+            Es = "es2",
+            Token = TokenUreteci.Uret(),
+            Aktif = true,
+            CreatedAt = simdi,
+        };
+
+        // etkinlik ayari (hardcoded yasak altyapisi; kapanis penceresi burada tutulur)
+        var ayar = new EtkinlikAyari
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlik.Id,
+            KapanisPencereGun = VarsayilanKapanisPencereGun,
+            UpdatedAt = simdi,
+        };
+
         db.Etkinlikler.Add(etkinlik);
         db.EtkinlikUyelikleri.Add(uyelik);
+        db.PaylasimBaglantilari.Add(linkEs1);
+        db.PaylasimBaglantilari.Add(linkEs2);
+        db.EtkinlikAyarlari.Add(ayar);
         db.DenetimGunlukleri.Add(new DenetimGunlugu
         {
             Id = Guid.NewGuid(),
@@ -145,7 +180,7 @@ public static class EtkinlikUclari
             DegisenAlanlar = JsonSerializer.Serialize(new { tur, es1, es2 }),
             CreatedAt = simdi,
         });
-        await db.SaveChangesAsync(); // tek SaveChanges = atomik transaction (etkinlik+uyelik+audit)
+        await db.SaveChangesAsync(); // tek SaveChanges = atomik (etkinlik+uyelik+2 link+ayar+audit)
 
         return Results.Json(EtkinlikYaniti(etkinlik, "es1"));
     }
@@ -211,4 +246,105 @@ public static class EtkinlikUclari
 
         return Results.Json(EtkinlikYaniti(etkinlik, rol));
     }
+
+    // Aktif etkinligin cift-linkleri (es1/es2 token + public URL).
+    private static async Task<IResult> AktifLinkler(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var linkler = await db.PaylasimBaglantilari.AsNoTracking()
+            .Where(p => p.EtkinlikId == etkinlikId)
+            .OrderBy(p => p.Es)
+            .ToListAsync();
+
+        return Results.Json(linkler.Select(p => new
+        {
+            es = p.Es,
+            token = p.Token,
+            aktif = p.Aktif,
+        }));
+    }
+
+    // Aktif etkinligin ayarlari (hardcoded yasak; tenant ayarindan okunur).
+    private static async Task<IResult> AktifAyarlar(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var ayar = await db.EtkinlikAyarlari.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlikId);
+        if (ayar == null)
+            return Hata(404, "AYAR_BULUNAMADI", "Etkinlik ayari bulunamadi.");
+
+        return Results.Json(AyarYaniti(ayar));
+    }
+
+    // Aktif etkinligin ayarlarini guncelle (karsilama/tema/kapanis penceresi).
+    private static async Task<IResult> AktifAyarlarGuncelle(
+        EtkinlikAyarGuncelleIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var ayar = await db.EtkinlikAyarlari
+            .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlikId);
+        if (ayar == null)
+            return Hata(404, "AYAR_BULUNAMADI", "Etkinlik ayari bulunamadi.");
+
+        // Yalniz gonderilen alanlar guncellenir (null = degistirme).
+        if (istek.MarkaKapak != null) ayar.MarkaKapak = istek.MarkaKapak.Trim();
+        if (istek.Tema != null) ayar.Tema = istek.Tema.Trim();
+        if (istek.KarsilamaMetni != null) ayar.KarsilamaMetni = istek.KarsilamaMetni.Trim();
+        if (istek.PromptMetni != null) ayar.PromptMetni = istek.PromptMetni.Trim();
+        if (istek.KapanisPencereGun.HasValue)
+        {
+            var gun = istek.KapanisPencereGun.Value;
+            if (gun < 1 || gun > 365)
+                return Hata(400, "DOGRULAMA_HATASI", "Kapanis penceresi 1-365 gun araliginda olmalidir.");
+            ayar.KapanisPencereGun = gun;
+        }
+        ayar.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kullaniciId,
+            Eylem = "AYAR_GUNCELLENDI",
+            Varlik = "etkinlik_ayarlari",
+            VarlikId = ayar.Id,
+            DegisenAlanlar = JsonSerializer.Serialize(new
+            {
+                istek.MarkaKapak,
+                istek.Tema,
+                istek.KarsilamaMetni,
+                istek.PromptMetni,
+                istek.KapanisPencereGun,
+            }),
+            CreatedAt = ayar.UpdatedAt,
+        });
+        await db.SaveChangesAsync(); // atomik: ayar + audit
+
+        return Results.Json(AyarYaniti(ayar));
+    }
+
+    private static object AyarYaniti(EtkinlikAyari a)
+        => new
+        {
+            marka_kapak = a.MarkaKapak,
+            tema = a.Tema,
+            karsilama_metni = a.KarsilamaMetni,
+            prompt_metni = a.PromptMetni,
+            kapanis_pencere_gun = a.KapanisPencereGun,
+        };
 }

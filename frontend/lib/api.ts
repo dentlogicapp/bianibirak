@@ -46,6 +46,15 @@ export type Etkinlik = {
   rol: string | null;
 };
 
+// Backend AyarYaniti ile birebir.
+export type EtkinlikAyar = {
+  marka_kapak: string | null;
+  tema: string | null;
+  karsilama_metni: string | null;
+  prompt_metni: string | null;
+  kapanis_pencere_gun: number;
+};
+
 export const api = {
   kayit: (v: { ad: string; email: string; sifre: string }) =>
     istek<Kullanici>("/api/kayit", {
@@ -87,4 +96,28 @@ export const api = {
       { method: "POST" }
     ),
   etkinlikAktif: () => istek<Etkinlik>("/api/etkinlik/aktif"),
+
+  // --- Paylasim linkleri + ayarlar (Asama 2) ---
+  etkinlikLinkler: () =>
+    istek<{ es: string; token: string; aktif: boolean }[]>(
+      "/api/etkinlik/aktif/linkler"
+    ),
+  etkinlikAyarlar: () => istek<EtkinlikAyar>("/api/etkinlik/aktif/ayarlar"),
+  etkinlikAyarGuncelle: (v: Partial<{
+    markaKapak: string;
+    tema: string;
+    karsilamaMetni: string;
+    promptMetni: string;
+    kapanisPencereGun: number;
+  }>) =>
+    istek<EtkinlikAyar>("/api/etkinlik/aktif/ayarlar", {
+      method: "PUT",
+      body: JSON.stringify({
+        MarkaKapak: v.markaKapak ?? null,
+        Tema: v.tema ?? null,
+        KarsilamaMetni: v.karsilamaMetni ?? null,
+        PromptMetni: v.promptMetni ?? null,
+        KapanisPencereGun: v.kapanisPencereGun ?? null,
+      }),
+    }),
 };

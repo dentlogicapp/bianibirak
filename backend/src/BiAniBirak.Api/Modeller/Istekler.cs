@@ -14,3 +14,11 @@ public record EtkinlikOlusturIstek(
     string EtkinlikTarihi,
     string? AcilisTarihi,
     string? KapanisTarihi);
+
+// Etkinlik ayarlarini guncelle. Null alan = degistirme (kismi guncelleme).
+public record EtkinlikAyarGuncelleIstek(
+    string? MarkaKapak,
+    string? Tema,
+    string? KarsilamaMetni,
+    string? PromptMetni,
+    int? KapanisPencereGun);

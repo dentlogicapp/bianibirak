@@ -19,6 +19,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Etkinlik> Etkinlikler => Set<Etkinlik>();
     public DbSet<EtkinlikUyeligi> EtkinlikUyelikleri => Set<EtkinlikUyeligi>();
     public DbSet<UyeDaveti> UyeDavetleri => Set<UyeDaveti>();
+    public DbSet<PaylasimBaglantisi> PaylasimBaglantilari => Set<PaylasimBaglantisi>();
+    public DbSet<EtkinlikAyari> EtkinlikAyarlari => Set<EtkinlikAyari>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -113,6 +115,47 @@ public class BiAniBirakDbContext : DbContext
             // token ile tekil arama + benzersizlik (Belge 08)
             e.HasIndex(x => x.Token).IsUnique();
             // FK iliskisi (model seviyesinde) -> EF insert sirasini dogru belirler
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
+
+        // ---- paylasim_baglantilari (cift-link: her ese ayri token) ----
+        model.Entity<PaylasimBaglantisi>(e =>
+        {
+            e.ToTable("paylasim_baglantilari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Es).HasColumnName("Es").IsRequired();
+            e.Property(x => x.Token).HasColumnName("Token").IsRequired();
+            e.Property(x => x.Aktif).HasColumnName("Aktif");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            // tenant filtresi icin index
+            e.HasIndex(x => x.EtkinlikId);
+            // token ile public sayfa cozumleme + benzersizlik (Belge 08)
+            e.HasIndex(x => x.Token).IsUnique();
+            // kural: etkinlik basina her es tek link
+            e.HasIndex(x => new { x.EtkinlikId, x.Es }).IsUnique();
+            // FK iliskisi (0C dersi: model seviyesinde)
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
+
+        // ---- etkinlik_ayarlari (hardcoded yasak; bire-bir etkinlik) ----
+        model.Entity<EtkinlikAyari>(e =>
+        {
+            e.ToTable("etkinlik_ayarlari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.MarkaKapak).HasColumnName("MarkaKapak");
+            e.Property(x => x.Tema).HasColumnName("Tema");
+            e.Property(x => x.KarsilamaMetni).HasColumnName("KarsilamaMetni");
+            e.Property(x => x.PromptMetni).HasColumnName("PromptMetni");
+            e.Property(x => x.KapanisPencereGun).HasColumnName("KapanisPencereGun");
+            e.Property(x => x.Ayarlar).HasColumnName("Ayarlar").HasColumnType("jsonb");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            // bire-bir: her etkinlige tek ayar satiri
+            e.HasIndex(x => x.EtkinlikId).IsUnique();
+            // FK iliskisi (0C dersi: model seviyesinde)
             e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
         });
     }
