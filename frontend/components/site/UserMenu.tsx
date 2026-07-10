@@ -80,14 +80,6 @@ export function UserMenu() {
           </div>
 
           <nav className="p-1.5">
-            <Link
-              href="/panel"
-              onClick={() => setAcik(false)}
-              className="block rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
-            >
-              Panelim
-            </Link>
-
             <button
               onClick={temaTersle}
               className="flex w-full items-center justify-between rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"

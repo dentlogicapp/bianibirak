@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
-import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
-import { UserMenu } from "@/components/site/UserMenu";
+import { AppShell } from "@/components/site/AppShell";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
 // Zero-friction: cift yalniz isim + tarih girer; gerisi varsayilan (backend Sabitler).
@@ -39,22 +37,17 @@ export default function PanelSayfasi() {
 
   if (durum !== "hazir" || !kullanici) {
     return (
-      <main className="flex min-h-screen items-center justify-center font-govde text-sm text-ikincil">
-        Yükleniyor...
-      </main>
+      <AppShell>
+        <div className="flex min-h-[50vh] items-center justify-center font-govde text-sm text-ikincil">
+          Yükleniyor...
+        </div>
+      </AppShell>
     );
   }
 
   return (
-    <main className="mx-auto max-w-icerik px-6 py-16">
-      <div className="flex items-center justify-between">
-        <Link href="/" aria-label="Ana sayfa">
-          <MarkaKilidi varyant="wordmark" boyut="kucuk" />
-        </Link>
-        <UserMenu />
-      </div>
-
-      <div className="mt-10 rounded-3xl border border-ayrac bg-yuzey p-8">
+    <AppShell>
+      <div className="rounded-3xl border border-ayrac bg-yuzey p-8">
         <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Panel</p>
         <h1 className="mt-3 font-display text-2xl text-murekkep">
           Merhaba {kullanici.ad}
@@ -73,7 +66,7 @@ export default function PanelSayfasi() {
       )}
 
       {etkinlikler.length > 0 && <YeniEtkinlikBolumu onEklendi={etkinlikEklendi} />}
-    </main>
+    </AppShell>
   );
 }
 

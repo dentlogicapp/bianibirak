@@ -23,10 +23,10 @@ html.dark {
   --yuzey-koyu: #271f18; /* ikincil yuzey */
   --murekkep: #ede2cf; /* ana metin (parsomen tersi) */
   --ikincil: #b3a58e; /* ikincil metin */
-  --sarap: #a85a6b; /* aksan (koyuda okunur sarap) */
-  --sarap-koyu: #8a3b4c; /* hover/pressed */
-  --yaldiz: #c4a25e; /* imza aksani (koyuda parlak) */
-  --yaldiz-acik: #d8bd7f; /* yaldiz vurgu */
+  --sarap: #c17a4a; /* aksan (koyuda: sicak amber-terracotta, pembe DEGIL) */
+  --sarap-koyu: #a5623a; /* hover/pressed */
+  --yaldiz: #d4af6a; /* imza aksani (koyuda parlak yaldiz) */
+  --yaldiz-acik: #e6c988; /* yaldiz vurgu */
   --ayrac: #3a2f24; /* ince cizgi (koyu) */
 }
 

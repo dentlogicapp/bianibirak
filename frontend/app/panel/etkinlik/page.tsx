@@ -2,23 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import QRCode from "qrcode";
 import { api, type Etkinlik, type EtkinlikAyar, type Katki } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
-import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
-import { UserMenu } from "@/components/site/UserMenu";
+import { AppShell } from "@/components/site/AppShell";
 import { BildirimAyari } from "@/components/site/BildirimAyari";
 
 type Link2 = { es: string; token: string; aktif: boolean };
 
 // 0D aktif etkinlik ekrani: ozet + zaman cizelgesi + cift-link/QR + ayarlar.
+type SekmeAd = "defter" | "paylasim" | "ayarlar";
+
 export default function AktifEtkinlikSayfasi() {
   const router = useRouter();
   const [etkinlik, setEtkinlik] = useState<Etkinlik | null>(null);
   const [linkler, setLinkler] = useState<Link2[]>([]);
   const [ayar, setAyar] = useState<EtkinlikAyar | null>(null);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
+  const [sekme, setSekme] = useState<SekmeAd>("defter");
 
   useEffect(() => {
     (async () => {
@@ -38,49 +39,44 @@ export default function AktifEtkinlikSayfasi() {
 
   if (durum === "yukleniyor") {
     return (
-      <main className="flex min-h-screen items-center justify-center font-govde text-sm text-ikincil">
-        Yükleniyor...
-      </main>
+      <AppShell>
+        <div className="flex min-h-[50vh] items-center justify-center font-govde text-sm text-ikincil">
+          Yükleniyor...
+        </div>
+      </AppShell>
     );
   }
 
   if (durum === "yok" || !etkinlik) {
     return (
-      <main className="mx-auto max-w-icerik px-6 py-16 text-center">
-        <p className="font-govde text-sm text-ikincil">Aktif bir etkinlik seçili değil.</p>
-        <button
-          onClick={() => router.push("/panel")}
-          className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
-        >
-          Panele dön
-        </button>
-      </main>
+      <AppShell>
+        <div className="rounded-3xl border border-ayrac bg-yuzey p-10 text-center">
+          <p className="font-govde text-sm text-ikincil">Aktif bir etkinlik seçili değil.</p>
+          <button
+            onClick={() => router.push("/panel")}
+            className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+          >
+            Etkinliklerime git
+          </button>
+        </div>
+      </AppShell>
     );
   }
 
-  return (
-    <main className="mx-auto max-w-icerik px-6 py-16">
-      <div className="flex items-center justify-between">
-        <Link href="/" aria-label="Ana sayfa">
-          <MarkaKilidi varyant="wordmark" boyut="kucuk" />
-        </Link>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/panel")}
-            className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:text-sarap"
-          >
-            Panel
-          </button>
-          <UserMenu />
-        </div>
-      </div>
+  const sekmeler: { ad: SekmeAd; etiket: string }[] = [
+    { ad: "defter", etiket: "Defter" },
+    { ad: "paylasim", etiket: "Paylaşım" },
+    { ad: "ayarlar", etiket: "Ayarlar" },
+  ];
 
-      {/* Ozet */}
-      <div className="mt-10 rounded-3xl border border-ayrac bg-yuzey p-8">
+  return (
+    <AppShell>
+      {/* Ozet basligi */}
+      <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
         <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
           {turEtiketi(etkinlik.tur)} · {durumEtiketi(etkinlik.durum)}
         </p>
-        <h1 className="mt-3 font-display text-3xl text-murekkep">
+        <h1 className="mt-3 font-display text-2xl text-murekkep sm:text-3xl">
           {etkinlik.es1_ad} &amp; {etkinlik.es2_ad}
         </h1>
         <p className="mt-2 font-govde text-sm text-ikincil">
@@ -88,38 +84,63 @@ export default function AktifEtkinlikSayfasi() {
         </p>
       </div>
 
-      {/* Zaman cizelgesi projeksiyonu (#8 UX; fiyat Asama 7) */}
-      <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
+      {/* Sekme cubugu (progressive disclosure - Belge 07) */}
+      <div className="mt-6 flex gap-1 rounded-full border border-ayrac bg-yuzey p-1">
+        {sekmeler.map((s) => (
+          <button
+            key={s.ad}
+            onClick={() => setSekme(s.ad)}
+            className={`flex-1 rounded-full px-4 py-2.5 font-govde text-sm transition-colors ${
+              sekme === s.ad
+                ? "bg-sarap text-parsomen"
+                : "text-ikincil hover:text-murekkep"
+            }`}
+          >
+            {s.etiket}
+          </button>
+        ))}
+      </div>
 
-      {/* Cift-link + QR */}
-      <section className="mt-8">
-        <h2 className="font-display text-lg text-murekkep">Davet bağlantıları</h2>
-        <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Her eşin ayrı bağlantısı ve QR kodu var. Davetliler bu bağlantıdan dilek
-          bırakır; hangi bağlantıdan geldiği o eşin onay kuyruğuna düşer.
-        </p>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
-          {linkler.map((l) => (
-            <LinkKarti
-              key={l.es}
-              es={l.es}
-              token={l.token}
-              esAdi={l.es === "es1" ? etkinlik.es1_ad : etkinlik.es2_ad}
-            />
-          ))}
-        </div>
-      </section>
+      {/* Sekme icerigi */}
+      <div className="mt-6">
+        {sekme === "defter" && (
+          <>
+            <OnayKuyrugu />
+            <OrtakDefter />
+          </>
+        )}
 
-      {/* Bildirimler (push izin + sessiz saat) */}
-      <BildirimAyari />
+        {sekme === "paylasim" && (
+          <>
+            <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
+            <section className="mt-8">
+              <h2 className="font-display text-lg text-murekkep">Davet bağlantıları</h2>
+              <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
+                Her eşin ayrı bağlantısı ve QR kodu var. Davetliler bu bağlantıdan dilek
+                bırakır; hangi bağlantıdan geldiği o eşin onay kuyruğuna düşer.
+              </p>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                {linkler.map((l) => (
+                  <LinkKarti
+                    key={l.es}
+                    es={l.es}
+                    token={l.token}
+                    esAdi={l.es === "es1" ? etkinlik.es1_ad : etkinlik.es2_ad}
+                  />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
 
-      {/* Onay kuyrugu + ortak defter (Asama 4 moderasyon) */}
-      <OnayKuyrugu />
-      <OrtakDefter />
-
-      {/* Ayarlar */}
-      {ayar && <AyarBolumu ilk={ayar} onGuncellendi={setAyar} />}
-    </main>
+        {sekme === "ayarlar" && (
+          <>
+            <BildirimAyari />
+            {ayar && <AyarBolumu ilk={ayar} onGuncellendi={setAyar} />}
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }
 
