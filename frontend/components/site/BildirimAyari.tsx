@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { pushAboneOl, pushCikar, pushDurumu, type PushDurum } from "@/lib/push";
+import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Bildirim ayari: push izin/abonelik + sessiz saat. Es, davetli katki bildirimlerini
 // buradan acar. Sessiz saatte bildirim ertelenir (gece rahatsiz etmez).
@@ -15,16 +16,20 @@ export function BildirimAyari() {
   const [ssAktif, setSsAktif] = useState(false);
   const [ssBas, setSsBas] = useState("22:00");
   const [ssBit, setSsBit] = useState("08:00");
-  const [ssKaydediliyor, setSsKaydediliyor] = useState(false);
-  const [ssMesaj, setSsMesaj] = useState("");
+  const [ssIlk, setSsIlk] = useState<{ aktif: boolean; bas: string; bit: string } | null>(null);
 
   useEffect(() => {
     pushDurumu().then(setDurum);
     api.sessizSaatGetir().then((c) => {
       if (c.ok) {
         setSsAktif(c.veri.aktif);
-        if (c.veri.baslangic) setSsBas(c.veri.baslangic);
-        if (c.veri.bitis) setSsBit(c.veri.bitis);
+        const bas = c.veri.baslangic || "22:00";
+        const bit = c.veri.bitis || "08:00";
+        if (c.veri.baslangic) setSsBas(bas);
+        if (c.veri.bitis) setSsBit(bit);
+        setSsIlk({ aktif: c.veri.aktif, bas, bit });
+      } else {
+        setSsIlk({ aktif: false, bas: "22:00", bit: "08:00" });
       }
     });
   }, []);
@@ -47,18 +52,26 @@ export function BildirimAyari() {
     }
   }
 
-  async function sessizSaatKaydet() {
-    setSsMesaj("");
-    setSsKaydediliyor(true);
+  // Otomatik kaydetme (kaydet butonu YOK): toggle/saat degisiminde debounce'lu kayit.
+  const ssDegisti =
+    ssIlk !== null && (ssAktif !== ssIlk.aktif || ssBas !== ssIlk.bas || ssBit !== ssIlk.bit);
+
+  async function sessizSaatKaydet(): Promise<boolean> {
     const cevap = await api.sessizSaatGuncelle({
       aktif: ssAktif,
       baslangic: ssBas,
       bitis: ssBit,
     });
-    setSsKaydediliyor(false);
-    if (cevap.ok) setSsMesaj("Kaydedildi.");
-    else setSsMesaj(cevap.mesaj);
+    if (cevap.ok) setSsIlk({ aktif: ssAktif, bas: ssBas, bit: ssBit });
+    return cevap.ok;
   }
+
+  const ssDurum = useOtoKaydet(
+    JSON.stringify({ ssAktif, ssBas, ssBit }),
+    ssDegisti,
+    sessizSaatKaydet
+  );
+  const ssGosterge = otoKayitEtiket(ssDurum);
 
   return (
     <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
@@ -157,16 +170,11 @@ export function BildirimAyari() {
             </div>
           )}
 
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              onClick={sessizSaatKaydet}
-              disabled={ssKaydediliyor}
-              className="rounded-full border border-ayrac px-5 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-60"
-            >
-              {ssKaydediliyor ? "..." : "Sessiz saatleri kaydet"}
-            </button>
-            {ssMesaj && <span className="font-govde text-xs text-yaldiz">{ssMesaj}</span>}
-          </div>
+          {ssGosterge && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className={`font-govde text-xs ${ssGosterge.sinif}`}>{ssGosterge.metin}</span>
+            </div>
+          )}
         </div>
       )}
     </section>

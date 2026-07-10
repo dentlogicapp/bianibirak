@@ -191,6 +191,9 @@ function KatkiFormu({
           <p className="metin-yasli mt-1.5 font-govde text-xs text-ikincil">
             {digerEs} tarafındansan, kendi bağlantına geçerek anını orada bırak.
           </p>
+          <p className="mt-2.5 text-center font-govde text-xs font-medium text-murekkep">
+            Dileğini {digerEs} tarafına geçtikten sonra bırak!
+          </p>
         </div>
 
         {/* Form */}

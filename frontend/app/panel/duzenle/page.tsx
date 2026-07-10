@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { AppShell } from "@/components/site/AppShell";
+import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Etkinlik Ayarlari (duzenle): hardcoded olmayan alanlar + CANLI ONIZLEME.
 // Karsilama metni, prompt, kapanis penceresi -> davetli ekraninin canli onizlemesi.
@@ -62,40 +63,62 @@ function DuzenleForm({ etkinlik, ilkAyar }: { etkinlik: Etkinlik; ilkAyar: Etkin
   const [karsilama, setKarsilama] = useState(ilkAyar.karsilama_metni ?? VARSAYILAN.karsilamaMetni);
   const [prompt, setPrompt] = useState(ilkAyar.prompt_metni ?? VARSAYILAN.promptMetni);
   const [gun, setGun] = useState(String(ilkAyar.kapanis_pencere_gun));
-  const [kaydediliyor, setKaydediliyor] = useState(false);
-  const [mesaj, setMesaj] = useState("");
   const [hata, setHata] = useState("");
 
   const karsilamaVarsayilan = karsilama.trim() === VARSAYILAN.karsilamaMetni;
   const promptVarsayilan = prompt.trim() === VARSAYILAN.promptMetni;
 
-  async function kaydet() {
-    setMesaj("");
+  // Otomatik kaydetme: her alan degisiminde debounce'lu kayit (kaydet butonu YOK).
+  const degistiMi =
+    karsilama !== (ilkAyar.karsilama_metni ?? VARSAYILAN.karsilamaMetni) ||
+    prompt !== (ilkAyar.prompt_metni ?? VARSAYILAN.promptMetni) ||
+    gun !== String(ilkAyar.kapanis_pencere_gun);
+
+  async function kaydet(): Promise<boolean> {
     setHata("");
     const g = parseInt(gun, 10);
     if (isNaN(g) || g < VARSAYILAN.minKapanisPencereGun || g > VARSAYILAN.maxKapanisPencereGun) {
       setHata(`Kapanış penceresi en az ${VARSAYILAN.minKapanisPencereGun} gün olmalıdır.`);
-      return;
+      return false;
     }
-    setKaydediliyor(true);
     const cevap = await api.etkinlikAyarGuncelle({
       karsilamaMetni: karsilama,
       promptMetni: prompt,
       kapanisPencereGun: g,
     });
-    setKaydediliyor(false);
-    if (cevap.ok) setMesaj("Kaydedildi.");
-    else setHata(cevap.mesaj);
+    if (!cevap.ok) {
+      setHata(cevap.mesaj);
+      return false;
+    }
+    return true;
   }
+
+  const kayitDurum = useOtoKaydet(
+    JSON.stringify({ karsilama, prompt, gun }),
+    degistiMi,
+    kaydet
+  );
+  const gosterge = otoKayitEtiket(kayitDurum);
 
   return (
     <AppShell>
       <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Etkinlik</p>
-        <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">Etkinlik Ayarları</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Etkinlik</p>
+            <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">Etkinlik Ayarları</h1>
+          </div>
+          {gosterge && (
+            <span
+              className={`shrink-0 rounded-full border border-ayrac bg-parsomen px-3 py-1.5 font-govde text-xs ${gosterge.sinif}`}
+            >
+              {gosterge.metin}
+            </span>
+          )}
+        </div>
         <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Davetlilerin göreceği metinleri düzenle. Değişiklikler sağdaki canlı önizlemede
-          anında görünür.
+          Davetlilerin göreceği metinleri düzenle. Değişiklikler otomatik kaydedilir ve
+          sağdaki canlı önizlemede anında görünür.
         </p>
       </div>
 
@@ -144,20 +167,11 @@ function DuzenleForm({ etkinlik, ilkAyar }: { etkinlik: Etkinlik; ilkAyar: Etkin
               </p>
             </div>
 
-            {mesaj && <p className="font-govde text-sm text-yaldiz">{mesaj}</p>}
             {hata && (
               <p className="font-govde text-sm text-sarap" role="alert">
                 {hata}
               </p>
             )}
-
-            <button
-              onClick={kaydet}
-              disabled={kaydediliyor}
-              className="rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-60"
-            >
-              {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
-            </button>
           </div>
         </div>
 
