@@ -76,6 +76,15 @@ export type Katki = {
   created_at: string;
 };
 
+// Denetim gunlugu kaydi.
+export type DenetimKaydi = {
+  id: string;
+  eylem: string;
+  varlik: string;
+  degisen_alanlar: string | null;
+  created_at: string;
+};
+
 export const api = {
   kayit: (v: { ad: string; email: string; sifre: string }) =>
     istek<Kullanici>("/api/kayit", {
@@ -179,6 +188,7 @@ export const api = {
   // --- Moderasyon (Asama 4; izolasyonlu kuyruk + onay/ret + birlesik defter) ---
   katkiKuyruk: () => istek<Katki[]>("/api/etkinlik/aktif/kuyruk"),
   katkiDefter: () => istek<Katki[]>("/api/etkinlik/aktif/defter"),
+  denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
   katkiOnayla: (id: string) =>
     istek<{ durum: string }>(`/api/katki/${id}/onayla`, { method: "POST" }),
   katkiReddet: (id: string) =>

@@ -6,8 +6,10 @@ import Link from "next/link";
 import { api, type Kullanici } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 
-// Kullanici menusu: avatar + dropdown (tema toggle + cikis). App-shell tutarli navigasyon.
-// Oturum yoksa "Giris" baglantisi gosterir.
+// Avatar menusu (planlama deseni): bolumlu dropdown.
+// Bolum 1 - Etkinlik: Etkinlik Ayarlari, Denetim Gunlugu.
+// Bolum 2 - Hesap: Bildirimler & Sessiz Saatler, Sifre Degistir, Tema, Cikis.
+// Koyu tonda avatar belirgin (dolu sarap zemin).
 export function UserMenu() {
   const router = useRouter();
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
@@ -27,7 +29,6 @@ export function UserMenu() {
     });
   }, []);
 
-  // Disari tiklayinca kapat
   useEffect(() => {
     function disari(e: MouseEvent) {
       if (kutuRef.current && !kutuRef.current.contains(e.target as Node)) setAcik(false);
@@ -61,30 +62,91 @@ export function UserMenu() {
 
   return (
     <div ref={kutuRef} className="relative">
+      {/* Avatar - koyu tonda belirgin (dolu sarap zemin + parsomen harf) */}
       <button
         onClick={() => setAcik((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={acik}
-        className="flex h-9 w-9 items-center justify-center rounded-full border border-ayrac bg-yuzey font-display text-sm text-sarap transition-colors hover:border-sarap"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-sarap font-display text-sm font-medium text-parsomen shadow-sm ring-1 ring-sarap/30 transition-transform hover:scale-105"
       >
         {basHarf}
       </button>
 
       {acik && (
-        <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-lg">
-          <div className="border-b border-ayrac px-4 py-3">
-            <p className="truncate font-govde text-sm font-medium text-murekkep">
-              {kullanici.ad}
-            </p>
-            <p className="truncate font-govde text-xs text-ikincil">{kullanici.email}</p>
+        <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-xl">
+          {/* Kullanici basligi */}
+          <div className="flex items-center gap-3 border-b border-ayrac px-4 py-3.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sarap font-display text-base font-medium text-parsomen">
+              {basHarf}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-govde text-sm font-medium text-murekkep">
+                {kullanici.ad}
+              </p>
+              <p className="truncate font-govde text-xs text-ikincil">{kullanici.email}</p>
+            </div>
           </div>
 
-          <nav className="p-1.5">
+          {/* Bolum 1 - Etkinlik */}
+          <div className="border-b border-ayrac p-1.5">
+            <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+              Etkinlik
+            </p>
+            <MenuLink href="/panel/duzenle" onClick={() => setAcik(false)} ikon={
+              <path d="M4 20h4l10-10-4-4L4 16v4Z M13.5 6.5l4 4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            }>
+              Etkinlik Ayarları
+            </MenuLink>
+            <MenuLink href="/panel/denetim" onClick={() => setAcik(false)} ikon={
+              <>
+                <path d="M9 5h6M4 9h16v11H4z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="M8 13h8M8 16h5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+              </>
+            }>
+              Denetim Günlüğü
+            </MenuLink>
+          </div>
+
+          {/* Bolum 2 - Hesap */}
+          <div className="p-1.5">
+            <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+              Hesap
+            </p>
+            <MenuLink href="/panel/ayarlar" onClick={() => setAcik(false)} ikon={
+              <>
+                <path d="M18 8a3 3 0 0 0-6 0v3l-2 3h10l-2-3V8Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="M13 18a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+              </>
+            }>
+              Bildirimler & Sessiz Saatler
+            </MenuLink>
+            <MenuLink href="/sifre-sifirla" onClick={() => setAcik(false)} ikon={
+              <>
+                <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+              </>
+            }>
+              Şifre Değiştir
+            </MenuLink>
+
+            {/* Tema */}
             <button
               onClick={temaTersle}
-              className="flex w-full items-center justify-between rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
+              className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
             >
-              <span>{tema === "acik" ? "Koyu temaya geç" : "Açık temaya geç"}</span>
+              <span className="flex items-center gap-2.5">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 text-ikincil" aria-hidden>
+                  {tema === "acik" ? (
+                    <path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                  ) : (
+                    <>
+                      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M6 6l1.5 1.5M16.5 16.5 18 18M6 18l1.5-1.5M16.5 7.5 18 6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                    </>
+                  )}
+                </svg>
+                {tema === "acik" ? "Koyu tema" : "Açık tema"}
+              </span>
               <span
                 role="switch"
                 aria-checked={tema === "koyu"}
@@ -99,18 +161,46 @@ export function UserMenu() {
                 />
               </span>
             </button>
-          </nav>
 
-          <div className="border-t border-ayrac p-1.5">
+            {/* Cikis */}
             <button
               onClick={cikis}
-              className="block w-full rounded-lg px-3 py-2 text-left font-govde text-sm text-sarap transition-colors hover:bg-yuzeyKoyu"
+              className="mt-0.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-sarap transition-colors hover:bg-yuzeyKoyu"
             >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2M9 12h11M17 9l3 3-3 3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
               Çıkış yap
             </button>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+// Menu ici link (ikon + metin)
+function MenuLink({
+  href,
+  onClick,
+  ikon,
+  children,
+}: {
+  href: string;
+  onClick: () => void;
+  ikon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4 text-ikincil" aria-hidden>
+        {ikon}
+      </svg>
+      {children}
+    </Link>
   );
 }

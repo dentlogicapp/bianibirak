@@ -30,6 +30,7 @@ public static class EtkinlikUclari
         app.MapPut("/api/etkinlik/aktif/ayarlar", AktifAyarlarGuncelle).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/kuyruk", AktifKuyruk).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/defter", AktifDefter).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/denetim", AktifDenetim).RequireAuthorization();
         app.MapPost("/api/katki/{id}/onayla", KatkiOnayla).RequireAuthorization();
         app.MapPost("/api/katki/{id}/reddet", KatkiReddet).RequireAuthorization();
     }
@@ -454,6 +455,31 @@ public static class EtkinlikUclari
         await db.SaveChangesAsync(); // atomik: ayar + audit
 
         return Results.Json(AyarYaniti(ayar));
+    }
+
+    // Denetim gunlugu: aktif etkinligin son 100 kaydi (tenant-scoped; seffaflik).
+    private static async Task<IResult> AktifDenetim(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var kayitlar = await db.DenetimGunlukleri.AsNoTracking()
+            .Where(d => d.EtkinlikId == etkinlikId)
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(100)
+            .ToListAsync();
+
+        return Results.Json(kayitlar.Select(d => new
+        {
+            id = d.Id,
+            eylem = d.Eylem,
+            varlik = d.Varlik,
+            degisen_alanlar = d.DegisenAlanlar,
+            created_at = d.CreatedAt,
+        }));
     }
 
     private static object AyarYaniti(EtkinlikAyari a)

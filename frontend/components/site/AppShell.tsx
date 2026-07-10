@@ -47,6 +47,18 @@ const SEKMELER: Sekme[] = [
       </svg>
     ),
   },
+  {
+    ad: "Paylaşım",
+    yol: "/panel/paylasim",
+    ikon: (a) => (
+      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
+        <circle cx="18" cy="5" r="2.5" stroke="currentColor" strokeWidth={a ? 2 : 1.6} />
+        <circle cx="6" cy="12" r="2.5" stroke="currentColor" strokeWidth={a ? 2 : 1.6} />
+        <circle cx="18" cy="19" r="2.5" stroke="currentColor" strokeWidth={a ? 2 : 1.6} />
+        <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" stroke="currentColor" strokeWidth={a ? 2 : 1.6} strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
