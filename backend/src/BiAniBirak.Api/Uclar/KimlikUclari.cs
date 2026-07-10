@@ -20,13 +20,14 @@ public static class KimlikUclari
         app.MapPost("/api/giris", Giris);
         app.MapPost("/api/cikis", Cikis);
         app.MapGet("/api/ben", Ben).RequireAuthorization();
+        app.MapPut("/api/profil", ProfilGuncelle).RequireAuthorization();
     }
 
     private static IResult Hata(int durum, string kod, string mesaj)
         => Results.Json(new { hata = kod, mesaj }, statusCode: durum);
 
     private static object KullaniciYaniti(Kullanici k)
-        => new { id = k.Id, ad = k.Ad, email = k.Email, super_admin = k.SuperAdmin };
+        => new { id = k.Id, ad = k.Ad, email = k.Email, cinsiyet = k.Cinsiyet, super_admin = k.SuperAdmin };
 
     private static async Task<IResult> Kayit(
         KayitIstek istek, BiAniBirakDbContext db, SifreServisi sifreServisi,
@@ -102,6 +103,55 @@ public static class KimlikUclari
         if (kullanici == null)
             return Hata(401, "ERISIM_YOK", "Kullanici bulunamadi.");
 
+        return Results.Json(KullaniciYaniti(kullanici));
+    }
+
+    // Profil guncelle: ad + cinsiyet. E-posta DEGISTIRILEMEZ (guvenlik/kimlik).
+    private static async Task<IResult> ProfilGuncelle(
+        ProfilGuncelleIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var kimlik = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                     ?? ctx.User.FindFirstValue("sub");
+        if (!Guid.TryParse(kimlik, out var id))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+
+        var kullanici = await db.Kullanicilar
+            .FirstOrDefaultAsync(k => k.Id == id && k.DeletedAt == null);
+        if (kullanici == null)
+            return Hata(401, "ERISIM_YOK", "Kullanici bulunamadi.");
+
+        var ad = (istek.Ad ?? "").Trim();
+        if (ad.Length < 2)
+            return Hata(400, "DOGRULAMA_HATASI", "Ad en az 2 karakter olmalidir.");
+
+        // Cinsiyet: yalniz "kadin" | "erkek" | null kabul edilir.
+        string? cinsiyet = (istek.Cinsiyet ?? "").Trim().ToLowerInvariant();
+        if (cinsiyet == "") cinsiyet = null;
+        if (cinsiyet != null && cinsiyet != "kadin" && cinsiyet != "erkek")
+            return Hata(400, "DOGRULAMA_HATASI", "Cinsiyet gecersiz.");
+
+        var eskiAd = kullanici.Ad;
+        var eskiCinsiyet = kullanici.Cinsiyet;
+        kullanici.Ad = ad;
+        kullanici.Cinsiyet = cinsiyet;
+        kullanici.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = null,
+            KullaniciId = kullanici.Id,
+            Eylem = "PROFIL_GUNCELLENDI",
+            Varlik = "kullanici",
+            DegisenAlanlar = JsonSerializer.Serialize(new
+            {
+                ad = new { eski = eskiAd, yeni = ad },
+                cinsiyet = new { eski = eskiCinsiyet, yeni = cinsiyet },
+            }),
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
         return Results.Json(KullaniciYaniti(kullanici));
     }
 

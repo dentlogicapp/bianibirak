@@ -15,6 +15,9 @@ public class Kullanici
 
     public string Ad { get; set; } = string.Empty;
 
+    // Cinsiyet: "kadin" | "erkek" | null (Profilim; opsiyonel).
+    public string? Cinsiyet { get; set; }
+
     public bool SuperAdmin { get; set; }
 
     // Sessiz saatler (push ertelemesi) - "HH:mm" TR saati. Aktifse aralikta bildirim ertelenir.

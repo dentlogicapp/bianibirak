@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type Kullanici } from "@/lib/api";
 import { useTema } from "@/lib/tema";
+import { ProfilimModal } from "@/components/site/ProfilimModal";
 
 // Avatar menusu (planlama deseni): bolumlu dropdown.
 // Bolum 1 - Etkinlik: Etkinlik Ayarlari, Denetim Gunlugu.
@@ -15,6 +16,7 @@ export function UserMenu() {
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
   const [oturum, setOturum] = useState<"bilinmiyor" | "var" | "yok">("bilinmiyor");
   const [acik, setAcik] = useState(false);
+  const [profilAcik, setProfilAcik] = useState(false);
   const [tema, temaTersle] = useTema();
   const kutuRef = useRef<HTMLDivElement>(null);
 
@@ -112,22 +114,19 @@ export function UserMenu() {
             <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
               Hesap
             </p>
-            <MenuLink href="/panel/ayarlar" onClick={() => setAcik(false)} ikon={
-              <>
-                <path d="M18 8a3 3 0 0 0-6 0v3l-2 3h10l-2-3V8Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
-                <path d="M13 18a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
-              </>
-            }>
-              Bildirimler & Sessiz Saatler
-            </MenuLink>
-            <MenuLink href="/sifre-sifirla" onClick={() => setAcik(false)} ikon={
-              <>
-                <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
-              </>
-            }>
-              Şifre Değiştir
-            </MenuLink>
+            <button
+              onClick={() => {
+                setAcik(false);
+                setProfilAcik(true);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-ikincil" aria-hidden>
+                <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M5 20a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+              </svg>
+              Profilim
+            </button>
 
             {/* Tema */}
             <button
@@ -174,6 +173,14 @@ export function UserMenu() {
             </button>
           </div>
         </div>
+      )}
+
+      {profilAcik && (
+        <ProfilimModal
+          kullanici={kullanici}
+          onKapat={() => setProfilAcik(false)}
+          onGuncellendi={(k) => setKullanici(k)}
+        />
       )}
     </div>
   );

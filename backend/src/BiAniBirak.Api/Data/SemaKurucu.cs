@@ -157,6 +157,8 @@ public static class SemaKurucu
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBaslangic" text NULL;
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBitis" text NULL;
+        -- Profilim: cinsiyet kolonu (idempotent)
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "Cinsiyet" text NULL;
 
         -- 0D.2 gecis: EtkinlikTarihi date -> timestamptz (idempotent; zaten timestamptz ise no-op).
         DO $$

@@ -39,6 +39,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Email).HasColumnName("email").IsRequired();
             e.Property(x => x.SifreHash).HasColumnName("sifre_hash").IsRequired();
             e.Property(x => x.Ad).HasColumnName("Ad").IsRequired();
+            e.Property(x => x.Cinsiyet).HasColumnName("Cinsiyet");
             e.Property(x => x.SuperAdmin).HasColumnName("super_admin");
             e.Property(x => x.SessizSaatAktif).HasColumnName("SessizSaatAktif");
             e.Property(x => x.SessizSaatBaslangic).HasColumnName("SessizSaatBaslangic");

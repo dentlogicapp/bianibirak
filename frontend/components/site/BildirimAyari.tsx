@@ -7,7 +7,7 @@ import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Bildirim ayari: push izin/abonelik + sessiz saat. Es, davetli katki bildirimlerini
 // buradan acar. Sessiz saatte bildirim ertelenir (gece rahatsiz etmez).
-export function BildirimAyari() {
+export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
   const [durum, setDurum] = useState<PushDurum>("desteklenmiyor");
   const [islem, setIslem] = useState(false);
   const [hata, setHata] = useState("");
@@ -74,7 +74,7 @@ export function BildirimAyari() {
   const ssGosterge = otoKayitEtiket(ssDurum);
 
   return (
-    <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
+    <section className={yalin ? "" : "mt-8 rounded-3xl border border-ayrac bg-yuzey p-8"}>
       <h2 className="font-display text-lg text-murekkep">Bildirimler</h2>
       <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
         Sana bir dilek bırakıldığında ve ortak deftere yeni bir anı eklendiğinde bildirim

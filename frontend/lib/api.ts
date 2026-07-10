@@ -30,6 +30,7 @@ export type Kullanici = {
   id: string;
   ad: string;
   email: string;
+  cinsiyet: string | null;
   super_admin: boolean;
 };
 
@@ -99,6 +100,8 @@ export const api = {
     }),
   cikis: () => istek<{ durum: string }>("/api/cikis", { method: "POST" }),
   ben: () => istek<Kullanici>("/api/ben"),
+  profilGuncelle: (govde: { ad: string; cinsiyet: string | null }) =>
+    istek<Kullanici>("/api/profil", { method: "PUT", body: JSON.stringify(govde) }),
 
   // --- Tenant cekirdegi (Asama 0C) ---
   etkinlikOlustur: (v: {

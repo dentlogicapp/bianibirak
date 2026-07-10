@@ -3,6 +3,7 @@ namespace BiAniBirak.Api.Modeller;
 // Istek govdeleri (JSON). Minimal ve sade.
 public record KayitIstek(string Ad, string Email, string Sifre);
 public record GirisIstek(string Email, string Sifre);
+public record ProfilGuncelleIstek(string Ad, string? Cinsiyet);
 
 // Etkinlik olusturma (Belge 03 Akis 1: minimal aktivasyon).
 // Tur: dugun|nisan|nikah. Tarih ISO (yyyy-MM-dd). Acilis/Kapanis ISO-8601.
