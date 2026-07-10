@@ -78,16 +78,16 @@ html.dark {
 }
 
 /* ====================== MARKA ANIMASYONLARI ====================== */
-/* Wordmark renkleri CSS-degiskenli: acik modda sarap, koyu modda parlak yaldiz(sarimsi).
-   "Bi" ve "Birak" sabit aksan; "Ani" animasyonlu renk gecisli. */
+/* Wordmark renkleri CSS-degiskenli. "Bi" ve "Birak" avatar rengiyle (--sarap) birebir ayni.
+   "Ani" animasyonlu: acik modda sarap<->yaldiz, koyu modda yaldiz(sarimsi)<->sarap(avatar). */
 .marka-bi path,
 .marka-birak path {
   fill: var(--sarap);
 }
-/* Koyu modda "Bi"/"Birak" da sarimsi (yaldiz) - kullanici istegi */
+/* Koyu modda da "Bi"/"Birak" avatar rengi = --sarap (kullanici: avatarla birebir ayni) */
 html.dark .marka-bi path,
 html.dark .marka-birak path {
-  fill: var(--yaldiz);
+  fill: var(--sarap);
 }
 
 /* "Ani" - guclu zipla + scale + renk gecisi (path fill) */
@@ -115,17 +115,15 @@ html.dark .marka-birak path {
   100% { fill: #6e2438; }
 }
 
-/* Koyu mod: sarimsi(yaldiz) temel <-> sarap gecisi (kullanici istegi: tersi geciş) */
+/* Koyu mod: yaldiz(sarimsi) <-> sarap(avatar) gecisi (kullanici istegi) */
 html.dark .marka-ani {
   animation: markaAniRenkKoyu 5.5s linear infinite, markaAniZipla 1.5s ease-in-out infinite;
 }
-html.dark .marka-bi path,
-html.dark .marka-birak path { fill: var(--yaldiz); }
 @keyframes markaAniRenkKoyu {
-  0% { fill: #d4af6a; }   /* sarimsi (yaldiz) temel */
-  25% { fill: #c8985a; }
-  50% { fill: #c17a4a; }  /* sarap-terracotta gecis */
-  75% { fill: #c8985a; }
+  0% { fill: #d4af6a; }   /* yaldiz (sarimsi) */
+  25% { fill: #cf9358; }
+  50% { fill: #c17a4a; }  /* sarap (avatar rengi) */
+  75% { fill: #cf9358; }
   100% { fill: #d4af6a; } /* sarimsiya donus */
 }
 @keyframes markaAniZipla {

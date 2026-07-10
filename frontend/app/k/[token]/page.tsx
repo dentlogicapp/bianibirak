@@ -179,16 +179,17 @@ function KatkiFormu({
             {karsilama}
           </p>
           {veri.prompt_metni && (
-            <p className="mt-3 font-govde text-sm text-ikincil">{veri.prompt_metni}</p>
+            <p className="metin-yasli mt-3 font-govde text-sm text-ikincil">{veri.prompt_metni}</p>
           )}
         </div>
 
-        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi */}
-        <div className="mt-4 rounded-2xl border border-yaldiz/40 bg-yaldiz/5 px-5 py-4">
-          <p className="font-govde text-sm leading-relaxed text-murekkep">
-            Bu ekrandan <span className="font-medium text-sarap">{buEs} tarafının yakını</span> olarak
-            anı girişi yapabilirsin. Eğer <span className="font-medium">{digerEs} tarafının yakını</span>{" "}
-            isen, kendi bağlantını/QR kodunu kontrol edip doğru bağlantıya geçerek anını oluşturabilirsin.
+        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}
+        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
+          <p className="text-center font-govde text-sm font-medium text-sarap">
+            {buEs} tarafının yakınısın
+          </p>
+          <p className="metin-yasli mt-1.5 font-govde text-xs text-ikincil">
+            {digerEs} tarafındansan, kendi bağlantına geçerek anını orada bırak.
           </p>
         </div>
 

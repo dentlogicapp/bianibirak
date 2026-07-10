@@ -19,7 +19,7 @@ const ikonKutu = { kucuk: "h-9 w-9 rounded-lg", orta: "h-12 w-12 rounded-xl", bu
 export function MarkaKilidi({
   varyant = "tam",
   boyut = "orta",
-  animasyonlu = false,
+  animasyonlu = true,
   className = "",
 }: {
   varyant?: Varyant;
