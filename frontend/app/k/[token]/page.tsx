@@ -135,6 +135,9 @@ function KatkiFormu({
   const karsilama =
     veri.karsilama_metni ||
     "Bu özel günümüzde bize bir anı bırakır mısın?";
+  // Davetli hangi esin linkinde? Yonlendirme icin (yanlis link uyarisi).
+  const buEs = veri.kaynak_es === "es1" ? veri.es1_ad : veri.es2_ad;
+  const digerEs = veri.kaynak_es === "es1" ? veri.es2_ad : veri.es1_ad;
 
   async function gonder(e: React.FormEvent) {
     e.preventDefault();
@@ -178,6 +181,15 @@ function KatkiFormu({
           {veri.prompt_metni && (
             <p className="mt-3 font-govde text-sm text-ikincil">{veri.prompt_metni}</p>
           )}
+        </div>
+
+        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi */}
+        <div className="mt-4 rounded-2xl border border-yaldiz/40 bg-yaldiz/5 px-5 py-4">
+          <p className="font-govde text-sm leading-relaxed text-murekkep">
+            Bu ekrandan <span className="font-medium text-sarap">{buEs} tarafının yakını</span> olarak
+            anı girişi yapabilirsin. Eğer <span className="font-medium">{digerEs} tarafının yakını</span>{" "}
+            isen, kendi bağlantını/QR kodunu kontrol edip doğru bağlantıya geçerek anını oluşturabilirsin.
+          </p>
         </div>
 
         {/* Form */}

@@ -59,6 +59,7 @@ export type EtkinlikAyar = {
 export type KatkiKarsilama = {
   es1_ad: string;
   es2_ad: string;
+  kaynak_es: string;
   tur: string;
   karsilama_metni: string | null;
   prompt_metni: string | null;

@@ -58,6 +58,7 @@ public static class KatkiUclari
         {
             es1_ad = etkinlik.Es1Ad,
             es2_ad = etkinlik.Es2Ad,
+            kaynak_es = link.Es, // davetli hangi esin linkinde (yonlendirme metni)
             tur = etkinlik.Tur,
             karsilama_metni = ayar?.KarsilamaMetni,
             prompt_metni = ayar?.PromptMetni,
