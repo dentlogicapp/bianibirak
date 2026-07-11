@@ -5,6 +5,7 @@ import "@fontsource-variable/inter";
 import "./globals.css";
 import { MARKA } from "@/lib/marka";
 import { PWARegister } from "@/components/site/PWARegister";
+import { Toaster } from "sonner";
 import { TEMA_INLINE_SCRIPT } from "@/lib/tema";
 
 export const metadata: Metadata = {
@@ -47,6 +48,23 @@ export default function RootLayout({
       <body>
         {children}
         <PWARegister />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "var(--yuzey)",
+              color: "var(--murekkep)",
+              border: "1px solid var(--ayrac)",
+              fontFamily: "var(--font-govde), Inter, sans-serif",
+              fontSize: "0.875rem",
+              lineHeight: "1.5",
+              borderRadius: "1rem",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+            },
+          }}
+          duration={5000}
+          closeButton
+        />
       </body>
     </html>
   );
