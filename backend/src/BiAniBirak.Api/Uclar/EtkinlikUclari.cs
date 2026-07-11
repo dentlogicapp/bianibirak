@@ -486,7 +486,7 @@ public static class EtkinlikUclari
         var katki = await db.Katkilar.AsNoTracking()
             .FirstOrDefaultAsync(k => k.Id == id && k.EtkinlikId == etkinlikId);
         if (katki == null)
-            return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");
+            return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadı.");
 
         return Results.Json(new
         {

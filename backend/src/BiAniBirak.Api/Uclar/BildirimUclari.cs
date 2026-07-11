@@ -34,7 +34,7 @@ public static class BildirimUclari
     private static async Task<IResult> Liste(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var bildirimler = await db.Bildirimler.AsNoTracking()
             .Where(b => b.KullaniciId == kullaniciId)
@@ -64,12 +64,12 @@ public static class BildirimUclari
     private static async Task<IResult> Okundu(Guid id, HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var b = await db.Bildirimler
             .FirstOrDefaultAsync(x => x.Id == id && x.KullaniciId == kullaniciId);
         if (b == null)
-            return Hata(404, "BILDIRIM_BULUNAMADI", "Bildirim bulunamadi.");
+            return Hata(404, "BILDIRIM_BULUNAMADI", "Bildirim bulunamadı.");
 
         if (!b.OkunduMu)
         {
@@ -84,7 +84,7 @@ public static class BildirimUclari
     private static async Task<IResult> HepsiOkundu(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var simdi = DateTimeOffset.UtcNow;
         var okunmamislar = await db.Bildirimler
@@ -103,12 +103,12 @@ public static class BildirimUclari
     private static async Task<IResult> Sil(Guid id, HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var b = await db.Bildirimler
             .FirstOrDefaultAsync(x => x.Id == id && x.KullaniciId == kullaniciId);
         if (b == null)
-            return Hata(404, "BILDIRIM_BULUNAMADI", "Bildirim bulunamadi.");
+            return Hata(404, "BILDIRIM_BULUNAMADI", "Bildirim bulunamadı.");
 
         db.Bildirimler.Remove(b);
         await db.SaveChangesAsync();
@@ -119,7 +119,7 @@ public static class BildirimUclari
     private static async Task<IResult> TumunuSil(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var hepsi = await db.Bildirimler
             .Where(b => b.KullaniciId == kullaniciId)

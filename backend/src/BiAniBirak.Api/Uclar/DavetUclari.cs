@@ -54,10 +54,10 @@ public static class DavetUclari
         HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
-            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
         var hedefRol = rol == "es1" ? "es2" : "es1";
 
@@ -65,7 +65,7 @@ public static class DavetUclari
         var zatenUye = await db.EtkinlikUyelikleri.AsNoTracking()
             .AnyAsync(u => u.EtkinlikId == etkinlikId && u.Rol == hedefRol);
         if (zatenUye)
-            return Hata(409, "ES_ZATEN_UYE", "Esiniz bu etkinlige zaten katilmis.");
+            return Hata(409, "ES_ZATEN_UYE", "Eşin bu deftere zaten katılmış.");
 
         // Bekleyen davet varsa onu dondur (yeni token uretme - tek dogruluk kaynagi)
         var mevcut = await db.UyeDavetleri
@@ -106,10 +106,10 @@ public static class DavetUclari
     private static async Task<IResult> DavetDurum(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
-            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
         var hedefRol = rol == "es1" ? "es2" : "es1";
         var esKatildi = await db.EtkinlikUyelikleri.AsNoTracking()
@@ -134,12 +134,12 @@ public static class DavetUclari
         var davet = await db.UyeDavetleri.AsNoTracking()
             .FirstOrDefaultAsync(d => d.Token == token);
         if (davet == null)
-            return Hata(404, "DAVET_BULUNAMADI", "Davet bulunamadi.");
+            return Hata(404, "DAVET_BULUNAMADI", "Bu davet bağlantısı geçersiz.");
 
         var etkinlik = await db.Etkinlikler.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == davet.EtkinlikId);
         if (etkinlik == null)
-            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadi.");
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadı.");
 
         return Results.Json(new
         {
@@ -158,26 +158,26 @@ public static class DavetUclari
         HttpResponse yanit, PushGonderici push)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var davet = await db.UyeDavetleri
             .FirstOrDefaultAsync(d => d.Token == token);
         if (davet == null)
-            return Hata(404, "DAVET_BULUNAMADI", "Davet bulunamadi.");
+            return Hata(404, "DAVET_BULUNAMADI", "Bu davet bağlantısı geçersiz.");
         if (davet.Durum != "beklemede")
-            return Hata(409, "DAVET_GECERSIZ", "Bu davet daha once kullanilmis.");
+            return Hata(409, "DAVET_GECERSIZ", "Bu davet daha önce kullanılmış.");
 
         // Zaten uye mi?
         var mevcutUyelik = await db.EtkinlikUyelikleri.AsNoTracking()
             .AnyAsync(u => u.EtkinlikId == davet.EtkinlikId && u.KullaniciId == kullaniciId);
         if (mevcutUyelik)
-            return Hata(409, "ZATEN_UYE", "Bu etkinlige zaten uyesiniz.");
+            return Hata(409, "ZATEN_UYE", "Bu deftere zaten üyesin.");
 
         // Hedef rol dolduysa (yaris) reddet
         var rolDolu = await db.EtkinlikUyelikleri.AsNoTracking()
             .AnyAsync(u => u.EtkinlikId == davet.EtkinlikId && u.Rol == davet.HedefRol);
         if (rolDolu)
-            return Hata(409, "ES_ZATEN_UYE", "Bu rol zaten dolu.");
+            return Hata(409, "ES_ZATEN_UYE", "Bu eş rolü zaten dolu.");
 
         var simdi = DateTimeOffset.UtcNow;
         db.EtkinlikUyelikleri.Add(new EtkinlikUyeligi
@@ -213,8 +213,8 @@ public static class DavetUclari
         if (kurucu != null && kullanici != null)
         {
             _ = push.GonderAsync(kurucu.KullaniciId,
-                "Esin defterine katildi",
-                $"{kullanici.Ad} ortak ani defterinize katildi. Artik kendi kuyrugunu yonetebilir.",
+                "Eşin deftere katıldı",
+                $"{kullanici.Ad}, ortak anı defterinize katıldı. Artık kendi bağlantısından gelen dilekleri kendisi onaylayacak.",
                 url: "/panel/etkinlik", etkinlikId: davet.EtkinlikId);
         }
 
