@@ -19,6 +19,14 @@ public class EtkinlikAyari
     // kapanis penceresi (gun) - varsayilan 30 (Karar 4 / Belge 05)
     public int KapanisPencereGun { get; set; } = 30;
 
+    // ---- SAYAC (geri sayim) ----
+    // Acik/kapali (true/false yazimi UI'da toggle olarak gosterilir).
+    public bool SayacAktif { get; set; } = true;
+    // Hedef tarihe kalan sure cumlesi ("Dugunumuze kalan sure")
+    public string? SayacAktifCumle { get; set; }
+    // Hedef tarih gectikten sonraki cumle ("Bugun en guzel gunumuz")
+    public string? SayacBittiCumle { get; set; }
+
     // genisletilebilir serbest ayarlar (jsonb)
     public string? Ayarlar { get; set; }
 

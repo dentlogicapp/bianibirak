@@ -160,6 +160,9 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.KarsilamaMetni).HasColumnName("KarsilamaMetni");
             e.Property(x => x.PromptMetni).HasColumnName("PromptMetni");
             e.Property(x => x.KapanisPencereGun).HasColumnName("KapanisPencereGun");
+            e.Property(x => x.SayacAktif).HasColumnName("SayacAktif");
+            e.Property(x => x.SayacAktifCumle).HasColumnName("SayacAktifCumle");
+            e.Property(x => x.SayacBittiCumle).HasColumnName("SayacBittiCumle");
             e.Property(x => x.Ayarlar).HasColumnName("Ayarlar").HasColumnType("jsonb");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             // bire-bir: her etkinlige tek ayar satiri

@@ -51,4 +51,7 @@ public record EtkinlikAyarGuncelleIstek(
     string? Tema,
     string? KarsilamaMetni,
     string? PromptMetni,
-    int? KapanisPencereGun);
+    int? KapanisPencereGun,
+    bool? SayacAktif,
+    string? SayacAktifCumle,
+    string? SayacBittiCumle);

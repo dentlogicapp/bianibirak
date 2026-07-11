@@ -181,10 +181,18 @@ function KatkiFormu({
           {veri.prompt_metni && (
             <p className="metin-yasli mt-3 font-govde text-sm text-ikincil">{veri.prompt_metni}</p>
           )}
+
+          {/* Geri sayim (etkinlik ayarindan; kapaliysa gosterilmez) */}
+          {veri.sayac_aktif && (
+            <DavetliSayac
+              hedef={veri.etkinlik_tarihi}
+              aktifCumle={veri.sayac_aktif_cumle}
+              bittiCumle={veri.sayac_bitti_cumle}
+            />
+          )}
         </div>
 
-        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}
-        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
+        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
           <p className="text-center font-govde text-sm font-medium text-sarap">
             {buEs} tarafının yakınısın
           </p>
@@ -287,4 +295,72 @@ function KatkiFormu({
       </div>
     </main>
   );
+}
+
+// ---- Davetli ekrani geri sayimi (etkinlik ayarindan) ----
+function DavetliSayac({
+  hedef,
+  aktifCumle,
+  bittiCumle,
+}: {
+  hedef: string;
+  aktifCumle: string | null;
+  bittiCumle: string | null;
+}) {
+  const [sk, setSk] = useState(() => hesapla(hedef));
+
+  useEffect(() => {
+    setSk(hesapla(hedef));
+    const i = setInterval(() => setSk(hesapla(hedef)), 1000);
+    return () => clearInterval(i);
+  }, [hedef]);
+
+  const cumle = sk.gecti
+    ? bittiCumle || "Hedef tarihe ulaşıldı"
+    : aktifCumle || "Etkinliğe kalan süre";
+
+  return (
+    <div className="mt-5 rounded-2xl border border-ayrac bg-parsomen px-5 py-4 text-center">
+      <p className="font-govde text-xs uppercase tracking-etiket text-ikincil">{cumle}</p>
+      <div className="mt-3 flex items-end justify-center gap-3">
+        <SayacRakam d={sk.gun} e="gün" vurgu />
+        <SayacRakam d={sk.sa} e="saat" />
+        <SayacRakam d={sk.dk} e="dk" />
+        <SayacRakam d={sk.sn} e="sn" />
+      </div>
+    </div>
+  );
+}
+
+function SayacRakam({ d, e, vurgu }: { d: number; e: string; vurgu?: boolean }) {
+  return (
+    <span className="inline-flex flex-col items-center">
+      <span
+        className={
+          vurgu
+            ? "font-display text-2xl leading-none text-sarap"
+            : "font-display text-lg leading-none text-murekkep"
+        }
+      >
+        {d.toString().padStart(2, "0")}
+      </span>
+      <span className="mt-1 font-govde text-[0.55rem] uppercase tracking-etiket text-ikincil">
+        {e}
+      </span>
+    </span>
+  );
+}
+
+function hesapla(hedefIso: string) {
+  const hedef = new Date(hedefIso).getTime();
+  if (isNaN(hedef)) return { gecti: false, gun: 0, sa: 0, dk: 0, sn: 0 };
+  const fark = hedef - Date.now();
+  const mutlak = Math.abs(fark);
+  return {
+    gecti: fark < 0,
+    gun: Math.floor(mutlak / 86400000),
+    sa: Math.floor((mutlak % 86400000) / 3600000),
+    dk: Math.floor((mutlak % 3600000) / 60000),
+    sn: Math.floor((mutlak % 60000) / 1000),
+  };
 }

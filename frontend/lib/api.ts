@@ -54,6 +54,9 @@ export type EtkinlikAyar = {
   karsilama_metni: string | null;
   prompt_metni: string | null;
   kapanis_pencere_gun: number;
+  sayac_aktif: boolean;
+  sayac_aktif_cumle: string | null;
+  sayac_bitti_cumle: string | null;
 };
 
 // Public davetli karsilama (GET /api/k/{token}).
@@ -66,6 +69,10 @@ export type KatkiKarsilama = {
   prompt_metni: string | null;
   acildi: boolean;
   kapandi: boolean;
+  sayac_aktif: boolean;
+  sayac_aktif_cumle: string | null;
+  sayac_bitti_cumle: string | null;
+  etkinlik_tarihi: string;
 };
 
 // Katki (moderasyon kuyrugu / defter).
@@ -178,6 +185,9 @@ export const api = {
     karsilamaMetni: string;
     promptMetni: string;
     kapanisPencereGun: number;
+    sayacAktif: boolean;
+    sayacAktifCumle: string;
+    sayacBittiCumle: string;
   }>) =>
     istek<EtkinlikAyar>("/api/etkinlik/aktif/ayarlar", {
       method: "PUT",
@@ -187,6 +197,9 @@ export const api = {
         KarsilamaMetni: v.karsilamaMetni ?? null,
         PromptMetni: v.promptMetni ?? null,
         KapanisPencereGun: v.kapanisPencereGun ?? null,
+        SayacAktif: v.sayacAktif ?? null,
+        SayacAktifCumle: v.sayacAktifCumle ?? null,
+        SayacBittiCumle: v.sayacBittiCumle ?? null,
       }),
     }),
 

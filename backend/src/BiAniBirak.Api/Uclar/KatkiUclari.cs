@@ -64,6 +64,11 @@ public static class KatkiUclari
             prompt_metni = ayar?.PromptMetni,
             acildi = acildiMi,
             kapandi = kapandiMi,
+            // Sayac (davetli ekraninda geri sayim)
+            sayac_aktif = ayar?.SayacAktif ?? false,
+            sayac_aktif_cumle = ayar?.SayacAktifCumle,
+            sayac_bitti_cumle = ayar?.SayacBittiCumle,
+            etkinlik_tarihi = etkinlik.EtkinlikTarihi,
         });
     }
 

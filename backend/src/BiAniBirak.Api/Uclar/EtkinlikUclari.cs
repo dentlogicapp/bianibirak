@@ -166,14 +166,19 @@ public static class EtkinlikUclari
             CreatedAt = simdi,
         };
 
-        // etkinlik ayari (hardcoded yasak altyapisi; varsayilan metinlerle dolu - 0D.3)
+        // etkinlik ayari - TURE GORE varsayilan blok (dugun/nisan/nikah ayri metinler).
+        // Cift zorunlu alanlar disinda hicbir seye dokunmasa bile etkinlik kusursuz calisir.
+        var varsayilan = Sabitler.TureGoreVarsayilan(tur);
         var ayar = new EtkinlikAyari
         {
             Id = Guid.NewGuid(),
             EtkinlikId = etkinlik.Id,
-            KarsilamaMetni = Sabitler.VarsayilanKarsilamaMetni,
-            PromptMetni = Sabitler.VarsayilanPromptMetni,
+            KarsilamaMetni = varsayilan.KarsilamaMetni,
+            PromptMetni = varsayilan.PromptMetni,
             KapanisPencereGun = Sabitler.VarsayilanKapanisPencereGun,
+            SayacAktif = true,
+            SayacAktifCumle = varsayilan.SayacAktifCumle,
+            SayacBittiCumle = varsayilan.SayacBittiCumle,
             UpdatedAt = simdi,
         };
 
@@ -431,6 +436,9 @@ public static class EtkinlikUclari
         if (istek.Tema != null) ayar.Tema = istek.Tema.Trim();
         if (istek.KarsilamaMetni != null) ayar.KarsilamaMetni = istek.KarsilamaMetni.Trim();
         if (istek.PromptMetni != null) ayar.PromptMetni = istek.PromptMetni.Trim();
+        if (istek.SayacAktif.HasValue) ayar.SayacAktif = istek.SayacAktif.Value;
+        if (istek.SayacAktifCumle != null) ayar.SayacAktifCumle = istek.SayacAktifCumle.Trim();
+        if (istek.SayacBittiCumle != null) ayar.SayacBittiCumle = istek.SayacBittiCumle.Trim();
         if (istek.KapanisPencereGun.HasValue)
         {
             var gun = istek.KapanisPencereGun.Value;
@@ -523,6 +531,9 @@ public static class EtkinlikUclari
             karsilama_metni = a.KarsilamaMetni,
             prompt_metni = a.PromptMetni,
             kapanis_pencere_gun = a.KapanisPencereGun,
+            sayac_aktif = a.SayacAktif,
+            sayac_aktif_cumle = a.SayacAktifCumle,
+            sayac_bitti_cumle = a.SayacBittiCumle,
         };
 
     private static object KatkiYaniti(Katki k)

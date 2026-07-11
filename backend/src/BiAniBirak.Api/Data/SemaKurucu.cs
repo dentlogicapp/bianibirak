@@ -175,6 +175,11 @@ public static class SemaKurucu
         -- Profilim: cinsiyet kolonu (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "Cinsiyet" text NULL;
 
+        -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
+        ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
+        ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;
+        ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacBittiCumle" text NULL;
+
         -- 0D.2 gecis: EtkinlikTarihi date -> timestamptz (idempotent; zaten timestamptz ise no-op).
         DO $$
         BEGIN
