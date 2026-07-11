@@ -73,7 +73,7 @@ export default function PaylasimSayfasi() {
 
       <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
 
-      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+      <div className="mt-6 grid min-w-0 gap-5 sm:grid-cols-2">
         {linkler.map((l) => (
           <LinkKarti
             key={l.es}
@@ -164,7 +164,7 @@ function LinkKarti({ esAdi, token }: { esAdi: string; token: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-ayrac bg-yuzey p-6">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-ayrac bg-yuzey p-5 sm:p-6">
       <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
         {esAdi} tarafının yakını
       </p>
@@ -175,21 +175,21 @@ function LinkKarti({ esAdi, token }: { esAdi: string; token: string }) {
           className="mx-auto mt-4 h-40 w-40 rounded-xl border border-ayrac"
         />
       )}
-      <div className="mt-4 rounded-lg border border-ayrac bg-parsomen px-3 py-2">
+      <div className="mt-4 min-w-0 rounded-lg border border-ayrac bg-parsomen px-3 py-2">
         <p className="truncate font-govde text-xs text-ikincil" title={url}>
           {url}
         </p>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex min-w-0 gap-2">
         <button
           onClick={paylas}
-          className="flex-1 rounded-full bg-sarap px-5 py-2 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+          className="min-w-0 flex-1 rounded-full bg-sarap px-4 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
         >
           Paylaş
         </button>
         <button
           onClick={kopyala}
-          className="rounded-full border border-ayrac px-5 py-2 font-govde text-sm text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+          className="shrink-0 rounded-full border border-ayrac px-4 py-2.5 font-govde text-sm text-ikincil transition-colors hover:border-sarap hover:text-sarap"
         >
           {kopyalandi ? "Kopyalandı" : "Kopyala"}
         </button>

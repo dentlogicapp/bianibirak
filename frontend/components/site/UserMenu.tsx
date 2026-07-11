@@ -180,32 +180,47 @@ export function UserMenu() {
             </div>
           </div>
 
-          {/* Bolum 1 - Yonetim */}
+          {/* Bolum 1 - Gezinme (planlama sirasi: Profilim ust, sonra ana yollar) */}
           <div className="border-b border-ayrac p-1.5">
-            <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            <MenuDugme
+              onClick={() => {
+                setAcik(false);
+                setTimeout(() => setProfilAcik(true), 50);
+              }}
+              ikon={
+                <>
+                  <circle cx="12" cy="8.5" r="3.4" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                  <path d="M5 19.5a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+                </>
+              }
+            >
+              Profilim
+            </MenuDugme>
+
+            <MenuLink href="/panel/etkinlik" onClick={() => setAcik(false)} ikon={
+              <>
+                <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="M8 8h6M8 11h6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+              </>
+            }>
+              Defter
+            </MenuLink>
+
+            <MenuLink href="/panel/paylasim" onClick={() => setAcik(false)} ikon={
+              <>
+                <circle cx="18" cy="5" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <circle cx="6" cy="12" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <circle cx="18" cy="19" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+              </>
+            }>
+              Paylaşım
+            </MenuLink>
+
+            <MenuLink href="/panel/yonetim" onClick={() => setAcik(false)} ikon={
+              <path d="M12 3.5 5 6.2v5c0 4.2 2.9 8.1 7 9.3 4.1-1.2 7-5.1 7-9.3v-5L12 3.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+            }>
               Yönetim
-            </p>
-            <MenuLink href="/panel/duzenle" onClick={() => setAcik(false)} ikon={
-              <path d="M4 20h4l10-10-4-4L4 16v4Z M13.5 6.5l4 4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            }>
-              Etkinlik &amp; Görünüm
-            </MenuLink>
-            <MenuLink href="/panel/es-ekle" onClick={() => setAcik(false)} ikon={
-              <>
-                <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
-                <path d="M18 8v6M15 11h6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-              </>
-            }>
-              Eşini Ekle
-            </MenuLink>
-            <MenuLink href="/panel/denetim" onClick={() => setAcik(false)} ikon={
-              <>
-                <path d="M9 5h6M4 9h16v11H4z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
-                <path d="M8 13h8M8 16h5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-              </>
-            }>
-              Denetim Günlüğü
             </MenuLink>
           </div>
 
@@ -222,7 +237,7 @@ export function UserMenu() {
                     key={e.id}
                     disabled={gecis}
                     onClick={() => etkinlikDegistir(e.id)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
+                    className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
                       <path
@@ -233,7 +248,7 @@ export function UserMenu() {
                       />
                       <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
                     </svg>
-                    <span className="flex-1 truncate">
+                    <span className="min-w-0 flex-1 truncate">
                       {e.es1_ad} &amp; {e.es2_ad}
                     </span>
                     <span className="shrink-0 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
@@ -244,25 +259,8 @@ export function UserMenu() {
             </div>
           )}
 
-          {/* Bolum 2 - Hesap */}
+          {/* Bolum 2 - Tema + Bildirimler + Cikis */}
           <div className="p-1.5">
-            <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-              Hesap
-            </p>
-            <button
-              onClick={() => {
-                setAcik(false);
-                setProfilAcik(true);
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4 text-ikincil" aria-hidden>
-                <circle cx="12" cy="8" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                <path d="M5 20a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
-              </svg>
-              Profilim
-            </button>
-
             {/* Tema */}
             <button
               onClick={temaTersle}
@@ -435,6 +433,29 @@ function MenuLink({
       </svg>
       {children}
     </Link>
+  );
+}
+
+// Menu ogesi - buton (Profilim gibi modal acanlar icin)
+function MenuDugme({
+  onClick,
+  ikon,
+  children,
+}: {
+  onClick: () => void;
+  ikon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+        {ikon}
+      </svg>
+      {children}
+    </button>
   );
 }
 
