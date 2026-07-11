@@ -25,8 +25,15 @@ public class JwtServisi
     public int GecerlilikGun => _gecerlilikGun;
 
     // aktifEtkinlikId opsiyonel: kayit/giris'te null (bos claim); aktif-yap ucunda dolu.
-    // Boylece mevcut cagrilar bozulmaz, tenant baglami sonradan JWT'ye gomulur.
-    public string Uret(Kullanici kullanici, Guid? aktifEtkinlikId = null)
+    // goruntulemeModu: super admin baska bir deftere SALT-OKUNUR girdiginde true.
+    //   -> global write-guard middleware bu claim'i gorur ve tum tenant yazimlarini 403 yapar.
+    //   -> otorite JWT claim'idir; frontend header'ina ASLA guvenilmez.
+    // sureSaat: doluysa gun yerine saat cinsinden omur (impersonation = 1 saat).
+    public string Uret(
+        Kullanici kullanici,
+        Guid? aktifEtkinlikId = null,
+        bool goruntulemeModu = false,
+        int? sureSaat = null)
     {
         var anahtar = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_gizli));
         var imza = new SigningCredentials(anahtar, SecurityAlgorithms.HmacSha256);
@@ -37,14 +44,19 @@ public class JwtServisi
             new(JwtRegisteredClaimNames.Email, kullanici.Email),
             new("super_admin", kullanici.SuperAdmin ? "true" : "false"),
             new("aktif_etkinlik_id", aktifEtkinlikId?.ToString() ?? string.Empty),
+            new("goruntuleme_modu", goruntulemeModu ? "true" : "false"),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
+
+        var bitis = sureSaat.HasValue
+            ? DateTime.UtcNow.AddHours(sureSaat.Value)
+            : DateTime.UtcNow.AddDays(_gecerlilikGun);
 
         var token = new JwtSecurityToken(
             issuer: _yayinci,
             audience: _hedef,
             claims: talepler,
-            expires: DateTime.UtcNow.AddDays(_gecerlilikGun),
+            expires: bitis,
             signingCredentials: imza);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

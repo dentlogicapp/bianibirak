@@ -89,10 +89,19 @@ public static class KatkiUclari
 
         // Yasam dongusu pencere kontrolu (backend zorunlu - kirmizi cizgi)
         var simdi = DateTimeOffset.UtcNow;
+
+        // SUPER PANEL: dondurulmus / cope atilmis defterde YAZIM reddedilir (kotuye kullanim - Belge 08).
+        // Guest token'la gelen davetli de dahil - UI'da gizlemek yetmez, kontrol backend'de.
+        if (etkinlik.SilindiMi)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Bu defter artık kullanılamıyor.");
+        if (etkinlik.Donduruldu)
+            return Hata(403, "ETKINLIK_DONDURULDU",
+                "Bu defter geçici olarak durduruldu; şu an yeni anı eklenemiyor.");
+
         if (simdi < etkinlik.AcilisTarihi)
-            return Hata(403, "ETKINLIK_ACILMADI", "Bu defter henuz acilmadi.");
+            return Hata(403, "ETKINLIK_ACILMADI", "Bu defter henüz açılmadı.");
         if (simdi > etkinlik.KapanisTarihi || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
-            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandi; yeni ani eklenemiyor.");
+            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı; yeni anı eklenemiyor.");
 
         // Dogrulama (ad+email+telefon+mesaj zorunlu - Belge 08)
         var ad = (istek.DavetliAd ?? "").Trim();

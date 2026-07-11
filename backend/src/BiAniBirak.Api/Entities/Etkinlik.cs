@@ -30,4 +30,12 @@ public class Etkinlik
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+
+    // ---- SUPER PANEL ----
+    // Cop kutusu (iki asamali silme: once cope at, sonra kalici sil)
+    public bool SilindiMi { get; set; }
+    public DateTimeOffset? SilinmeZamani { get; set; }
+
+    // Dondurma (kotuye kullanim - Belge 08): davetli YAZIMI reddedilir, cift okuyabilir.
+    public bool Donduruldu { get; set; }
 }

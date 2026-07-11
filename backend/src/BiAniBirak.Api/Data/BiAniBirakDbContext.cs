@@ -26,6 +26,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Cihaz> Cihazlar => Set<Cihaz>();
     public DbSet<ErtelenenBildirim> ErtelenenBildirimler => Set<ErtelenenBildirim>();
     public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
+    public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
+    public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -41,6 +43,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.SifreHash).HasColumnName("sifre_hash").IsRequired();
             e.Property(x => x.Ad).HasColumnName("Ad").IsRequired();
             e.Property(x => x.Cinsiyet).HasColumnName("Cinsiyet");
+            e.Property(x => x.SuperAdmin).HasColumnName("SuperAdmin");
             e.Property(x => x.SuperAdmin).HasColumnName("super_admin");
             e.Property(x => x.SessizSaatAktif).HasColumnName("SessizSaatAktif");
             e.Property(x => x.SessizSaatBaslangic).HasColumnName("SessizSaatBaslangic");
@@ -79,6 +82,9 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.AcilisTarihi).HasColumnName("AcilisTarihi");
             e.Property(x => x.KapanisTarihi).HasColumnName("KapanisTarihi");
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.SilindiMi).HasColumnName("SilindiMi");
+            e.Property(x => x.SilinmeZamani).HasColumnName("SilinmeZamani");
+            e.Property(x => x.Donduruldu).HasColumnName("Donduruldu");
             e.Property(x => x.UstOrganizatorId).HasColumnName("UstOrganizatorId");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
@@ -186,6 +192,9 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Mesaj).HasColumnName("Mesaj").IsRequired();
             e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.SilindiMi).HasColumnName("SilindiMi");
+            e.Property(x => x.SilinmeZamani).HasColumnName("SilinmeZamani");
+            e.Property(x => x.SilenKullaniciId).HasColumnName("SilenKullaniciId");
             e.Property(x => x.OnaylayanKullaniciId).HasColumnName("OnaylayanKullaniciId");
             e.Property(x => x.OnayZamani).HasColumnName("OnayZamani");
             e.Property(x => x.DuzeltmeNotu).HasColumnName("DuzeltmeNotu");
@@ -274,6 +283,41 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => new { x.KullaniciId, x.OkunduMu });
             e.HasOne<Kullanici>().WithMany().HasForeignKey(x => x.KullaniciId);
+        });
+
+        // ---- sistem_metinleri (KVKK/gizlilik - super panelden yonetilir) ----
+        model.Entity<SistemMetni>(e =>
+        {
+            e.ToTable("sistem_metinleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Anahtar).HasColumnName("Anahtar").IsRequired();
+            e.Property(x => x.Baslik).HasColumnName("Baslik").IsRequired();
+            e.Property(x => x.Icerik).HasColumnName("Icerik").IsRequired();
+            e.Property(x => x.YururlukTarihi).HasColumnName("YururlukTarihi");
+            e.Property(x => x.GuncelleyenKullaniciId).HasColumnName("GuncelleyenKullaniciId");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => x.Anahtar).IsUnique();
+        });
+
+        // ---- kvkk_talepleri (ilgili kisi haklari) ----
+        model.Entity<KvkkTalebi>(e =>
+        {
+            e.ToTable("kvkk_talepleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Email).HasColumnName("Email").IsRequired();
+            e.Property(x => x.Tip).HasColumnName("Tip").IsRequired();
+            e.Property(x => x.Aciklama).HasColumnName("Aciklama").IsRequired();
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.SonucNotu).HasColumnName("SonucNotu");
+            e.Property(x => x.SonYanitTarihi).HasColumnName("SonYanitTarihi");
+            e.Property(x => x.IsleyenKullaniciId).HasColumnName("IsleyenKullaniciId");
+            e.Property(x => x.IslemZamani).HasColumnName("IslemZamani");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.Durum);
         });
     }
 }

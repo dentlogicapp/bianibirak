@@ -32,6 +32,8 @@ export type Kullanici = {
   email: string;
   cinsiyet: string | null;
   super_admin: boolean;
+  goruntuleme_modu: boolean;
+  goruntulenen_defter: string | null;
 };
 
 // Backend EtkinlikYaniti ile birebir (snake_case alanlar).
@@ -99,6 +101,93 @@ export type Bildirim = {
 export type BildirimOzeti = {
   okunmamis_sayisi: number;
   bildirimler: Bildirim[];
+};
+
+// ---- SUPER PANEL ----
+export type SuperOzet = {
+  defter: { toplam: number; aktif: number; donduruldu: number; copte: number; yeni_7gun: number };
+  kullanici: { toplam: number; super_admin: number };
+  dilek: {
+    toplam: number;
+    beklemede: number;
+    onayli: number;
+    red: number;
+    kaldirilan: number;
+    yeni_7gun: number;
+  };
+  kvkk: { bekleyen_talep: number };
+};
+
+export type SuperDefter = {
+  id: string;
+  es1_ad: string;
+  es2_ad: string;
+  tur: string;
+  etkinlik_tarihi: string;
+  durum: string;
+  donduruldu: boolean;
+  silindi_mi: boolean;
+  silinme_zamani: string | null;
+  created_at: string;
+  uye_sayisi: number;
+  dilek_sayisi: number;
+  bekleyen_dilek: number;
+  hareketsiz: boolean;
+};
+
+export type SuperKullanici = {
+  id: string;
+  ad: string;
+  email: string;
+  super_admin: boolean;
+  created_at: string;
+  defterler: { defter: string; rol: string }[];
+};
+
+export type AkisKaydi = {
+  id: string;
+  eylem: string;
+  varlik: string;
+  aktor: string;
+  defter: string | null;
+  degisen_alanlar: string | null;
+  created_at: string;
+};
+
+export type KvkkMetin = {
+  anahtar: string;
+  baslik: string;
+  icerik: string;
+  yururluk_tarihi: string;
+  updated_at: string;
+};
+
+export type KvkkTalep = {
+  id: string;
+  email: string;
+  tip: string;
+  aciklama: string;
+  durum: string;
+  sonuc_notu: string | null;
+  son_yanit_tarihi: string;
+  created_at: string;
+};
+
+export type CopKutusu = {
+  defterler: {
+    id: string;
+    es1_ad: string;
+    es2_ad: string;
+    tur: string;
+    silinme_zamani: string;
+  }[];
+  dilekler: {
+    id: string;
+    etkinlik_id: string;
+    davetli_ad: string;
+    mesaj: string;
+    silinme_zamani: string;
+  }[];
 };
 
 // Denetim gunlugu kaydi.
@@ -231,6 +320,68 @@ export const api = {
       davetli_ad: string;
       benim_kuyrugumda: boolean;
     }>(`/api/etkinlik/aktif/katki/${id}`),
+  // ---- SUPER PANEL ----
+  superOzet: () => istek<SuperOzet>("/api/super/ozet"),
+  superDefterler: (ara?: string, durum?: string, cop?: boolean) => {
+    const p = new URLSearchParams();
+    if (ara) p.set("ara", ara);
+    if (durum) p.set("durum", durum);
+    if (cop) p.set("cop", "true");
+    const q = p.toString();
+    return istek<SuperDefter[]>(`/api/super/defterler${q ? `?${q}` : ""}`);
+  },
+  superGoruntule: (id: string) =>
+    istek<{
+      ok: boolean;
+      goruntuleme_modu: boolean;
+      defter: { id: string; es1_ad: string; es2_ad: string };
+      gecerlilik_bitis: string | null;
+    }>(`/api/super/defter/${id}/goruntule`, { method: "POST" }),
+  superGoruntulemeBitir: () =>
+    istek<{ ok: boolean; aktif_etkinlik_id: string | null }>("/api/super/goruntule/bitir", {
+      method: "POST",
+    }),
+  superDondur: (id: string) =>
+    istek<{ ok: boolean; donduruldu: boolean }>(`/api/super/defter/${id}/dondur`, {
+      method: "POST",
+    }),
+  superDefterCopeAt: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/defter/${id}`, { method: "DELETE" }),
+  superDefterGeriAl: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/defter/${id}/geri-al`, { method: "POST" }),
+  superDefterKaliciSil: (id: string, teyit: string) =>
+    istek<{ ok: boolean }>(`/api/super/defter/${id}/kalici-sil`, {
+      method: "POST",
+      body: JSON.stringify({ Teyit: teyit }),
+    }),
+  superKatkiKaldir: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/katki/${id}`, { method: "DELETE" }),
+  superKatkiGeriAl: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/katki/${id}/geri-al`, { method: "POST" }),
+  superCop: () => istek<CopKutusu>("/api/super/cop"),
+  superKullanicilar: (ara?: string) =>
+    istek<SuperKullanici[]>(`/api/super/kullanicilar${ara ? `?ara=${encodeURIComponent(ara)}` : ""}`),
+  superAdminAta: (id: string, superAdmin: boolean) =>
+    istek<{ ok: boolean; super_admin: boolean }>(`/api/super/kullanici/${id}/super-admin`, {
+      method: "POST",
+      body: JSON.stringify({ SuperAdmin: superAdmin }),
+    }),
+  superAkis: (limit?: number) =>
+    istek<AkisKaydi[]>(`/api/super/akis${limit ? `?limit=${limit}` : ""}`),
+  superKvkkMetinler: () => istek<KvkkMetin[]>("/api/super/kvkk/metinler"),
+  superKvkkMetinGuncelle: (anahtar: string, v: { baslik?: string; icerik?: string }) =>
+    istek<{ ok: boolean }>(`/api/super/kvkk/metin/${anahtar}`, {
+      method: "PUT",
+      body: JSON.stringify({ Baslik: v.baslik ?? null, Icerik: v.icerik ?? null }),
+    }),
+  superKvkkTalepler: (durum?: string) =>
+    istek<KvkkTalep[]>(`/api/super/kvkk/talepler${durum ? `?durum=${durum}` : ""}`),
+  superKvkkTalepIsle: (id: string, durum: string, sonucNotu?: string) =>
+    istek<{ ok: boolean }>(`/api/super/kvkk/talep/${id}`, {
+      method: "POST",
+      body: JSON.stringify({ Durum: durum, SonucNotu: sonucNotu ?? null }),
+    }),
+
   denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
 
   // Es daveti (paylasilabilir link - mail gerekmez)

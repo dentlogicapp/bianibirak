@@ -562,7 +562,8 @@ public static class EtkinlikUclari
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
 
         var kuyruk = await db.Katkilar.AsNoTracking()
-            .Where(k => k.EtkinlikId == etkinlikId && k.KaynakEs == rol && k.Durum == "beklemede")
+            .Where(k => k.EtkinlikId == etkinlikId && k.KaynakEs == rol && k.Durum == "beklemede"
+                        && !k.SilindiMi)
             .OrderBy(k => k.CreatedAt)
             .ToListAsync();
 
@@ -580,7 +581,7 @@ public static class EtkinlikUclari
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
 
         var defter = await db.Katkilar.AsNoTracking()
-            .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli")
+            .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli" && !k.SilindiMi)
             .OrderBy(k => k.CreatedAt)
             .ToListAsync();
 

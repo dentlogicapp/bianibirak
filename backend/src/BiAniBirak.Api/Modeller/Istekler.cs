@@ -55,3 +55,20 @@ public record EtkinlikAyarGuncelleIstek(
     bool? SayacAktif,
     string? SayacAktifCumle,
     string? SayacBittiCumle);
+
+// ---- SUPER PANEL ----
+
+// Kalici silme: cift adi teyidi ("Ayse & Musa" birebir)
+public record KaliciSilIstek(string? Teyit);
+
+// Super admin yetkisi ata/kaldir
+public record SuperAdminAtaIstek(bool SuperAdmin);
+
+// KVKK/gizlilik metni guncelle
+public record SistemMetniGuncelleIstek(
+    string? Baslik,
+    string? Icerik,
+    DateTimeOffset? YururlukTarihi);
+
+// KVKK talebi isle (durum + sonuc notu)
+public record KvkkTalepIsleIstek(string Durum, string? SonucNotu);

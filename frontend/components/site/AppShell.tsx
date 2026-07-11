@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
 import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
+import { GoruntulemeBandi } from "@/components/site/GoruntulemeBandi";
 import { useSwOdakDinleyici } from "@/lib/odak";
 
 // Uygulama kabugu: TEK navigasyon noktasi = avatar menusu + baglamsal ust bar.
@@ -21,6 +22,7 @@ const HIYERARSI: Record<string, Sayfa> = {
   "/panel/denetim": { baslik: "Denetim Günlüğü", ebeveyn: "/panel/yonetim" },
   "/panel/es-ekle": { baslik: "Eşini Ekle", ebeveyn: "/panel/yonetim" },
   "/panel": { baslik: "Etkinliklerim", ebeveyn: "/panel/yonetim" },
+  "/panel/super": { baslik: "Süper Panel", ebeveyn: "/panel/etkinlik" },
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -50,6 +52,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-parsomen">
+      <GoruntulemeBandi />
+
       <header className="sticky top-0 z-40 border-b border-ayrac/60 bg-parsomen/90 backdrop-blur">
         <div
           className={`mx-auto flex max-w-icerik items-center justify-between px-5 transition-all duration-200 sm:px-6 ${

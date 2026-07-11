@@ -40,4 +40,10 @@ public class Katki
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // ---- SUPER PANEL MODERASYON ----
+    // Uygunsuz icerik kaldirma (Belge 08: raporla/kaldir). Cop kutusuna duser, geri alinabilir.
+    public bool SilindiMi { get; set; }
+    public DateTimeOffset? SilinmeZamani { get; set; }
+    public Guid? SilenKullaniciId { get; set; }
 }

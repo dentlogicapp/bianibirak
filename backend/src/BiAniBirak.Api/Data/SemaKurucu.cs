@@ -168,6 +168,53 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_bildirimler_kullanici_okundu ON bildirimler ("KullaniciId", "OkunduMu");
 
+        -- ================= SUPER PANEL =================
+        -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SuperAdmin" boolean NOT NULL DEFAULT false;
+        CREATE INDEX IF NOT EXISTS ix_kullanicilar_super_admin
+            ON kullanicilar ("SuperAdmin") WHERE "SuperAdmin" = true;
+
+        -- Etkinlik: cop kutusu (iki asamali silme) + dondurma (kotuye kullanim)
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "SilindiMi" boolean NOT NULL DEFAULT false;
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "SilinmeZamani" timestamptz NULL;
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "Donduruldu" boolean NOT NULL DEFAULT false;
+        CREATE INDEX IF NOT EXISTS ix_etkinlikler_silindi ON etkinlikler ("SilindiMi");
+
+        -- Katki: moderasyon kaldirma (cop kutusu, geri alinabilir)
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "SilindiMi" boolean NOT NULL DEFAULT false;
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "SilinmeZamani" timestamptz NULL;
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "SilenKullaniciId" uuid NULL;
+        CREATE INDEX IF NOT EXISTS ix_katkilar_silindi ON katkilar ("SilindiMi");
+
+        -- KVKK / gizlilik metinleri (hardcoded yasak: sayfalar buradan okur)
+        CREATE TABLE IF NOT EXISTS sistem_metinleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "Anahtar" text NOT NULL,
+            "Baslik" text NOT NULL,
+            "Icerik" text NOT NULL,
+            "YururlukTarihi" timestamptz NOT NULL DEFAULT now(),
+            "GuncelleyenKullaniciId" uuid NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_sistem_metinleri_anahtar ON sistem_metinleri ("Anahtar");
+
+        -- KVKK ilgili kisi talepleri (erisim/duzeltme/silme/itiraz - 30 gun yasal sure)
+        CREATE TABLE IF NOT EXISTS kvkk_talepleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NULL,
+            "Email" text NOT NULL,
+            "Tip" text NOT NULL,
+            "Aciklama" text NOT NULL,
+            "Durum" text NOT NULL DEFAULT 'yeni',
+            "SonucNotu" text NULL,
+            "SonYanitTarihi" timestamptz NOT NULL DEFAULT (now() + interval '30 days'),
+            "IsleyenKullaniciId" uuid NULL,
+            "IslemZamani" timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_kvkk_talepleri_durum ON kvkk_talepleri ("Durum");
+
         -- Push: kullanicilara sessiz saat kolonlari (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBaslangic" text NULL;

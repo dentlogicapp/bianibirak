@@ -222,6 +222,26 @@ export function UserMenu() {
             }>
               Yönetim
             </MenuLink>
+
+            {/* Super Panel - yalniz sistem yoneticisi gorur (yaldiz vurgu) */}
+            {kullanici.super_admin && (
+              <Link
+                href="/panel/super"
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm font-medium text-yaldiz transition-colors hover:bg-yuzeyKoyu"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                  <path
+                    d="M4 8.5 7.5 12 12 5l4.5 7L20 8.5V18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8.5Z"
+                    stroke="currentColor"
+                    strokeWidth={1.6}
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                </svg>
+                Süper Panel
+              </Link>
+            )}
           </div>
 
           {/* Diger etkinliklerin (yalniz 2+ etkinlik varsa - planlama workspace switcher) */}

@@ -96,14 +96,35 @@ public static class KimlikUclari
         var kimlik = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
                      ?? ctx.User.FindFirstValue("sub");
         if (!Guid.TryParse(kimlik, out var id))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
         var kullanici = await db.Kullanicilar
             .FirstOrDefaultAsync(k => k.Id == id && k.DeletedAt == null);
         if (kullanici == null)
-            return Hata(401, "ERISIM_YOK", "Kullanici bulunamadi.");
+            return Hata(401, "ERISIM_YOK", "Kullanıcı bulunamadı.");
 
-        return Results.Json(KullaniciYaniti(kullanici));
+        // Goruntuleme modu (super admin salt-okunur girisi) - frontend bant gosterir.
+        var goruntulemeModu = ctx.User.FindFirstValue("goruntuleme_modu") == "true";
+        string? hedefDefter = null;
+        if (goruntulemeModu &&
+            Guid.TryParse(ctx.User.FindFirstValue("aktif_etkinlik_id"), out var hedefId))
+        {
+            hedefDefter = await db.Etkinlikler.AsNoTracking()
+                .Where(e => e.Id == hedefId)
+                .Select(e => e.Es1Ad + " & " + e.Es2Ad)
+                .FirstOrDefaultAsync();
+        }
+
+        return Results.Json(new
+        {
+            id = kullanici.Id,
+            ad = kullanici.Ad,
+            email = kullanici.Email,
+            cinsiyet = kullanici.Cinsiyet,
+            super_admin = kullanici.SuperAdmin,
+            goruntuleme_modu = goruntulemeModu,
+            goruntulenen_defter = hedefDefter,
+        });
     }
 
     // Profil guncelle: ad + cinsiyet. E-posta DEGISTIRILEMEZ (guvenlik/kimlik).

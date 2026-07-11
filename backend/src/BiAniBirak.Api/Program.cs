@@ -2,6 +2,7 @@
 // Asama 4: kimlik cekirdegi (JwtBearer + host-scoped cerez okuma) + servis kayitlari.
 using System.Text;
 using BiAniBirak.Api.Data;
+using BiAniBirak.Api.Entities;
 using BiAniBirak.Api.Kimlik;
 using BiAniBirak.Api.Servisler;
 using BiAniBirak.Api.Uclar;
@@ -86,12 +87,63 @@ if (!string.IsNullOrWhiteSpace(postgresBaglanti))
 app.UseAuthentication();
 app.UseAuthorization();
 
+// ============ GORUNTULEME MODU YAZMA KORUMASI (OWASP A01) ============
+// Super admin baska bir ani defterine SALT-OKUNUR girer. Otorite JWT claim'idir
+// (goruntuleme_modu=true); frontend header'ina ASLA guvenilmez.
+// Yazma metodu + tenant yolu -> 403 + audit (adli iz).
+// Istisnalar (kilitlenme onleme):
+//   /api/super/*  -> goruntulemeyi bitirebilmeli + super admin islemleri serbest
+//   /api/kimlik/* -> giris/cikis kimlik islemi; tenant verisi yazimi degil
+app.Use(async (ctx, sonraki) =>
+{
+    if (ctx.User?.FindFirst("goruntuleme_modu")?.Value == "true")
+    {
+        var metot = ctx.Request.Method;
+        var yazma = HttpMethods.IsPost(metot) || HttpMethods.IsPut(metot)
+                    || HttpMethods.IsPatch(metot) || HttpMethods.IsDelete(metot);
+
+        var yol = ctx.Request.Path.Value ?? string.Empty;
+        var superYolu = yol.StartsWith("/api/super", StringComparison.OrdinalIgnoreCase);
+        var kimlikYolu = yol.StartsWith("/api/kimlik", StringComparison.OrdinalIgnoreCase);
+
+        if (yazma && !superYolu && !kimlikYolu)
+        {
+            // Adli iz: yazma denemesi audit'e yazilir (Belge 08 - impersonation her zaman audit'e).
+            using var kapsam = ctx.RequestServices.CreateScope();
+            var db = kapsam.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
+            Guid.TryParse(ctx.User.FindFirst("sub")?.Value, out var aktorId);
+            Guid.TryParse(ctx.User.FindFirst("aktif_etkinlik_id")?.Value, out var hedefId);
+            db.DenetimGunlukleri.Add(new DenetimGunlugu
+            {
+                Id = Guid.NewGuid(),
+                EtkinlikId = hedefId == Guid.Empty ? null : hedefId,
+                KullaniciId = aktorId == Guid.Empty ? null : aktorId,
+                Eylem = "GORUNTULEME_YAZMA_ENGELLENDI",
+                Varlik = "sistem",
+                DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { metot, yol }),
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+
+            ctx.Response.StatusCode = 403;
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                hata = "GORUNTULEME_MODU",
+                mesaj = "Görüntüleme modundasın - bu defterde değişiklik yapamazsın.",
+            });
+            return;
+        }
+    }
+    await sonraki();
+});
+
 app.KimlikUclariniEkle();
 app.EtkinlikUclariniEkle();
 app.KatkiUclariniEkle();
 app.CihazUclariniEkle();
 app.BildirimUclariniEkle();
 app.DavetUclariniEkle();
+app.SuperUclariniEkle();
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new
