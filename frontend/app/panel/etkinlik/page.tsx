@@ -95,7 +95,7 @@ function DefterIcerik() {
     // ANLIK: kuyruktan cikar; onaylandiysa ORTAK DEFTERE ekle (yenileme gerekmez).
     setKuyruk((o) => o.filter((x) => x.id !== k.id));
     if (onay) {
-      setDefter((o) => [{ ...k, durum: "onaylandi" }, ...o]);
+      setDefter((o) => [{ ...k, durum: "onayli" }, ...o]);
     }
   }
 

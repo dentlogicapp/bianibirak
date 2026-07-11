@@ -85,14 +85,14 @@ export function UserMenu() {
     const katkiId = eslesme[1];
 
     // 3) Dilegin GUNCEL durumunu sunucudan oku (planlama: cache'e guvenme).
-    //    Duruma gore hedefi kur -> defter sayfasi uyariyi + odagi isler.
+    //    Gercek durum degerleri: "beklemede" | "onayli" | "red"
     const c = await api.katkiDurum(katkiId);
     let hedef: string;
     if (!c.ok) {
       hedef = `/panel/etkinlik?uyari=bulunamadi`;
-    } else if (c.veri.durum === "onaylandi") {
+    } else if (c.veri.durum === "onayli") {
       hedef = `/panel/etkinlik?focus=${katkiId}&uyari=onaylandi`;
-    } else if (c.veri.durum === "reddedildi") {
+    } else if (c.veri.durum === "red") {
       hedef = `/panel/etkinlik?uyari=reddedildi`;
     } else {
       hedef = `/panel/etkinlik?focus=${katkiId}`;
