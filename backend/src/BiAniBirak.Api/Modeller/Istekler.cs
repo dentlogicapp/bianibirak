@@ -14,7 +14,8 @@ public record EtkinlikOlusturIstek(
     string Es2Ad,
     string EtkinlikTarihi,
     string? AcilisTarihi,
-    string? KapanisTarihi);
+    string? KapanisTarihi,
+    string? KurucuEs);
 
 // Etkinlik duzenleme. Null alan = degistirme (kismi guncelleme).
 public record EtkinlikGuncelleIstek(

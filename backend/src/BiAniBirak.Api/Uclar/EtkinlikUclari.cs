@@ -91,6 +91,12 @@ public static class EtkinlikUclari
             return Hata(400, "DOGRULAMA_HATASI",
                 "Tur (dugun/nisan/nikah) ve iki es adi gereklidir.");
 
+        // Kurucu hangi es? Verilmezse es1 (geriye donuk uyumluluk).
+        // Bu, "hangi linkten gelen katki kime duser" dogrulugunu saglar.
+        var kurucuEs = (istek.KurucuEs ?? "es1").Trim().ToLowerInvariant();
+        if (kurucuEs != "es1" && kurucuEs != "es2")
+            return Hata(400, "DOGRULAMA_HATASI", "Kurucu es gecersiz (es1/es2).");
+
         if (!DateTimeOffset.TryParse(istek.EtkinlikTarihi, CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var etkinlikTarihi))
             return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi/saati gereklidir.");
@@ -129,13 +135,13 @@ public static class EtkinlikUclari
             UpdatedAt = simdi,
         };
 
-        // olusturan = es1 uyesi
+        // olusturan = kendi sectigi es rolunun uyesi (KurucuEs)
         var uyelik = new EtkinlikUyeligi
         {
             Id = Guid.NewGuid(),
             EtkinlikId = etkinlik.Id,
             KullaniciId = kullaniciId,
-            Rol = "es1",
+            Rol = kurucuEs,
             CreatedAt = simdi,
         };
 

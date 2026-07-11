@@ -111,6 +111,7 @@ export const api = {
     etkinlikTarihi: string;
     acilisTarihi?: string;
     kapanisTarihi?: string;
+    kurucuEs?: string;
   }) =>
     istek<Etkinlik>("/api/etkinlik", {
       method: "POST",
@@ -121,6 +122,7 @@ export const api = {
         EtkinlikTarihi: v.etkinlikTarihi,
         AcilisTarihi: v.acilisTarihi ?? null,
         KapanisTarihi: v.kapanisTarihi ?? null,
+        KurucuEs: v.kurucuEs ?? "es1",
       }),
     }),
   etkinliklerim: () => istek<Etkinlik[]>("/api/etkinliklerim"),

@@ -206,6 +206,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
   const [tur, setTur] = useState("dugun");
   const [es1Ad, setEs1Ad] = useState("");
   const [es2Ad, setEs2Ad] = useState("");
+  const [kurucuEs, setKurucuEs] = useState("es1");
   const [etkinlikTarihi, setEtkinlikTarihi] = useState("");
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -227,6 +228,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
       es1Ad: es1Ad.trim(),
       es2Ad: es2Ad.trim(),
       etkinlikTarihi: new Date(etkinlikTarihi).toISOString(),
+      kurucuEs,
     });
     setYukleniyor(false);
     if (cevap.ok) onEklendi(cevap.veri);
@@ -280,6 +282,38 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
             placeholder="Örn. Mehmet"
           />
         </div>
+      </div>
+
+      {/* Kurucu hangi es? Katkilar ve bildirimler bu secime gore dogru ese duser. */}
+      <div>
+        <label className="mb-2 block font-govde text-xs uppercase tracking-etiket text-ikincil">
+          Bu hesap hangi eşe ait?
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { deger: "es1", ad: es1Ad.trim() || "İlk eş" },
+            { deger: "es2", ad: es2Ad.trim() || "İkinci eş" },
+          ].map((o) => {
+            const secili = kurucuEs === o.deger;
+            return (
+              <button
+                key={o.deger}
+                type="button"
+                onClick={() => setKurucuEs(o.deger)}
+                className={`rounded-xl border px-4 py-3 font-govde text-sm transition-colors ${
+                  secili
+                    ? "border-sarap bg-sarap/10 font-medium text-sarap"
+                    : "border-ayrac bg-parsomen text-ikincil hover:border-sarap/50"
+                }`}
+              >
+                {o.ad}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 font-govde text-xs text-ikincil">
+          Seçtiğin eşin bağlantısından gelen dilekler senin onay kuyruğuna düşer.
+        </p>
       </div>
 
       <div>
