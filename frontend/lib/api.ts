@@ -233,6 +233,29 @@ export const api = {
     }>(`/api/etkinlik/aktif/katki/${id}`),
   denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
 
+  // Es daveti (paylasilabilir link - mail gerekmez)
+  davetDurum: () =>
+    istek<{ es_katildi: boolean; hedef_rol: string; token: string | null }>(
+      "/api/etkinlik/aktif/davet"
+    ),
+  davetOlustur: () =>
+    istek<{ token: string; hedef_rol: string; durum: string }>("/api/etkinlik/aktif/davet", {
+      method: "POST",
+    }),
+  davetBilgi: (token: string) =>
+    istek<{
+      durum: string;
+      hedef_rol: string;
+      es1_ad: string;
+      es2_ad: string;
+      tur: string;
+      etkinlik_tarihi: string;
+    }>(`/api/davet/${token}`),
+  davetKabul: (token: string) =>
+    istek<{ durum: string; etkinlik_id: string; rol: string }>(`/api/davet/${token}/kabul`, {
+      method: "POST",
+    }),
+
   // Uygulama-ici bildirimler (avatar cani)
   bildirimler: () => istek<BildirimOzeti>("/api/bildirimler"),
   bildirimOkundu: (id: string) =>

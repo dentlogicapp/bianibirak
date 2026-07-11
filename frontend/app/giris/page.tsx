@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { api } from "@/lib/api";
@@ -9,7 +9,17 @@ import { api } from "@/lib/api";
 // KVKK deseni (Planlama/Stripe/Linear/Notion): girişte onay kutusu YOK - sürtünmesiz.
 // KVKK yalnız kayıtta ince onam metni + her iki modda footer'da kanuni erişim linki.
 export default function GirisSayfasi() {
+  return (
+    <Suspense fallback={null}>
+      <GirisIcerik />
+    </Suspense>
+  );
+}
+
+function GirisIcerik() {
   const router = useRouter();
+  const arama = useSearchParams();
+  const davetToken = arama.get("davet"); // es daveti ile geldiyse geri don
   const [kayitMi, setKayitMi] = useState(false);
   const [ad, setAd] = useState("");
   const [email, setEmail] = useState("");
@@ -32,6 +42,13 @@ export default function GirisSayfasi() {
     if (!cevap.ok) {
       setYukleniyor(false);
       setHata(cevap.mesaj);
+      return;
+    }
+
+    // Es daveti ile geldiyse davet ekranina don (orada "Deftere katil" butonu cikar).
+    if (davetToken) {
+      setYukleniyor(false);
+      router.push(`/davet/${davetToken}`);
       return;
     }
 

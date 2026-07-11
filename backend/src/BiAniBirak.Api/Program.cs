@@ -91,6 +91,7 @@ app.EtkinlikUclariniEkle();
 app.KatkiUclariniEkle();
 app.CihazUclariniEkle();
 app.BildirimUclariniEkle();
+app.DavetUclariniEkle();
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

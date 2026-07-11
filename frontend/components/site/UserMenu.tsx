@@ -190,6 +190,15 @@ export function UserMenu() {
             }>
               Etkinlik &amp; Görünüm
             </MenuLink>
+            <MenuLink href="/panel/es-ekle" onClick={() => setAcik(false)} ikon={
+              <>
+                <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+                <path d="M18 8v6M15 11h6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+              </>
+            }>
+              Eşini Ekle
+            </MenuLink>
             <MenuLink href="/panel/denetim" onClick={() => setAcik(false)} ikon={
               <>
                 <path d="M9 5h6M4 9h16v11H4z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
