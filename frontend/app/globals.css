@@ -252,3 +252,13 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 106, 0.75); }
   50% { box-shadow: 0 0 0 5px rgba(212, 175, 106, 0); }
 }
+
+/* Sayfa gecisi - yumusak beliriş (Linear/Notion hissi) */
+@keyframes sayfaGirisi {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sayfa-girisi { animation: sayfaGirisi 160ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sayfa-girisi { animation: none; }
+}

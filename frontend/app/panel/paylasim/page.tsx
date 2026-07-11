@@ -60,20 +60,16 @@ export default function PaylasimSayfasi() {
 
   return (
     <AppShell>
-      <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Paylaşım</p>
-        <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">
-          Davet bağlantıları
-        </h1>
-        <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Her eşin ayrı bağlantısı ve QR kodu var. Davetliler bu bağlantıdan dilek bırakır;
-          hangi bağlantıdan geldiği o eşin onay kuyruğuna düşer.
-        </p>
-      </div>
+      {/* Ust barda "Paylasim" yaziyor - baslik tekrarlanmaz. IZOLASYON: yalniz KENDI baglantin. */}
+      <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
+        Bu bağlantı yalnız <span className="font-medium text-murekkep">sana</span> ait.
+        Buradan gelen dilekler yalnız senin onay kuyruğuna düşer; eşinin bağlantısı ayrıdır
+        ve onun kuyruğuna gider. Karışıklık olmaması için yalnız kendi bağlantını görürsün.
+      </p>
 
       <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
 
-      <div className="mt-6 grid min-w-0 gap-5 sm:grid-cols-2">
+      <div className="mt-6 grid min-w-0 gap-5">
         {linkler.map((l) => (
           <LinkKarti
             key={l.es}
@@ -166,7 +162,7 @@ function LinkKarti({ esAdi, token }: { esAdi: string; token: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border border-ayrac bg-yuzey p-5 sm:p-6">
       <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-        {esAdi} tarafının yakını
+        {esAdi} · senin bağlantın
       </p>
       {qr && (
         <img

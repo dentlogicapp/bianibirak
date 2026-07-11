@@ -155,19 +155,13 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
 
   return (
     <AppShell>
-      <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Yönetim</p>
-        <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">
-          Etkinlik &amp; Görünüm
-        </h1>
-        <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Etkinlik bilgilerini, davetlilerin göreceği ekranı ve geri sayımı düzenle.
-          Değişiklikler otomatik kaydedilir ve önizlemede anında görünür.
-        </p>
-      </div>
+      {/* Ust barda baslik var - burada yalniz kisa yonlendirme */}
+      <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
+        Değişiklikler otomatik kaydedilir ve sağdaki önizlemede anında görünür.
+      </p>
 
       {/* Sekmeler */}
-      <div className="mt-6 flex gap-1 rounded-full border border-ayrac bg-yuzey p-1">
+      <div className="mt-5 flex gap-1 rounded-full border border-ayrac bg-yuzey p-1">
         {SEKMELER.map((s) => (
           <button
             key={s.kod}

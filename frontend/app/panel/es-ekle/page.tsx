@@ -113,14 +113,10 @@ export default function EsEkleSayfasi() {
 
   return (
     <AppShell>
-      <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Yönetim</p>
-        <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">Eşini Ekle</h1>
-        <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Eşin de defterinize katılsın: kendi bağlantısından gelen dilekleri kendi onaylasın,
-          bildirimlerini alsın. Aşağıdaki davet bağlantısını ona gönder.
-        </p>
-      </div>
+      <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
+        Eşin de defterinize katılsın: kendi bağlantısından gelen dilekleri kendi onaylasın,
+        bildirimlerini alsın. Aşağıdaki davet bağlantısını ona gönder.
+      </p>
 
       {esKatildi ? (
         <div className="mt-6 flex items-start gap-3 rounded-3xl border border-yaldiz/40 bg-yaldiz/10 p-6">

@@ -65,19 +65,16 @@ export default function YonetimSayfasi() {
 
   return (
     <AppShell>
-      <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
+      {/* Ust barda "Yonetim" yaziyor - baslik TEKRARLANMAZ; yalniz baglam (hangi defter) */}
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yaldiz" aria-hidden />
+        <p className="truncate font-govde text-xs uppercase tracking-etiket text-ikincil">
           {etkinlik.es1_ad} &amp; {etkinlik.es2_ad}
-        </p>
-        <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">Yönetim</h1>
-        <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Etkinlik bilgilerini düzenle, davetli ekranını biçimlendir, kayıtları incele ve
-          eşini deftere davet et.
         </p>
       </div>
 
       {/* Yonetim araclari (planlama: buton izgarasi) */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <AracButonu
           href="/panel/duzenle"
           baslik="Etkinlik & Görünüm"

@@ -381,13 +381,16 @@ public static class EtkinlikUclari
     private static async Task<IResult> AktifLinkler(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
-            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
-            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
+        // IZOLASYON: her es YALNIZ kendi baglantisini gorur. Esinin baglantisini
+        // yanlislikla paylasmasi, gelen katkilarin yanlis kuyruga dusmesine yol acar.
+        // Bu yuzden filtre backend'de - UI'da gizlemek yeterli DEGIL.
         var linkler = await db.PaylasimBaglantilari.AsNoTracking()
-            .Where(p => p.EtkinlikId == etkinlikId)
+            .Where(p => p.EtkinlikId == etkinlikId && p.Es == rol)
             .OrderBy(p => p.Es)
             .ToListAsync();
 

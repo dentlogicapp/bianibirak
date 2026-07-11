@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { api, type Etkinlik, type Katki } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { esTarafiKisa } from "@/lib/es";
@@ -162,9 +163,7 @@ function DefterIcerik() {
         </p>
 
         {kuyruk.length === 0 ? (
-          <p className="mt-6 rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-8 text-center font-govde text-sm text-ikincil">
-            Şu an bekleyen dilek yok. Davet bağlantını paylaştıkça buraya düşecek.
-          </p>
+          <BosKuyruk defterBos={defter.length === 0} />
         ) : (
           <div className="mt-5 space-y-3">
             {kuyruk.map((k) => (
@@ -261,4 +260,73 @@ function tarihSaatMetni(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Bos kuyruk = satis motoru: davet baglantisini PAYLAS (sayfaya gitmeden, Web Share).
+// Yalniz KENDI baglantisi getirilir (backend zaten rol filtresi uyguluyor).
+function BosKuyruk({ defterBos }: { defterBos: boolean }) {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    api.etkinlikLinkler().then((c) => {
+      if (c.ok && c.veri.length > 0 && typeof window !== "undefined") {
+        setUrl(`${window.location.origin}/k/${c.veri[0].token}`);
+      }
+    });
+  }, []);
+
+  async function paylas() {
+    if (!url) return;
+    const metin = "Anı defterimize bir dilek bırakır mısın?";
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Anı Defterimiz", text: metin, url });
+        return;
+      } catch {
+        /* kullanici iptal etti */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Bağlantın kopyalandı - dilediğin yere yapıştırabilirsin.");
+    } catch {
+      toast.error("Kopyalanamadı - Paylaşım ekranından deneyebilirsin.");
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-8 text-center">
+      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-sarap/10 text-sarap">
+        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+          <circle cx="18" cy="5" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+          <circle cx="6" cy="12" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+          <circle cx="18" cy="19" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
+          <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+        </svg>
+      </span>
+
+      <p className="mt-4 font-display text-lg text-murekkep">
+        {defterBos ? "Defterin ilk sayfasını açalım" : "Şu an bekleyen dilek yok"}
+      </p>
+      <p className="metin-yasli mx-auto mt-2 max-w-sm font-govde text-sm leading-relaxed text-ikincil">
+        Davet bağlantını paylaş; senin tarafından gelen dilekler burada, yalnız senin
+        onayına düşsün.
+      </p>
+
+      <button
+        onClick={paylas}
+        disabled={!url}
+        className="mt-5 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+      >
+        Bağlantını paylaş
+      </button>
+
+      <Link
+        href="/panel/paylasim"
+        className="mt-3 block font-govde text-xs text-ikincil transition-colors hover:text-sarap"
+      >
+        QR kodu ve tüm paylaşım seçenekleri
+      </Link>
+    </div>
+  );
 }
