@@ -56,6 +56,10 @@ public static class SemaKurucu
         CREATE INDEX IF NOT EXISTS ix_etkinlik_uyelikleri_etkinlik ON etkinlik_uyelikleri ("EtkinlikId");
         CREATE INDEX IF NOT EXISTS ix_etkinlik_uyelikleri_kullanici ON etkinlik_uyelikleri ("KullaniciId");
         CREATE UNIQUE INDEX IF NOT EXISTS ux_etkinlik_uyelikleri_etkinlik_rol ON etkinlik_uyelikleri ("EtkinlikId", "Rol");
+        -- Defense in depth: ayni kullanici ayni deftere IKI KEZ uye olamaz (es1 + es2 ayni kisi olamaz).
+        -- Kodda kontrol var (DavetKabul 409); bu DB seviyesinde ikinci katman.
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_etkinlik_uyelikleri_etkinlik_kullanici
+            ON etkinlik_uyelikleri ("EtkinlikId", "KullaniciId");
 
         CREATE TABLE IF NOT EXISTS uye_davetleri (
             "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -170,9 +174,19 @@ public static class SemaKurucu
 
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
-        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SuperAdmin" boolean NOT NULL DEFAULT false;
+        -- NOT: kolon adi super_admin (snake_case) - DbContext eslemesi boyle. PascalCase DEGIL.
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS super_admin boolean NOT NULL DEFAULT false;
         CREATE INDEX IF NOT EXISTS ix_kullanicilar_super_admin
-            ON kullanicilar ("SuperAdmin") WHERE "SuperAdmin" = true;
+            ON kullanicilar (super_admin) WHERE super_admin = true;
+        -- Yanlislikla acilan PascalCase kolonu varsa degerini tasi ve dusur (idempotent)
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='kullanicilar' AND column_name='SuperAdmin') THEN
+                UPDATE kullanicilar SET super_admin = true WHERE "SuperAdmin" = true;
+                ALTER TABLE kullanicilar DROP COLUMN "SuperAdmin";
+            END IF;
+        END $$;
 
         -- Etkinlik: cop kutusu (iki asamali silme) + dondurma (kotuye kullanim)
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "SilindiMi" boolean NOT NULL DEFAULT false;

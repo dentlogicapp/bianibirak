@@ -45,6 +45,8 @@ public static class SuperUclari
         // Kullanicilar
         app.MapGet("/api/super/kullanicilar", Kullanicilar).RequireAuthorization();
         app.MapPost("/api/super/kullanici/{id:guid}/super-admin", SuperAdminAta).RequireAuthorization();
+        app.MapPost("/api/super/kullanici/{id:guid}/askiya-al", KullaniciAskiyaAl).RequireAuthorization();
+        app.MapPost("/api/super/kullanici/{id:guid}/sil", KullaniciSil).RequireAuthorization();
 
         // Canli akis (tum sistem denetim gunlugu)
         app.MapGet("/api/super/akis", CanliAkis).RequireAuthorization();
@@ -164,12 +166,12 @@ public static class SuperUclari
         var defterler = await sorgu.OrderByDescending(e => e.CreatedAt).Take(200).ToListAsync();
         var idler = defterler.Select(e => e.Id).ToList();
 
-        // Sayimlar (tek sorgu - N+1 yok)
-        var uyeSayilari = await db.EtkinlikUyelikleri.AsNoTracking()
+        // Uyeler: ad + rol (tek sorgu - N+1 yok). Defter kartinda kimler oldugu gorunur.
+        var uyeKayitlari = await db.EtkinlikUyelikleri.AsNoTracking()
             .Where(u => idler.Contains(u.EtkinlikId))
-            .GroupBy(u => u.EtkinlikId)
-            .Select(g => new { g.Key, Sayi = g.Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.Sayi);
+            .Join(db.Kullanicilar, u => u.KullaniciId, k => k.Id,
+                (u, k) => new { u.EtkinlikId, u.Rol, k.Ad, k.Email, u.CreatedAt })
+            .ToListAsync();
 
         var dilekSayilari = await db.Katkilar.AsNoTracking()
             .Where(k => idler.Contains(k.EtkinlikId) && !k.SilindiMi)
@@ -203,7 +205,13 @@ public static class SuperUclari
             silindi_mi = e.SilindiMi,
             silinme_zamani = e.SilinmeZamani,
             created_at = e.CreatedAt,
-            uye_sayisi = uyeSayilari.TryGetValue(e.Id, out var us) ? us : 0,
+            uyeler = uyeKayitlari
+                .Where(u => u.EtkinlikId == e.Id)
+                .OrderBy(u => u.Rol)
+                .Select(u => new { ad = u.Ad, email = u.Email, rol = u.Rol, katildi = u.CreatedAt }),
+            uye_sayisi = uyeKayitlari.Count(u => u.EtkinlikId == e.Id),
+            // Yetim defter: hic uyesi kalmamis (ornegin tek uye silinmis) - mudahale gerekir.
+            yetim = !uyeKayitlari.Any(u => u.EtkinlikId == e.Id),
             dilek_sayisi = dilekSayilari.TryGetValue(e.Id, out var ds) ? ds.Toplam : 0,
             bekleyen_dilek = dilekSayilari.TryGetValue(e.Id, out var ds2) ? ds2.Beklemede : 0,
             hareketsiz = !hareketli.Contains(e.Id) && e.CreatedAt < otuzGunOnce,
@@ -468,7 +476,8 @@ public static class SuperUclari
         var (ok, _) = await SuperAdminMi(ctx, db);
         if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
-        var sorgu = db.Kullanicilar.AsNoTracking().Where(k => k.DeletedAt == null);
+        // Askidakiler de listelenir (geri acilabilsinler) - "askida" bayragiyla isaretlenir.
+        var sorgu = db.Kullanicilar.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(ara))
         {
             var a = ara.Trim().ToLower();
@@ -490,6 +499,7 @@ public static class SuperUclari
             ad = k.Ad,
             email = k.Email,
             super_admin = k.SuperAdmin,
+            askida = k.DeletedAt != null,
             created_at = k.CreatedAt,
             defterler = uyelikler
                 .Where(u => u.KullaniciId == k.Id)
@@ -526,6 +536,85 @@ public static class SuperUclari
             "kullanicilar", id, new { hedef = hedef.Email });
 
         return Results.Json(new { ok = true, super_admin = hedef.SuperAdmin });
+    }
+
+    // Askiya al / geri ac (soft delete - DeletedAt). Giris yapamaz, verisi durur, geri alinabilir.
+    // KVKK "silme talebi" akisiyla uyumlu: once askiya al, yasal sure sonunda kalici sil.
+    private static async Task<IResult> KullaniciAskiyaAl(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, aktor) = await SuperAdminMi(ctx, db);
+        if (!ok || aktor == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        if (id == aktor.Id)
+            return Hata(400, "KENDINI_ASKIYA_ALAMAZ", "Kendi hesabını askıya alamazsın.");
+
+        var hedef = await db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == id);
+        if (hedef == null)
+            return Hata(404, "KULLANICI_BULUNAMADI", "Kullanıcı bulunamadı.");
+
+        var askidaydi = hedef.DeletedAt != null;
+        hedef.DeletedAt = askidaydi ? null : DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        await Denetim(db, null, aktor.Id,
+            askidaydi ? "KULLANICI_GERI_ACILDI" : "KULLANICI_ASKIYA_ALINDI",
+            "kullanicilar", id, new { hedef = hedef.Email });
+
+        return Results.Json(new { ok = true, askida = !askidaydi });
+    }
+
+    // KALICI SIL - geri alinamaz. Korumalar:
+    //  - Kendini silemez
+    //  - Son super admin silinemez
+    //  - E-posta teyidi (yanlis kullanici silme korumasi)
+    // Denetim izi KORUNUR (KullaniciId null'a duser - adli iz kaybolmaz).
+    private static async Task<IResult> KullaniciSil(
+        Guid id, KullaniciSilIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, aktor) = await SuperAdminMi(ctx, db);
+        if (!ok || aktor == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        if (id == aktor.Id)
+            return Hata(400, "KENDINI_SILEMEZ", "Kendi hesabını silemezsin.");
+
+        var hedef = await db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == id);
+        if (hedef == null)
+            return Hata(404, "KULLANICI_BULUNAMADI", "Kullanıcı bulunamadı.");
+
+        // Koruma - e-posta teyidi
+        if (!string.Equals(istek.Teyit?.Trim(), hedef.Email, StringComparison.OrdinalIgnoreCase))
+            return Hata(400, "TEYIT_ESLESMEDI",
+                $"Teyit eşleşmedi. Silmek için tam olarak şunu yaz: {hedef.Email}");
+
+        // Koruma - son super admin
+        if (hedef.SuperAdmin)
+        {
+            var superSayi = await db.Kullanicilar.CountAsync(k => k.SuperAdmin && k.DeletedAt == null);
+            if (superSayi <= 1)
+                return Hata(400, "SON_SUPER_ADMIN", "Sistemdeki son yöneticinin hesabı silinemez.");
+        }
+
+        var email = hedef.Email;
+
+        // Bagimli kayitlar (FK model seviyesinde - manuel temizlik)
+        db.Bildirimler.RemoveRange(db.Bildirimler.Where(b => b.KullaniciId == id));
+        db.ErtelenenBildirimler.RemoveRange(db.ErtelenenBildirimler.Where(b => b.KullaniciId == id));
+        db.Cihazlar.RemoveRange(db.Cihazlar.Where(c => c.KullaniciId == id));
+        db.EtkinlikUyelikleri.RemoveRange(db.EtkinlikUyelikleri.Where(u => u.KullaniciId == id));
+
+        // Denetim izi KORUNUR - yalniz aktor bagi kopar (adli iz kaybolmaz)
+        var denetimler = await db.DenetimGunlukleri.Where(d => d.KullaniciId == id).ToListAsync();
+        foreach (var d in denetimler) d.KullaniciId = null;
+
+        db.Kullanicilar.Remove(hedef);
+        await db.SaveChangesAsync(); // atomik
+
+        await Denetim(db, null, aktor.Id, "KULLANICI_SILINDI", "kullanicilar", id, new { email });
+
+        return Results.Json(new { ok = true });
     }
 
     // ---------------- CANLI AKIS ----------------

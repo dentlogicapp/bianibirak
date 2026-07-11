@@ -72,3 +72,6 @@ public record SistemMetniGuncelleIstek(
 
 // KVKK talebi isle (durum + sonuc notu)
 public record KvkkTalepIsleIstek(string Durum, string? SonucNotu);
+
+// Kullanici kalici silme: e-posta teyidi
+public record KullaniciSilIstek(string? Teyit);

@@ -129,7 +129,9 @@ export type SuperDefter = {
   silindi_mi: boolean;
   silinme_zamani: string | null;
   created_at: string;
+  uyeler: { ad: string; email: string; rol: string; katildi: string }[];
   uye_sayisi: number;
+  yetim: boolean;
   dilek_sayisi: number;
   bekleyen_dilek: number;
   hareketsiz: boolean;
@@ -140,6 +142,7 @@ export type SuperKullanici = {
   ad: string;
   email: string;
   super_admin: boolean;
+  askida: boolean;
   created_at: string;
   defterler: { defter: string; rol: string }[];
 };
@@ -365,6 +368,15 @@ export const api = {
     istek<{ ok: boolean; super_admin: boolean }>(`/api/super/kullanici/${id}/super-admin`, {
       method: "POST",
       body: JSON.stringify({ SuperAdmin: superAdmin }),
+    }),
+  superKullaniciAskiyaAl: (id: string) =>
+    istek<{ ok: boolean; askida: boolean }>(`/api/super/kullanici/${id}/askiya-al`, {
+      method: "POST",
+    }),
+  superKullaniciSil: (id: string, teyit: string) =>
+    istek<{ ok: boolean }>(`/api/super/kullanici/${id}/sil`, {
+      method: "POST",
+      body: JSON.stringify({ Teyit: teyit }),
     }),
   superAkis: (limit?: number) =>
     istek<AkisKaydi[]>(`/api/super/akis${limit ? `?limit=${limit}` : ""}`),

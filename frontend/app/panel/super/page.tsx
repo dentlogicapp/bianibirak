@@ -266,8 +266,24 @@ function DefterlerSekmesi() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <Rozet metin={durumEtiketi(d.durum)} />
                   {d.donduruldu && <Rozet metin="Dondurulmuş" tip="uyari" />}
+                  {d.yetim && <Rozet metin="Yetim" tip="uyari" />}
                   {d.hareketsiz && <Rozet metin="Hareketsiz" tip="soluk" />}
                 </div>
+              </div>
+
+              {/* Uyeler - kim, hangi rolde */}
+              <div className="mt-3 space-y-1">
+                {d.uyeler.length === 0 ? (
+                  <p className="font-govde text-xs text-yaldiz">
+                    Bu defterin hiç üyesi yok - müdahale gerekebilir.
+                  </p>
+                ) : (
+                  d.uyeler.map((u) => (
+                    <p key={u.email} className="min-w-0 truncate font-govde text-xs text-ikincil">
+                      <span className="text-murekkep">{u.ad}</span> · {u.rol === "es1" ? "Birinci eş" : "İkinci eş"} · {tarihKisa(u.katildi)}
+                    </p>
+                  ))
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-3 font-govde text-xs text-ikincil">
@@ -370,6 +386,8 @@ function KullanicilarSekmesi() {
   const [kullanicilar, setKullanicilar] = useState<SuperKullanici[]>([]);
   const [ara, setAra] = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [silHedef, setSilHedef] = useState<SuperKullanici | null>(null);
+  const [teyit, setTeyit] = useState("");
 
   const cek = useCallback(async () => {
     setYukleniyor(true);
@@ -392,6 +410,29 @@ function KullanicilarSekmesi() {
     toast.success(
       c.veri.super_admin ? "Sistem yöneticisi yetkisi verildi." : "Yetki kaldırıldı."
     );
+    void cek();
+  }
+
+  async function askiya(k: SuperKullanici) {
+    const c = await api.superKullaniciAskiyaAl(k.id);
+    if (!c.ok) {
+      toast.error(c.mesaj);
+      return;
+    }
+    toast.success(c.veri.askida ? "Hesap askıya alındı." : "Hesap yeniden açıldı.");
+    void cek();
+  }
+
+  async function kullaniciSil() {
+    if (!silHedef) return;
+    const c = await api.superKullaniciSil(silHedef.id, teyit);
+    if (!c.ok) {
+      toast.error(c.mesaj);
+      return;
+    }
+    toast.success("Hesap kalıcı olarak silindi.");
+    setSilHedef(null);
+    setTeyit("");
     void cek();
   }
 
@@ -422,6 +463,11 @@ function KullanicilarSekmesi() {
                         Yönetici
                       </span>
                     )}
+                    {k.askida && (
+                      <span className="ml-2 font-govde text-[0.6rem] uppercase tracking-etiket text-sarap">
+                        Askıda
+                      </span>
+                    )}
                   </p>
                   <p className="truncate font-govde text-xs text-ikincil">{k.email}</p>
                   {k.defterler.length > 0 && (
@@ -430,14 +476,77 @@ function KullanicilarSekmesi() {
                     </p>
                   )}
                 </div>
-                <button
-                  onClick={() => yetkiDegistir(k)}
-                  className="shrink-0 rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                >
-                  {k.super_admin ? "Yetkiyi al" : "Yönetici yap"}
-                </button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                  <button
+                    onClick={() => yetkiDegistir(k)}
+                    className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                  >
+                    {k.super_admin ? "Yetkiyi al" : "Yönetici yap"}
+                  </button>
+                  <button
+                    onClick={() => askiya(k)}
+                    className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                  >
+                    {k.askida ? "Geri aç" : "Askıya al"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSilHedef(k);
+                      setTeyit("");
+                    }}
+                    className="rounded-full border border-sarap/40 px-3 py-1.5 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
+                  >
+                    Sil
+                  </button>
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Kalici silme onayi - e-posta teyidi */}
+      {silHedef && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setSilHedef(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-sarap/40 bg-yuzey p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="font-display text-lg text-sarap">Hesabı kalıcı sil</p>
+            <p className="metin-yasli mt-3 font-govde text-sm leading-relaxed text-ikincil">
+              Bu hesap, üyelikleri, bildirimleri ve cihaz kayıtları silinecek. Denetim kayıtları
+              adli iz olarak korunur. Geri alınamaz - askıya almayı tercih edebilirsin.
+            </p>
+            <p className="mt-4 font-govde text-xs text-ikincil">
+              Onaylamak için e-postayı tam yaz:
+            </p>
+            <p className="mt-1 truncate rounded-lg border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep">
+              {silHedef.email}
+            </p>
+            <input
+              value={teyit}
+              onChange={(e) => setTeyit(e.target.value)}
+              placeholder="Buraya yaz..."
+              className="mt-3 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
+            />
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={kullaniciSil}
+                disabled={teyit.trim().toLowerCase() !== silHedef.email.toLowerCase()}
+                className="flex-1 rounded-full bg-sarap px-5 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-40"
+              >
+                Kalıcı sil
+              </button>
+              <button
+                onClick={() => setSilHedef(null)}
+                className="rounded-full border border-ayrac px-5 py-3 font-govde text-sm text-ikincil transition-colors hover:border-murekkep"
+              >
+                Vazgeç
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -43,7 +43,6 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.SifreHash).HasColumnName("sifre_hash").IsRequired();
             e.Property(x => x.Ad).HasColumnName("Ad").IsRequired();
             e.Property(x => x.Cinsiyet).HasColumnName("Cinsiyet");
-            e.Property(x => x.SuperAdmin).HasColumnName("SuperAdmin");
             e.Property(x => x.SuperAdmin).HasColumnName("super_admin");
             e.Property(x => x.SessizSaatAktif).HasColumnName("SessizSaatAktif");
             e.Property(x => x.SessizSaatBaslangic).HasColumnName("SessizSaatBaslangic");
@@ -109,6 +108,7 @@ public class BiAniBirakDbContext : DbContext
             e.HasIndex(x => x.KullaniciId);
             // kural: etkinlik basina her rol tek satir
             e.HasIndex(x => new { x.EtkinlikId, x.Rol }).IsUnique();
+            e.HasIndex(x => new { x.EtkinlikId, x.KullaniciId }).IsUnique();
             // FK iliskileri (model seviyesinde) -> EF insert sirasini dogru belirler
             e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
             e.HasOne<Kullanici>().WithMany().HasForeignKey(x => x.KullaniciId);
