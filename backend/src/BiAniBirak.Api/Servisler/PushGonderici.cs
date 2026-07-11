@@ -29,6 +29,25 @@ public class PushGonderici
         Guid kullaniciId, string baslik, string govde, string? url = null,
         Guid? etkinlikId = null, bool sessizSaateTabi = true, CancellationToken ct = default)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
+
+        // UYGULAMA-ICI BILDIRIM (avatar cani): push izninden ve sessiz saatten BAGIMSIZ.
+        // Her zaman olusur; kullanici uygulamayi acinca gorur. Push sadece "anlik haber verme".
+        db.Bildirimler.Add(new Bildirim
+        {
+            Id = Guid.NewGuid(),
+            KullaniciId = kullaniciId,
+            EtkinlikId = etkinlikId,
+            Tip = BildirimTipi(url),
+            Baslik = baslik,
+            Mesaj = govde,
+            Url = url,
+            OkunduMu = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+
         var pub = _config["Vapid:PublicKey"];
         var priv = _config["Vapid:PrivateKey"];
         var subject = _config["Vapid:Subject"] ?? "mailto:destek@dentlogicapp.com";
@@ -39,10 +58,7 @@ public class PushGonderici
         }
         var vapid = new VapidDetails(subject, pub, priv);
 
-        using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
-
-        // Sessiz saat kontrolu -> ertele
+        // Sessiz saat kontrolu -> ertele (yalniz PUSH ertelenir; can bildirimi yukarida dustu)
         if (sessizSaateTabi)
         {
             var k = await db.Kullanicilar.AsNoTracking()
@@ -130,6 +146,14 @@ public class PushGonderici
     }
 
     // TR saati (UTC+3) ile sessiz saat araliginda miyiz? Gece yarisi gecisini destekler.
+    // Bildirim tipi: url'e gore basit siniflandirma (frontend ikon/renk icin).
+    private static string BildirimTipi(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "sistem";
+        if (url.Contains("/panel/etkinlik")) return "katki";
+        return "sistem";
+    }
+
     public static bool SessizSaatteMi(string? baslangic, string? bitis)
     {
         if (!TimeOnly.TryParse(baslangic, out var bas) || !TimeOnly.TryParse(bitis, out var bit))

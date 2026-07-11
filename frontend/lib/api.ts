@@ -78,6 +78,22 @@ export type Katki = {
   created_at: string;
 };
 
+// Uygulama-ici bildirim (avatar cani).
+export type Bildirim = {
+  id: string;
+  tip: string;
+  baslik: string;
+  mesaj: string;
+  url: string | null;
+  okundu_mu: boolean;
+  created_at: string;
+};
+
+export type BildirimOzeti = {
+  okunmamis_sayisi: number;
+  bildirimler: Bildirim[];
+};
+
 // Denetim gunlugu kaydi.
 export type DenetimKaydi = {
   id: string;
@@ -195,6 +211,17 @@ export const api = {
   katkiKuyruk: () => istek<Katki[]>("/api/etkinlik/aktif/kuyruk"),
   katkiDefter: () => istek<Katki[]>("/api/etkinlik/aktif/defter"),
   denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
+
+  // Uygulama-ici bildirimler (avatar cani)
+  bildirimler: () => istek<BildirimOzeti>("/api/bildirimler"),
+  bildirimOkundu: (id: string) =>
+    istek<{ durum: string }>(`/api/bildirimler/${id}/okundu`, { method: "POST" }),
+  bildirimHepsiOkundu: () =>
+    istek<{ durum: string }>("/api/bildirimler/hepsi-okundu", { method: "POST" }),
+  bildirimSil: (id: string) =>
+    istek<{ durum: string }>(`/api/bildirimler/${id}`, { method: "DELETE" }),
+  bildirimTumunuSil: () =>
+    istek<{ durum: string }>("/api/bildirimler", { method: "DELETE" }),
   katkiOnayla: (id: string) =>
     istek<{ durum: string }>(`/api/katki/${id}/onayla`, { method: "POST" }),
   katkiReddet: (id: string) =>

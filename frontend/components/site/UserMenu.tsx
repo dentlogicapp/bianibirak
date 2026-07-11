@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type Kullanici } from "@/lib/api";
+import { api, type Kullanici, type Bildirim } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
 
@@ -17,6 +17,8 @@ export function UserMenu() {
   const [oturum, setOturum] = useState<"bilinmiyor" | "var" | "yok">("bilinmiyor");
   const [acik, setAcik] = useState(false);
   const [profilAcik, setProfilAcik] = useState(false);
+  const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
+  const [okunmamis, setOkunmamis] = useState(0);
   const [tema, temaTersle] = useTema();
   const kutuRef = useRef<HTMLDivElement>(null);
 
@@ -38,6 +40,55 @@ export function UserMenu() {
     if (acik) document.addEventListener("mousedown", disari);
     return () => document.removeEventListener("mousedown", disari);
   }, [acik]);
+
+  // Bildirim cekme (planlama deseni): 15sn polling + pencere odaginda tazele.
+  useEffect(() => {
+    if (oturum !== "var") return;
+
+    let iptal = false;
+    async function cek() {
+      const c = await api.bildirimler();
+      if (!iptal && c.ok) {
+        setBildirimler(c.veri.bildirimler);
+        setOkunmamis(c.veri.okunmamis_sayisi);
+      }
+    }
+    void cek();
+    const zaman = setInterval(cek, 15000);
+    function odak() {
+      void cek();
+    }
+    window.addEventListener("focus", odak);
+    return () => {
+      iptal = true;
+      clearInterval(zaman);
+      window.removeEventListener("focus", odak);
+    };
+  }, [oturum]);
+
+  async function bildirimeTikla(b: Bildirim) {
+    // Tikla -> okundu (soluklasir, listede kalir) + yonlendir.
+    if (!b.okundu_mu) {
+      setBildirimler((o) => o.map((x) => (x.id === b.id ? { ...x, okundu_mu: true } : x)));
+      setOkunmamis((s) => Math.max(0, s - 1));
+      void api.bildirimOkundu(b.id);
+    }
+    setAcik(false);
+    if (b.url) router.push(b.url);
+  }
+
+  async function bildirimSil(id: string) {
+    const hedef = bildirimler.find((x) => x.id === id);
+    setBildirimler((o) => o.filter((x) => x.id !== id));
+    if (hedef && !hedef.okundu_mu) setOkunmamis((s) => Math.max(0, s - 1));
+    void api.bildirimSil(id);
+  }
+
+  async function bildirimTumunuTemizle() {
+    setBildirimler([]);
+    setOkunmamis(0);
+    void api.bildirimTumunuSil();
+  }
 
   async function cikis() {
     await api.cikis();
@@ -64,14 +115,19 @@ export function UserMenu() {
 
   return (
     <div ref={kutuRef} className="relative">
-      {/* Avatar - koyu tonda belirgin (dolu sarap zemin + parsomen harf) */}
+      {/* Avatar - koyu tonda belirgin (dolu sarap zemin + parsomen harf) + bildirim rozeti */}
       <button
         onClick={() => setAcik((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={acik}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-sarap font-display text-sm font-medium text-parsomen shadow-sm ring-1 ring-sarap/30 transition-transform hover:scale-105"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full bg-sarap font-display text-sm font-medium text-parsomen shadow-sm ring-1 ring-sarap/30 transition-transform hover:scale-105"
       >
         {basHarf}
+        {okunmamis > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yaldiz px-1 font-govde text-[0.6rem] font-bold text-murekkep ring-2 ring-parsomen">
+            {okunmamis > 9 ? "9+" : okunmamis}
+          </span>
+        )}
       </button>
 
       {acik && (
@@ -161,6 +217,73 @@ export function UserMenu() {
               </span>
             </button>
 
+            {/* BILDIRIMLER (tema ile cikis arasi) */}
+            <div className="my-1.5 border-t border-ayrac pt-1.5">
+              <div className="flex items-center justify-between px-3 pb-1 pt-1">
+                <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                  Bildirimler
+                </p>
+                {bildirimler.length > 0 && (
+                  <button
+                    onClick={bildirimTumunuTemizle}
+                    className="font-govde text-[0.65rem] text-ikincil transition-colors hover:text-sarap"
+                  >
+                    Tümünü temizle
+                  </button>
+                )}
+              </div>
+
+              {bildirimler.length === 0 ? (
+                <p className="px-3 py-2 font-govde text-xs text-ikincil">
+                  Yeni bildirim yok.
+                </p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto">
+                  {bildirimler.slice(0, 8).map((b) => (
+                    <div
+                      key={b.id}
+                      className="group flex items-start gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-yuzeyKoyu"
+                    >
+                      <button
+                        onClick={() => bildirimeTikla(b)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p
+                          className={`truncate font-govde text-xs font-medium ${
+                            b.okundu_mu ? "text-ikincil" : "text-sarap"
+                          }`}
+                        >
+                          {b.baslik}
+                        </p>
+                        <p
+                          className={`mt-0.5 line-clamp-2 font-govde text-[0.7rem] leading-snug ${
+                            b.okundu_mu ? "text-ikincil/70" : "text-murekkep"
+                          }`}
+                        >
+                          {b.mesaj}
+                        </p>
+                        <p className="mt-0.5 font-govde text-[0.6rem] text-ikincil">
+                          {gecenSure(b.created_at)}
+                        </p>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          bildirimSil(b.id);
+                        }}
+                        aria-label="Bildirimi sil"
+                        className="shrink-0 self-center p-1 text-ikincil opacity-0 transition-opacity hover:text-sarap group-hover:opacity-100"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Cikis */}
             <button
               onClick={cikis}
@@ -210,4 +333,18 @@ function MenuLink({
       {children}
     </Link>
   );
+}
+
+// Gecen sure metni ("3 dk once", "2 sa once", "dun", ...)
+function gecenSure(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return "";
+  const fark = Math.floor((Date.now() - t) / 1000);
+  if (fark < 60) return "az önce";
+  if (fark < 3600) return `${Math.floor(fark / 60)} dk önce`;
+  if (fark < 86400) return `${Math.floor(fark / 3600)} sa önce`;
+  const gun = Math.floor(fark / 86400);
+  if (gun === 1) return "dün";
+  if (gun < 7) return `${gun} gün önce`;
+  return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
 }

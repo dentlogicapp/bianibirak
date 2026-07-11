@@ -25,6 +25,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<KatkiMedyasi> KatkiMedyalari => Set<KatkiMedyasi>();
     public DbSet<Cihaz> Cihazlar => Set<Cihaz>();
     public DbSet<ErtelenenBildirim> ErtelenenBildirimler => Set<ErtelenenBildirim>();
+    public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -251,6 +252,25 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Url).HasColumnName("Url");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => x.KullaniciId);
+        });
+
+        // ---- bildirimler (uygulama-ici bildirim; avatar cani) ----
+        model.Entity<Bildirim>(e =>
+        {
+            e.ToTable("bildirimler");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Tip).HasColumnName("Tip").IsRequired();
+            e.Property(x => x.Baslik).HasColumnName("Baslik").IsRequired();
+            e.Property(x => x.Mesaj).HasColumnName("Mesaj").IsRequired();
+            e.Property(x => x.Url).HasColumnName("Url");
+            e.Property(x => x.OkunduMu).HasColumnName("OkunduMu");
+            e.Property(x => x.OkunmaZamani).HasColumnName("OkunmaZamani");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => new { x.KullaniciId, x.OkunduMu });
+            e.HasOne<Kullanici>().WithMany().HasForeignKey(x => x.KullaniciId);
         });
     }
 }

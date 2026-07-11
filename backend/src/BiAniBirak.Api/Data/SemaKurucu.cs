@@ -153,6 +153,21 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_ertelenen_bildirimler_kullanici ON ertelenen_bildirimler ("KullaniciId");
 
+        -- Uygulama-ici bildirimler (avatar cani; push'tan bagimsiz)
+        CREATE TABLE IF NOT EXISTS bildirimler (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NOT NULL REFERENCES kullanicilar ("Id"),
+            "EtkinlikId" uuid NULL,
+            "Tip" text NOT NULL,
+            "Baslik" text NOT NULL,
+            "Mesaj" text NOT NULL,
+            "Url" text NULL,
+            "OkunduMu" boolean NOT NULL DEFAULT false,
+            "OkunmaZamani" timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_bildirimler_kullanici_okundu ON bildirimler ("KullaniciId", "OkunduMu");
+
         -- Push: kullanicilara sessiz saat kolonlari (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBaslangic" text NULL;
