@@ -31,6 +31,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Kurasyon> Kurasyonlar => Set<Kurasyon>();
     public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
+    public DbSet<EtkinlikGorseli> EtkinlikGorselleri => Set<EtkinlikGorseli>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -192,6 +193,8 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.DavetliAd).HasColumnName("DavetliAd").IsRequired();
             e.Property(x => x.DavetliEmail).HasColumnName("DavetliEmail").IsRequired();
             e.Property(x => x.DavetliTelefon).HasColumnName("DavetliTelefon").IsRequired();
+            e.Property(x => x.DavetliIliski).HasColumnName("DavetliIliski");
+            e.Property(x => x.FotoAnahtari).HasColumnName("FotoAnahtari");
             e.Property(x => x.Mesaj).HasColumnName("Mesaj").IsRequired();
             e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
@@ -337,7 +340,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.IthafMetni).HasColumnName("IthafMetni");
             e.Property(x => x.KapanisMetni).HasColumnName("KapanisMetni");
             e.Property(x => x.GruplamaTipi).HasColumnName("GruplamaTipi").IsRequired();
-            e.Property(x => x.QrKoprusuAktif).HasColumnName("QrKoprusuAktif");
+            e.Property(x => x.TarihGoster).HasColumnName("TarihGoster");
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
             e.Property(x => x.TamamlanmaZamani).HasColumnName("TamamlanmaZamani");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -380,6 +383,25 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.OlusturanKullaniciId).HasColumnName("OlusturanKullaniciId");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => x.EtkinlikId);
+        });
+
+        // ---- etkinlik_gorselleri (cift gorselleri - en fazla 8) ----
+        model.Entity<EtkinlikGorseli>(e =>
+        {
+            e.ToTable("etkinlik_gorselleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.DepolamaAnahtari).HasColumnName("DepolamaAnahtari").IsRequired();
+            e.Property(x => x.Konum).HasColumnName("Konum").IsRequired();
+            e.Property(x => x.Sira).HasColumnName("Sira");
+            e.Property(x => x.Altyazi).HasColumnName("Altyazi");
+            e.Property(x => x.Genislik).HasColumnName("Genislik");
+            e.Property(x => x.Yukseklik).HasColumnName("Yukseklik");
+            e.Property(x => x.Bayt).HasColumnName("Bayt");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => new { x.EtkinlikId, x.Sira });
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
         });
     }
 }

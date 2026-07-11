@@ -21,6 +21,7 @@ public static class KatkiUclari
         // PUBLIC - RequireAuthorization YOK
         app.MapGet("/api/k/{token}", KarsilamaGetir);
         app.MapPost("/api/k/{token}", KatkiBirak);
+        app.MapPost("/api/k/{token}/foto/{katkiId:guid}", KatkiFoto).DisableAntiforgery();
     }
 
     private static IResult Hata(int durum, string kod, string mesaj)
@@ -54,6 +55,20 @@ public static class KatkiUclari
         var ayar = await db.EtkinlikAyarlari.AsNoTracking()
             .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlik.Id);
 
+        // Cift gorselleri: davetli cift'in yuzunu gorur -> duygusal bag -> daha iyi dilek.
+        // Kapak once, sonra galeri sirasi.
+        var gorseller = await db.EtkinlikGorselleri.AsNoTracking()
+            .Where(g => g.EtkinlikId == etkinlik.Id)
+            .OrderBy(g => g.Konum == "kapak" ? 0 : 1)
+            .ThenBy(g => g.Sira)
+            .Select(g => new
+            {
+                url = "/api/gorsel/" + g.DepolamaAnahtari,
+                altyazi = g.Altyazi,
+                kapak = g.Konum == "kapak",
+            })
+            .ToListAsync();
+
         return Results.Json(new
         {
             es1_ad = etkinlik.Es1Ad,
@@ -69,6 +84,9 @@ public static class KatkiUclari
             sayac_aktif_cumle = ayar?.SayacAktifCumle,
             sayac_bitti_cumle = ayar?.SayacBittiCumle,
             etkinlik_tarihi = etkinlik.EtkinlikTarihi,
+            gorseller,
+            // Saklama seffafligi (Musa karari): davetli ne kadar tutuldugunu BILSIN.
+            saklama_gun = Sabitler.SaklamaGun,
         });
     }
 
@@ -107,16 +125,22 @@ public static class KatkiUclari
         var ad = (istek.DavetliAd ?? "").Trim();
         var email = (istek.DavetliEmail ?? "").Trim();
         var telefon = (istek.DavetliTelefon ?? "").Trim();
+        var iliski = (istek.DavetliIliski ?? "").Trim();
         var mesaj = (istek.Mesaj ?? "").Trim();
 
         if (ad.Length < 2)
             return Hata(400, "DOGRULAMA_HATASI", "Ad Soyad gereklidir.");
         if (!email.Contains('@') || !email.Contains('.'))
-            return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir e-posta gereklidir.");
+            return Hata(400, "DOGRULAMA_HATASI", "Geçerli bir e-posta gereklidir.");
         if (telefon.Length < 7)
-            return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir telefon gereklidir.");
+            return Hata(400, "DOGRULAMA_HATASI", "Geçerli bir telefon gereklidir.");
+        // ILISKI zorunlu: cift 20 yil sonra "bu Ayse kimdi?" dememeli.
+        if (iliski.Length < 2)
+            return Hata(400, "DOGRULAMA_HATASI", "Çifte yakınlığını belirtmelisin.");
+        if (iliski.Length > 60)
+            return Hata(400, "DOGRULAMA_HATASI", "Yakınlık metni çok uzun (en fazla 60 karakter).");
         if (mesaj.Length < 2)
-            return Hata(400, "DOGRULAMA_HATASI", "Bir mesaj yazmalisin.");
+            return Hata(400, "DOGRULAMA_HATASI", "Bir mesaj yazmalısın.");
         if (mesaj.Length > 5000)
             return Hata(400, "DOGRULAMA_HATASI", "Mesaj cok uzun (en fazla 5000 karakter).");
 
@@ -130,6 +154,7 @@ public static class KatkiUclari
             DavetliAd = ad,
             DavetliEmail = email,
             DavetliTelefon = telefon,
+            DavetliIliski = iliski,
             Mesaj = mesaj,
             Tur = "dilek",
             Durum = "beklemede", // ilgili esin onay kuyruguna duser (Asama 4)
@@ -163,7 +188,68 @@ public static class KatkiUclari
                 url: $"/panel/etkinlik?focus={katki.Id}", etkinlikId: etkinlik.Id);
         }
 
-        // Teyit (davetliye minimal yanit - okuma yuzeyi yok)
-        return Results.Json(new { durum = "alindi", mesaj = "Dilegin iletildi. Tesekkurler." });
+        // Teyit (davetliye minimal yanit - okuma yuzeyi yok).
+        // katki_id: SADECE fotograf yukleme adimi icin (2. adim). Okuma yetkisi vermez.
+        return Results.Json(new
+        {
+            durum = "alindi",
+            katki_id = katki.Id,
+            mesaj = "Dileğin iletildi. Teşekkürler.",
+        });
+    }
+
+    // DAVETLI FOTOGRAFI (davetli basina EN FAZLA 1 - Musa karari).
+    // Iki asamali akis: once dilek kaydedilir (kaybolmaz), sonra foto eklenir.
+    // Boylece foto yuklemesi basarisiz olsa bile dilek durur.
+    private static async Task<IResult> KatkiFoto(
+        string token, Guid katkiId, HttpContext ctx, BiAniBirakDbContext db,
+        DepolamaServisi depo, IFormFile? dosya)
+    {
+        var (link, etkinlik) = await Cozumle(db, token);
+        if (link == null || etkinlik == null)
+            return Hata(404, "BAGLANTI_BULUNAMADI", "Bu bağlantı geçersiz veya kaldırılmış.");
+
+        // Pencere + defter durumu (yazim kontrolu - kirmizi cizgi)
+        var simdi = DateTimeOffset.UtcNow;
+        if (etkinlik.SilindiMi || etkinlik.Donduruldu)
+            return Hata(403, "ETKINLIK_KAPALI", "Bu deftere şu an ekleme yapılamıyor.");
+        if (simdi > etkinlik.KapanisTarihi || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
+            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı.");
+
+        // Katki BU tokenden mi geldi? (izolasyon: baska esin katkisina foto eklenemez)
+        var katki = await db.Katkilar
+            .FirstOrDefaultAsync(k => k.Id == katkiId
+                                      && k.EtkinlikId == etkinlik.Id
+                                      && k.PaylasimBaglantiId == link.Id
+                                      && !k.SilindiMi);
+        if (katki == null)
+            return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadı.");
+
+        // Tek fotograf hakki
+        if (katki.FotoAnahtari != null)
+            return Hata(400, "FOTO_ZATEN_VAR", "Bu dileğe zaten bir fotoğraf eklenmiş.");
+
+        // Yalniz onay bekleyen dilege foto eklenebilir (onay sonrasi degistirilemez)
+        if (katki.Durum != "beklemede")
+            return Hata(400, "KATKI_KAPALI", "Bu dilek artık düzenlenemiyor.");
+
+        if (dosya == null || dosya.Length == 0)
+            return Hata(400, "DOGRULAMA_HATASI", "Bir fotoğraf seçmelisin.");
+        if (dosya.Length > DepolamaServisi.TavanBayt)
+            return Hata(400, "GORSEL_COK_BUYUK", "Fotoğraf çok büyük.");
+
+        using var bellek = new MemoryStream();
+        await dosya.CopyToAsync(bellek);
+        var veri = bellek.ToArray();
+
+        var tip = DepolamaServisi.TipCoz(veri);
+        if (tip == null)
+            return Hata(400, "GECERSIZ_GORSEL", "Yalnızca JPEG, PNG veya WebP kabul edilir.");
+
+        katki.FotoAnahtari = await depo.KaydetAsync(etkinlik.Id, veri, tip.Uzanti);
+        katki.UpdatedAt = simdi;
+        await db.SaveChangesAsync();
+
+        return Results.Json(new { ok = true });
     }
 }

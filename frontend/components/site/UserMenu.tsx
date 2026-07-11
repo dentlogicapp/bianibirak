@@ -215,6 +215,15 @@ export function UserMenu() {
               Kürasyon Stüdyosu
             </MenuLink>
 
+            <MenuLink href="/panel/fotograflar" onClick={() => setAcik(false)} ikon={
+              <>
+                <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
+              </>
+            }>
+              Fotoğraflar
+            </MenuLink>
+
             <MenuLink href="/panel/paylasim" onClick={() => setAcik(false)} ikon={
               <>
                 <circle cx="18" cy="5" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />

@@ -44,6 +44,10 @@ services:
       - Jwt__Issuer=bianibirak
       - Jwt__Audience=bianibirak
       - Jwt__GecerlilikGun=7
+      - Depolama__Kok=/veri/medya
+    volumes:
+      # Gorseller KALICI olmali - container yeniden kurulunca ucmasin.
+      - bianibirak_medya:/veri/medya
     depends_on:
       bianibirak-postgres:
         condition: service_healthy
@@ -82,3 +86,5 @@ networks:
 volumes:
   bianibirak_pgdata:
     name: bianibirak_pgdata
+  bianibirak_medya:
+    name: bianibirak_medya

@@ -127,6 +127,10 @@ public static class Sabitler
             KapanisMetni: kapanis);
     }
 
+    // SAKLAMA & IMHA (Musa karari): kapanistan sonra 37 gun. Aksiyon yoksa TAM IMHA.
+    // Davetli ekraninda ve KVKK metninde acikca gosterilir - guven rozeti.
+    public const int SaklamaGun = 37;
+
     // Editoryel temalar (PDF + onizleme ortak sozlugu)
     public static readonly string[] Temalar = { "klasik", "modern", "zarif" };
 }

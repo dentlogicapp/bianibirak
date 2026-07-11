@@ -241,7 +241,6 @@ public static class SemaKurucu
             "IthafMetni" text NULL,
             "KapanisMetni" text NULL,
             "GruplamaTipi" text NOT NULL DEFAULT 'taraf',
-            "QrKoprusuAktif" boolean NOT NULL DEFAULT true,
             "Durum" text NOT NULL DEFAULT 'taslak',
             "TamamlanmaZamani" timestamptz NULL,
             created_at timestamptz NOT NULL DEFAULT now(),
@@ -277,6 +276,30 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_kurasyon_ciktilari_etkinlik
             ON kurasyon_ciktilari ("EtkinlikId");
+
+        -- Cift gorselleri (en fazla 8 - uygulama seviyesinde kontrol)
+        CREATE TABLE IF NOT EXISTS etkinlik_gorselleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id") ON DELETE CASCADE,
+            "DepolamaAnahtari" text NOT NULL,
+            "Konum" text NOT NULL DEFAULT 'galeri',
+            "Sira" integer NOT NULL DEFAULT 0,
+            "Altyazi" text NULL,
+            "Genislik" integer NOT NULL DEFAULT 0,
+            "Yukseklik" integer NOT NULL DEFAULT 0,
+            "Bayt" bigint NOT NULL DEFAULT 0,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_etkinlik_gorselleri_sira
+            ON etkinlik_gorselleri ("EtkinlikId", "Sira");
+
+        -- Davetli: iliski (kim oldugunu hatirlatir) + tek fotograf
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "DavetliIliski" text NOT NULL DEFAULT '';
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "FotoAnahtari" text NULL;
+
+        -- Kurasyon: QR koprusu KALDIRILDI (Musa karari); tarih gosterimi eklendi
+        ALTER TABLE kurasyonlar ADD COLUMN IF NOT EXISTS "TarihGoster" boolean NOT NULL DEFAULT true;
+        ALTER TABLE kurasyonlar DROP COLUMN IF EXISTS "QrKoprusuAktif";
 
         -- Push: kullanicilara sessiz saat kolonlari (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;

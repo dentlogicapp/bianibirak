@@ -25,8 +25,8 @@ public class Kurasyon
     // Gruplama: "taraf" (gelinin/damadin tarafindan) | "kronolojik" | "bolum" (ozel basliklar)
     public string GruplamaTipi { get; set; } = "taraf";
 
-    // Kitap-ici QR koprusu (B5): basili defterin son sayfasinda dijital deftere QR
-    public bool QrKoprusuAktif { get; set; } = true;
+    // Defterde tarih gosterilsin mi? (dilek altinda "12 Temmuz 2026")
+    public bool TarihGoster { get; set; } = true;
 
     // Durum: "taslak" | "tamamlandi" (tamamlandi = Kuzey Yildizi metrigi)
     public string Durum { get; set; } = "taslak";

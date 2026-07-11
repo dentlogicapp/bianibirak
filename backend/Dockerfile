@@ -10,6 +10,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 RUN adduser --disabled-password --gecos "" --uid 1001 apiuser
 COPY --from=build /app/publish ./
+# Medya dizini (volume mount noktasi) - apiuser yazabilmeli
+RUN mkdir -p /veri/medya && chown -R apiuser:apiuser /veri
 USER apiuser
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080

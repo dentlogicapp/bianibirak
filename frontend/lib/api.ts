@@ -75,6 +75,8 @@ export type KatkiKarsilama = {
   sayac_aktif_cumle: string | null;
   sayac_bitti_cumle: string | null;
   etkinlik_tarihi: string;
+  gorseller: { url: string; altyazi: string | null; kapak: boolean }[];
+  saklama_gun: number;
 };
 
 // Katki (moderasyon kuyrugu / defter).
@@ -193,6 +195,56 @@ export type CopKutusu = {
   }[];
 };
 
+// Cift gorseli yukle (multipart - istek<T> JSON gonderir, bu ayri yol).
+export async function gorselYukle(
+  hazir: { dosya: File; genislik: number; yukseklik: number },
+  konum = "galeri"
+): Promise<{ ok: true; veri: EtkinlikGorseli } | { ok: false; mesaj: string }> {
+  try {
+    const form = new FormData();
+    form.append("dosya", hazir.dosya);
+    form.append("konum", konum);
+    form.append("genislik", String(hazir.genislik));
+    form.append("yukseklik", String(hazir.yukseklik));
+
+    const yanit = await fetch("/api/etkinlik/aktif/gorsel", {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
+    const govde = await yanit.json().catch(() => ({}));
+    if (!yanit.ok) {
+      return { ok: false, mesaj: govde.mesaj ?? "Fotoğraf yüklenemedi." };
+    }
+    return { ok: true, veri: govde as EtkinlikGorseli };
+  } catch {
+    return { ok: false, mesaj: "Sunucuya ulaşılamadı." };
+  }
+}
+
+// Davetli fotografi yukle (token + katkiId ile; davetli basina 1 adet)
+export async function davetliFotoYukle(
+  token: string,
+  katkiId: string,
+  dosya: File
+): Promise<{ ok: boolean; mesaj?: string }> {
+  try {
+    const form = new FormData();
+    form.append("dosya", dosya);
+    const yanit = await fetch(`/api/k/${token}/foto/${katkiId}`, {
+      method: "POST",
+      body: form,
+    });
+    if (!yanit.ok) {
+      const govde = await yanit.json().catch(() => ({}));
+      return { ok: false, mesaj: govde.mesaj ?? "Fotoğraf yüklenemedi." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Sunucuya ulaşılamadı." };
+  }
+}
+
 // Baskiya hazir defteri indir (PDF - blob, JSON degil).
 // onizleme=true -> filigranli surum (satin alma oncesi).
 export async function defteriIndir(onizleme = false): Promise<{ ok: true } | { ok: false; mesaj: string }> {
@@ -226,6 +278,17 @@ export async function defteriIndir(onizleme = false): Promise<{ ok: true } | { o
   }
 }
 
+// ---- GORSELLER (cift - en fazla 8) ----
+export type EtkinlikGorseli = {
+  id: string;
+  url: string;
+  konum: string; // kapak | ithaf | bolum | kapanis | galeri
+  sira: number;
+  altyazi: string | null;
+  genislik: number;
+  yukseklik: number;
+};
+
 // ---- KURASYON (Asama 6 - miras) ----
 export type KurasyonOgesi = {
   katki_id: string;
@@ -246,7 +309,7 @@ export type Kurasyon = {
   ithaf_metni: string | null;
   kapanis_metni: string | null;
   gruplama_tipi: string;
-  qr_koprusu_aktif: boolean;
+  tarih_goster: boolean;
   durum: string;
   tamamlanma_zamani: string | null;
   es1_ad: string;
@@ -363,17 +426,27 @@ export const api = {
     istek<KatkiKarsilama>(`/api/k/${encodeURIComponent(token)}`),
   katkiBirak: (
     token: string,
-    v: { davetliAd: string; davetliEmail: string; davetliTelefon: string; mesaj: string }
+    v: {
+      davetliAd: string;
+      davetliEmail: string;
+      davetliTelefon: string;
+      davetliIliski: string;
+      mesaj: string;
+    }
   ) =>
-    istek<{ durum: string; mesaj: string }>(`/api/k/${encodeURIComponent(token)}`, {
-      method: "POST",
-      body: JSON.stringify({
-        DavetliAd: v.davetliAd,
-        DavetliEmail: v.davetliEmail,
-        DavetliTelefon: v.davetliTelefon,
-        Mesaj: v.mesaj,
-      }),
-    }),
+    istek<{ durum: string; katki_id: string; mesaj: string }>(
+      `/api/k/${encodeURIComponent(token)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          DavetliAd: v.davetliAd,
+          DavetliEmail: v.davetliEmail,
+          DavetliTelefon: v.davetliTelefon,
+          DavetliIliski: v.davetliIliski,
+          Mesaj: v.mesaj,
+        }),
+      }
+    ),
 
   // --- Moderasyon (Asama 4; izolasyonlu kuyruk + onay/ret + birlesik defter) ---
   katkiKuyruk: () => istek<Katki[]>("/api/etkinlik/aktif/kuyruk"),
@@ -457,6 +530,22 @@ export const api = {
       body: JSON.stringify({ Durum: durum, SonucNotu: sonucNotu ?? null }),
     }),
 
+  // ---- GORSELLER ----
+  gorselListe: () =>
+    istek<{ gorseller: EtkinlikGorseli[]; tavan: number }>("/api/etkinlik/aktif/gorseller"),
+  gorselGuncelle: (id: string, v: { konum?: string; altyazi?: string }) =>
+    istek<{ ok: boolean }>(`/api/etkinlik/aktif/gorsel/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ Konum: v.konum ?? null, Altyazi: v.altyazi ?? null }),
+    }),
+  gorselSirala: (idler: string[]) =>
+    istek<{ ok: boolean }>("/api/etkinlik/aktif/gorsel/sirala", {
+      method: "POST",
+      body: JSON.stringify({ Idler: idler }),
+    }),
+  gorselSil: (id: string) =>
+    istek<{ ok: boolean }>(`/api/etkinlik/aktif/gorsel/${id}`, { method: "DELETE" }),
+
   // ---- KURASYON ----
   kurasyonGetir: () => istek<Kurasyon>("/api/etkinlik/aktif/kurasyon"),
   kurasyonGuncelle: (v: Partial<{
@@ -467,7 +556,7 @@ export const api = {
     ithafMetni: string;
     kapanisMetni: string;
     gruplamaTipi: string;
-    qrKoprusuAktif: boolean;
+    tarihGoster: boolean;
   }>) =>
     istek<{ ok: boolean }>("/api/etkinlik/aktif/kurasyon", {
       method: "PUT",
@@ -479,7 +568,7 @@ export const api = {
         IthafMetni: v.ithafMetni ?? null,
         KapanisMetni: v.kapanisMetni ?? null,
         GruplamaTipi: v.gruplamaTipi ?? null,
-        QrKoprusuAktif: v.qrKoprusuAktif ?? null,
+        TarihGoster: v.tarihGoster ?? null,
       }),
     }),
   kurasyonOgeGuncelle: (katkiId: string, v: { dahil?: boolean; bolumBasligi?: string }) =>

@@ -77,7 +77,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   const [kapakAltBaslik, setKapakAltBaslik] = useState(ilk.kapak_alt_baslik ?? "");
   const [ithaf, setIthaf] = useState(ilk.ithaf_metni ?? "");
   const [kapanis, setKapanis] = useState(ilk.kapanis_metni ?? "");
-  const [qrKoprusu, setQrKoprusu] = useState(ilk.qr_koprusu_aktif);
+  const [tarihGoster, setTarihGoster] = useState(ilk.tarih_goster);
 
   // Ogeler (yerel - anlik guncelleme)
   const [ogeler, setOgeler] = useState<KurasyonOgesi[]>(ilk.ogeler);
@@ -92,7 +92,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     kapakAltBaslik !== (ilk.kapak_alt_baslik ?? "") ||
     ithaf !== (ilk.ithaf_metni ?? "") ||
     kapanis !== (ilk.kapanis_metni ?? "") ||
-    qrKoprusu !== ilk.qr_koprusu_aktif;
+    tarihGoster !== ilk.tarih_goster;
 
   async function kaydet(): Promise<boolean> {
     const c = await api.kurasyonGuncelle({
@@ -102,7 +102,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       kapakAltBaslik,
       ithafMetni: ithaf,
       kapanisMetni: kapanis,
-      qrKoprusuAktif: qrKoprusu,
+      tarihGoster,
     });
     if (!c.ok) {
       toast.error(c.mesaj);
@@ -112,7 +112,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   }
 
   const kayitDurum = useOtoKaydet(
-    JSON.stringify({ tema, gruplama, kapakBaslik, kapakAltBaslik, ithaf, kapanis, qrKoprusu }),
+    JSON.stringify({ tema, gruplama, kapakBaslik, kapakAltBaslik, ithaf, kapanis, tarihGoster }),
     degisti,
     kaydet
   );
@@ -411,27 +411,27 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                 </div>
               </div>
 
-              {/* QR koprusu */}
+              {/* Tarih gosterimi */}
               <div className="flex items-center justify-between gap-3 rounded-xl border border-ayrac bg-parsomen px-4 py-3">
                 <div className="min-w-0">
                   <p className="font-govde text-sm font-medium text-murekkep">
-                    Kitap-içi QR köprüsü
+                    Tarihleri göster
                   </p>
                   <p className="mt-0.5 font-govde text-xs text-ikincil">
-                    Son sayfaya QR eklenir; okutan dijital deftere ulaşır.
+                    Her dileğin altında bırakıldığı tarih yazar - yıllar sonra anlam kazanır.
                   </p>
                 </div>
                 <button
                   role="switch"
-                  aria-checked={qrKoprusu}
-                  onClick={() => setQrKoprusu((v) => !v)}
+                  aria-checked={tarihGoster}
+                  onClick={() => setTarihGoster((v) => !v)}
                   className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                    qrKoprusu ? "bg-sarap" : "bg-ayrac"
+                    tarihGoster ? "bg-sarap" : "bg-ayrac"
                   }`}
                 >
                   <span
                     className={`inline-block h-5 w-5 transform rounded-full bg-parsomen shadow-sm transition-transform ${
-                      qrKoprusu ? "translate-x-5" : "translate-x-0.5"
+                      tarihGoster ? "translate-x-5" : "translate-x-0.5"
                     }`}
                   />
                 </button>
@@ -452,7 +452,6 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             kapakAltBaslik={kapakAltBaslik}
             ithaf={ithaf}
             kapanis={kapanis}
-            qrKoprusu={qrKoprusu}
             ogeler={dahilOgeler}
             es1Ad={ilk.es1_ad}
             es2Ad={ilk.es2_ad}
@@ -558,7 +557,6 @@ function EserOnizleme({
   kapakAltBaslik,
   ithaf,
   kapanis,
-  qrKoprusu,
   ogeler,
   es1Ad,
   es2Ad,
@@ -570,7 +568,6 @@ function EserOnizleme({
   kapakAltBaslik: string;
   ithaf: string;
   kapanis: string;
-  qrKoprusu: boolean;
   ogeler: KurasyonOgesi[];
   es1Ad: string;
   es2Ad: string;
@@ -601,7 +598,7 @@ function EserOnizleme({
             ithaf={ithaf}
           />
         ) : (
-          <IcSayfa tema={tema} gruplu={gruplu} kapanis={kapanis} qrKoprusu={qrKoprusu} />
+          <IcSayfa tema={tema} gruplu={gruplu} kapanis={kapanis} />
         )}
       </div>
 
@@ -681,12 +678,10 @@ function IcSayfa({
   tema,
   gruplu,
   kapanis,
-  qrKoprusu,
 }: {
   tema: string;
   gruplu: { baslik: string | null; ogeler: KurasyonOgesi[] }[];
   kapanis: string;
-  qrKoprusu: boolean;
 }) {
   const italik = tema === "zarif";
   const ortali = tema !== "modern";
@@ -754,24 +749,6 @@ function IcSayfa({
         </div>
       )}
 
-      {/* QR koprusu */}
-      {qrKoprusu && (
-        <div className="mt-6 flex flex-col items-center gap-1.5">
-          <div className="grid h-10 w-10 grid-cols-3 grid-rows-3 gap-0.5 rounded-sm bg-[#211a17] p-1">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <span
-                key={i}
-                className={`rounded-[1px] ${
-                  [0, 2, 4, 6, 8].includes(i) ? "bg-[#fdf9f0]" : "bg-transparent"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="font-govde text-[0.5rem] uppercase tracking-[0.15em] text-[#6c5f50]">
-            Dijital defter
-          </p>
-        </div>
-      )}
     </div>
   );
 }

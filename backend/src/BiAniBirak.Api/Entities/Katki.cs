@@ -21,6 +21,14 @@ public class Katki
     public string DavetliEmail { get; set; } = string.Empty;
     public string DavetliTelefon { get; set; } = string.Empty;
 
+    // ILISKI (Musa karari): "Damadin calisma arkadasi" gibi. Isim benzerligi/soyad
+    // hatirlamama sorununu cozer. DEFTERE BASILIR: "Ayse Yildiz - Gelinin universite arkadasi".
+    public string DavetliIliski { get; set; } = string.Empty;
+
+    // Davetli fotografi (davetli basina EN FAZLA 1 - Musa karari).
+    // Depolama anahtari; dilegin yanina deftere basilir.
+    public string? FotoAnahtari { get; set; }
+
     public string Mesaj { get; set; } = string.Empty;
 
     // dilek | foto  (gelecek: ses | video). Asama 3'te daima dilek.

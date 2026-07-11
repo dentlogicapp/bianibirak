@@ -33,6 +33,7 @@ builder.Services.AddSingleton<SifreServisi>();
 builder.Services.AddSingleton<HizSiniri>();
 builder.Services.AddSingleton<PushGonderici>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
+builder.Services.AddSingleton<DepolamaServisi>();
 
 // --- Kimlik dogrulama: JwtBearer (Authorization header VEYA host-scoped cerez) ---
 builder.Services
@@ -145,6 +146,7 @@ app.BildirimUclariniEkle();
 app.DavetUclariniEkle();
 app.SuperUclariniEkle();
 app.KurasyonUclariniEkle();
+app.GorselUclariniEkle();
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

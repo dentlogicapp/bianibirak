@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { api, type KatkiKarsilama } from "@/lib/api";
+import { api, davetliFotoYukle, type KatkiKarsilama } from "@/lib/api";
+import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 
 // Public davetli katki sayfasi (login YOK; surtunme sifir - Belge 01).
@@ -127,6 +128,9 @@ function KatkiFormu({
   const [email, setEmail] = useState("");
   const [telefon, setTelefon] = useState("");
   const [mesaj, setMesaj] = useState("");
+  const [iliski, setIliski] = useState("");
+  const [iliskiSerbest, setIliskiSerbest] = useState("");
+  const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
   const [riza, setRiza] = useState(false);
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -139,6 +143,17 @@ function KatkiFormu({
   const buEs = veri.kaynak_es === "es1" ? veri.es1_ad : veri.es2_ad;
   const digerEs = veri.kaynak_es === "es1" ? veri.es2_ad : veri.es1_ad;
 
+  // Iliski secenekleri: davetli HANGI esin linkinden geldiyse ona gore.
+  // Deftere "Ayse Yildiz - Musa'nin universite arkadasi" olarak basilir.
+  const iliskiSecenekleri = [
+    `${buEs} tarafından akraba`,
+    `${buEs} ile çalışma arkadaşı`,
+    `${buEs} ile okul arkadaşı`,
+    `${buEs} ile çocukluk arkadaşı`,
+    "Aile dostu",
+    "Komşu",
+  ];
+
   async function gonder(e: React.FormEvent) {
     e.preventDefault();
     setHata("");
@@ -149,6 +164,9 @@ function KatkiFormu({
     if (ad.trim().length < 2) return setHata("Adını yazar mısın?");
     if (!email.includes("@")) return setHata("Geçerli bir e-posta gerekli.");
     if (telefon.trim().length < 7) return setHata("Geçerli bir telefon gerekli.");
+    const secilenIliski = iliski === "diger" ? iliskiSerbest.trim() : iliski;
+    if (secilenIliski.length < 2)
+      return setHata("Çifte yakınlığını seçer misin? Bu, seni yıllar sonra hatırlamalarını sağlar.");
     if (mesaj.trim().length < 2) return setHata("Bir mesaj yazmalısın.");
 
     setYukleniyor(true);
@@ -156,11 +174,44 @@ function KatkiFormu({
       davetliAd: ad.trim(),
       davetliEmail: email.trim(),
       davetliTelefon: telefon.trim(),
+      davetliIliski: secilenIliski,
       mesaj: mesaj.trim(),
     });
+
+    if (!cevap.ok) {
+      setYukleniyor(false);
+      setHata(cevap.mesaj);
+      return;
+    }
+
+    // Fotograf 2. adimda gider: dilek ZATEN kaydedildi, foto basarisiz olsa bile kaybolmaz.
+    if (foto) {
+      const f = await davetliFotoYukle(token, cevap.veri.katki_id, foto.dosya);
+      if (!f.ok) {
+        // Dilek gitti; yalniz foto gitmedi - davetliyi bosuna kaygilandirma
+        setYukleniyor(false);
+        onGonderildi();
+        return;
+      }
+    }
+
     setYukleniyor(false);
-    if (cevap.ok) onGonderildi();
-    else setHata(cevap.mesaj);
+    onGonderildi();
+  }
+
+  async function fotoSecildi(e: React.ChangeEvent<HTMLInputElement>) {
+    const ham = e.target.files?.[0];
+    e.target.value = "";
+    if (!ham) return;
+    setHata("");
+    try {
+      // Tarayicida kucult + EXIF/GPS temizle - sunucuya 8 MB degil ~700 KB gider
+      const hazir = await gorselHazirla(ham);
+      if (foto) URL.revokeObjectURL(foto.onizleme);
+      setFoto({ dosya: hazir.dosya, onizleme: hazir.onizlemeUrl });
+    } catch (h) {
+      setHata(h instanceof Error ? h.message : "Fotoğraf işlenemedi.");
+    }
   }
 
   return (
@@ -171,7 +222,30 @@ function KatkiFormu({
         </div>
 
         {/* Karsilama */}
-        <div className="rounded-3xl border border-ayrac bg-yuzey p-8 text-center">
+        <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
+          {/* CIFT GORSELLERI: davetli cift'i gorur -> duygusal bag -> daha ictem dilek.
+              Kapak once gelir. Gorsel yoksa tipografi zaten yeterli. */}
+          {veri.gorseller.length > 0 && (
+            <div className={veri.gorseller.length === 1 ? "" : "flex gap-0.5"}>
+              {veri.gorseller.slice(0, 3).map((g, i) => (
+                <div
+                  key={i}
+                  className={`relative overflow-hidden bg-parsomen ${
+                    veri.gorseller.length === 1 ? "aspect-[16/10] w-full" : "aspect-square flex-1"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={g.url}
+                    alt={g.altyazi ?? ciftAdi}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="p-8 text-center">
           <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
             {ciftAdi}
           </p>
@@ -190,9 +264,11 @@ function KatkiFormu({
               bittiCumle={veri.sayac_bitti_cumle}
             />
           )}
+          </div>
         </div>
 
-        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
+        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}
+        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
           <p className="text-center font-govde text-sm font-medium text-sarap">
             {buEs} tarafının yakınısın
           </p>
@@ -241,6 +317,55 @@ function KatkiFormu({
             </label>
           </div>
 
+          {/* ILISKI - deftere basilir: "Ayse Yildiz - Gelinin universite arkadasi".
+              Cift 20 yil sonra "bu kimdi?" demesin. */}
+          <div className="mt-4">
+            <span className="mb-1.5 block font-govde text-xs text-ikincil">
+              Çifte yakınlığın
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {iliskiSecenekleri.map((sec) => (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => setIliski(sec)}
+                  className={`rounded-full border px-3 py-1.5 font-govde text-xs transition-colors ${
+                    iliski === sec
+                      ? "border-sarap bg-sarap text-parsomen"
+                      : "border-ayrac bg-parsomen text-ikincil hover:border-sarap"
+                  }`}
+                >
+                  {sec}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setIliski("diger")}
+                className={`rounded-full border px-3 py-1.5 font-govde text-xs transition-colors ${
+                  iliski === "diger"
+                    ? "border-sarap bg-sarap text-parsomen"
+                    : "border-ayrac bg-parsomen text-ikincil hover:border-sarap"
+                }`}
+              >
+                Diğer
+              </button>
+            </div>
+
+            {iliski === "diger" && (
+              <input
+                value={iliskiSerbest}
+                onChange={(e) => setIliskiSerbest(e.target.value)}
+                maxLength={60}
+                autoFocus
+                className="mt-2 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
+                placeholder={`Örn: ${buEs} ile aynı mahallede büyüdük`}
+              />
+            )}
+            <p className="mt-1.5 font-govde text-[0.7rem] text-ikincil">
+              Defterde adının altında yazacak - seni yıllar sonra da hatırlasınlar.
+            </p>
+          </div>
+
           <label className="mt-4 block">
             <span className="mb-1 block font-govde text-xs text-ikincil">Mesajın</span>
             <textarea
@@ -251,6 +376,49 @@ function KatkiFormu({
               placeholder="Dileğini, anını ya da tavsiyeni buraya yaz..."
             />
           </label>
+
+          {/* FOTOGRAF - davetli basina 1 adet */}
+          <div className="mt-4">
+            <span className="mb-1.5 block font-govde text-xs text-ikincil">
+              Bir fotoğraf (isteğe bağlı)
+            </span>
+
+            {foto ? (
+              <div className="flex items-center gap-3 rounded-xl border border-ayrac bg-parsomen p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={foto.onizleme}
+                  alt="Seçtiğin fotoğraf"
+                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-govde text-xs text-murekkep">Fotoğrafın hazır</p>
+                  <p className="font-govde text-[0.7rem] text-ikincil">
+                    Dileğinin yanına, deftere basılacak.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    URL.revokeObjectURL(foto.onizleme);
+                    setFoto(null);
+                  }}
+                  className="shrink-0 rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                >
+                  Kaldır
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ayrac bg-parsomen px-4 py-4 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                  <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                  <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                </svg>
+                Fotoğraf ekle
+                <input type="file" accept="image/*" onChange={fotoSecildi} className="hidden" />
+              </label>
+            )}
+          </div>
 
           {/* KVKK aydinlatma + riza (Belge 08) */}
           <label className="mt-4 flex items-start gap-2 font-govde text-xs text-ikincil">

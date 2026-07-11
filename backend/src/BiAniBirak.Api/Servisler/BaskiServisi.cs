@@ -53,7 +53,16 @@ public static class BaskiServisi
     }
 
     // Esere girecek tek dilek
-    public sealed record Dilek(string DavetliAd, string Mesaj, string KaynakEs, DateTimeOffset Birakilma);
+    public sealed record Dilek(
+        string DavetliAd,
+        string Iliski,        // "Gelinin universite arkadasi" - 20 yil sonra kim oldugunu hatirlatir
+        string Mesaj,
+        string KaynakEs,
+        DateTimeOffset Birakilma,
+        byte[]? Foto);        // davetli basina en fazla 1
+
+    // Cift gorseli (kapak/ithaf/bolum/kapanis)
+    public sealed record Gorsel(byte[] Veri, string? Altyazi);
 
     // Eserin tum kurgusu
     public sealed record EserVerisi(
@@ -63,11 +72,16 @@ public static class BaskiServisi
         string KapakAltBaslik,
         string? IthafMetni,
         string? KapanisMetni,
-        bool QrKoprusuAktif,
+        bool TarihGoster,
         string Es1Ad,
         string Es2Ad,
-        string DijitalDefterUrl,
         IReadOnlyList<Dilek> Dilekler,
+        // Cift gorselleri - YOKSA tipografik kapak yine de eser kalitesinde
+        // (Musa: "Foto zenginlestirme, zorunluluk degil")
+        Gorsel? KapakGorseli,
+        Gorsel? IthafGorseli,
+        Gorsel? KapanisGorseli,
+        IReadOnlyList<Gorsel> BolumGorselleri,
         bool Filigranli);
 
     public static byte[] DefterUret(EserVerisi eser)
@@ -99,8 +113,8 @@ public static class BaskiServisi
                 AltbilgiKur(sayfa);
             });
 
-            // --- KAPANIS + QR KOPRUSU ---
-            if (!string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.QrKoprusuAktif)
+            // --- KAPANIS ---
+            if (!string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.KapanisGorseli != null)
             {
                 kapsayici.Page(sayfa =>
                 {
@@ -152,7 +166,22 @@ public static class BaskiServisi
 
         kap.Column(sutun =>
         {
-            sutun.Item().Height(40);
+            // KAPAK GORSELI (varsa): ust blok, yaldiz cerceveli.
+            // YOKSA: saf tipografik kapak - eser kalitesi dusmez (Musa karari).
+            if (eser.KapakGorseli != null)
+            {
+                sutun.Item().Height(8);
+                sutun.Item().AlignCenter()
+                    .Width(120).Height(90)
+                    .Border(0.8f).BorderColor(Yaldiz)
+                    .Padding(3)
+                    .Image(eser.KapakGorseli.Veri).FitArea();
+                sutun.Item().Height(26);
+            }
+            else
+            {
+                sutun.Item().Height(40);
+            }
 
             // Ust susleme
             if (eser.Tema == "klasik")
@@ -205,6 +234,14 @@ public static class BaskiServisi
 
         kap.AlignMiddle().Column(sutun =>
         {
+            if (eser.IthafGorseli != null)
+            {
+                sutun.Item().AlignCenter().Width(110).Height(80)
+                    .Border(0.8f).BorderColor(Yaldiz).Padding(3)
+                    .Image(eser.IthafGorseli.Veri).FitArea();
+                sutun.Item().Height(20);
+            }
+
             sutun.Item().AlignCenter().Width(40).Height(1).Background(Yaldiz);
             sutun.Item().Height(22);
 
@@ -268,9 +305,20 @@ public static class BaskiServisi
 
                 foreach (var d in dilekler)
                 {
-                    // Her dilek bolunmez bir birim (sayfa ortasindan kesilmez)
+                    // Her dilek BOLUNMEZ bir birim (sayfa ortasindan kesilmez - ShowEntire)
                     sutun.Item().PaddingBottom(20).ShowEntire().Column(dc =>
                     {
+                        // DAVETLI FOTOGRAFI (varsa): dilegin ustunde, olculu boyut.
+                        // Sayfa dolgusu degil, ani; kucuk ve zarif tutulur.
+                        if (d.Foto != null)
+                        {
+                            var fotoKap = ortali ? dc.Item().AlignCenter() : dc.Item();
+                            fotoKap.Width(78).Height(58)
+                                .Border(0.6f).BorderColor(Yaldiz).Padding(2)
+                                .Image(d.Foto).FitArea();
+                            dc.Item().Height(9);
+                        }
+
                         var metinKap = ortali ? dc.Item().AlignCenter() : dc.Item();
                         metinKap.Text(d.Mesaj)
                             .FontFamily(GovdeFont).FontSize(10.5f).LineHeight(1.7f)
@@ -278,9 +326,28 @@ public static class BaskiServisi
 
                         dc.Item().Height(7);
 
+                        // IMZA: ad + ILISKI (20 yil sonra "bu kimdi?" sorusunu oldurur)
                         var imzaKap = ortali ? dc.Item().AlignCenter() : dc.Item();
                         imzaKap.Text(d.DavetliAd)
                             .FontFamily(BaslikFont).FontSize(10).FontColor(Sarap);
+
+                        if (!string.IsNullOrWhiteSpace(d.Iliski))
+                        {
+                            dc.Item().Height(2);
+                            var iliskiKap = ortali ? dc.Item().AlignCenter() : dc.Item();
+                            iliskiKap.Text(d.Iliski)
+                                .FontFamily(GovdeFont).FontSize(7.5f).FontColor(Ikincil)
+                                .LetterSpacing(0.06f);
+                        }
+
+                        // TARIH (cift toggle'lar): 20 yil sonra anlam kazanir
+                        if (eser.TarihGoster)
+                        {
+                            dc.Item().Height(2);
+                            var tarihKap = ortali ? dc.Item().AlignCenter() : dc.Item();
+                            tarihKap.Text(TarihMetni(d.Birakilma))
+                                .FontFamily(GovdeFont).FontSize(6.8f).FontColor(Yaldiz);
+                        }
 
                         // Klasik temada dilekler arasi ince ayrac
                         if (eser.Tema == "klasik")
@@ -294,7 +361,7 @@ public static class BaskiServisi
         });
     }
 
-    // ---------- KAPANIS + QR ----------
+    // ---------- KAPANIS ----------
     private static void Kapanis(IContainer kap, EserVerisi eser)
     {
         var italik = eser.Tema == "zarif";
@@ -309,21 +376,20 @@ public static class BaskiServisi
                 sutun.Item().Height(30);
             }
 
-            // Kitap-ici QR koprusu (B5): basili defteri dijitale baglar
-            if (eser.QrKoprusuAktif)
+            // KAPANIS GORSELI (varsa) - eserin son nefesi
+            if (eser.KapanisGorseli != null)
             {
-                sutun.Item().AlignCenter().Column(qr =>
+                sutun.Item().AlignCenter().Width(110).Height(80)
+                    .Border(0.8f).BorderColor(Yaldiz).Padding(3)
+                    .Image(eser.KapanisGorseli.Veri).FitArea();
+
+                if (!string.IsNullOrWhiteSpace(eser.KapanisGorseli.Altyazi))
                 {
-                    qr.Item().AlignCenter().Width(72).Height(72)
-                        .Image(QrPng(eser.DijitalDefterUrl));
-                    qr.Item().Height(8);
-                    qr.Item().AlignCenter().Text("DİJİTAL DEFTER")
-                        .FontFamily(GovdeFont).FontSize(6.5f).FontColor(Yaldiz).LetterSpacing(0.25f);
-                    qr.Item().Height(3);
-                    qr.Item().AlignCenter().Text("Okutunca dileklerin tamamına ulaşırsın")
-                        .FontFamily(GovdeFont).FontSize(7).FontColor(Ikincil);
-                });
-                sutun.Item().Height(36);
+                    sutun.Item().Height(6);
+                    sutun.Item().AlignCenter().Text(eser.KapanisGorseli.Altyazi)
+                        .FontFamily(GovdeFont).FontSize(7.5f).FontColor(Ikincil).Italic();
+                }
+                sutun.Item().Height(32);
             }
 
             // Marka kilidi
@@ -338,13 +404,10 @@ public static class BaskiServisi
         });
     }
 
-    // QR (kitap-ici kopru): test edilmis kutuphane - basili kod OKUNMAK zorunda.
-    private static byte[] QrPng(string url)
+    // Tarih metni (Turkce): "12 Temmuz 2026"
+    private static string TarihMetni(DateTimeOffset t)
     {
-        using var uretec = new QRCoder.QRCodeGenerator();
-        // ECC-M: kagit uzerinde leke/kirisiklik toleransi (~%15 kurtarma)
-        using var veri = uretec.CreateQrCode(url, QRCoder.QRCodeGenerator.ECCLevel.M);
-        var png = new QRCoder.PngByteQRCode(veri);
-        return png.GetGraphic(10); // 10 piksel/modul -> baskida net
+        var kultur = new System.Globalization.CultureInfo("tr-TR");
+        return t.ToLocalTime().ToString("d MMMM yyyy", kultur);
     }
 }

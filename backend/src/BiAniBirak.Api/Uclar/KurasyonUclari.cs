@@ -31,7 +31,8 @@ public static class KurasyonUclari
     // BASKIYA HAZIR DEFTER (Belge 01 - asil deger).
     // onizleme=true -> filigranli (satin alma oncesi; Belge 05 paywall matrisi).
     private static async Task<IResult> DefterPdf(
-        HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam, bool onizleme = false)
+        HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
+        DepolamaServisi depo, bool onizleme = false)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
@@ -55,19 +56,53 @@ public static class KurasyonUclari
             .OrderBy(o => o.Sira)
             .Join(db.Katkilar.AsNoTracking().Where(k => !k.SilindiMi),
                 o => o.KatkiId, k => k.Id,
-                (o, k) => new { k.DavetliAd, k.Mesaj, k.KaynakEs, k.CreatedAt })
+                (o, k) => new
+                {
+                    k.DavetliAd,
+                    k.DavetliIliski,
+                    k.Mesaj,
+                    k.KaynakEs,
+                    k.CreatedAt,
+                    k.FotoAnahtari,
+                })
             .ToListAsync();
 
         if (dilekler.Count == 0)
             return Hata(400, "DILEK_YOK", "Esere en az bir dilek eklemelisin.");
 
-        // Kitap-ici QR koprusu: bu esin paylasim baglantisi (dijital deftere gotururur)
-        var token = await db.PaylasimBaglantilari.AsNoTracking()
-            .Where(p => p.EtkinlikId == etkinlikId)
-            .Select(p => p.Token)
-            .FirstOrDefaultAsync();
-        var taban = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
-        var dijitalUrl = token == null ? taban : $"{taban}/k/{token}";
+        // Cift gorselleri (konumlara gore)
+        var gorseller = await db.EtkinlikGorselleri.AsNoTracking()
+            .Where(g => g.EtkinlikId == etkinlikId)
+            .OrderBy(g => g.Sira)
+            .ToListAsync();
+
+        async Task<BaskiServisi.Gorsel?> GorselYukle(EtkinlikGorseli? g)
+        {
+            if (g == null) return null;
+            var veri = await depo.OkuAsync(g.DepolamaAnahtari);
+            return veri == null ? null : new BaskiServisi.Gorsel(veri, g.Altyazi);
+        }
+
+        var kapakG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapak"));
+        var ithafG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "ithaf"));
+        var kapanisG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapanis"));
+
+        var bolumG = new List<BaskiServisi.Gorsel>();
+        foreach (var g in gorseller.Where(g => g.Konum == "bolum"))
+        {
+            var y = await GorselYukle(g);
+            if (y != null) bolumG.Add(y);
+        }
+
+        // Davetli fotograflari
+        var dilekListe = new List<BaskiServisi.Dilek>();
+        foreach (var d in dilekler)
+        {
+            byte[]? foto = null;
+            if (d.FotoAnahtari != null) foto = await depo.OkuAsync(d.FotoAnahtari);
+            dilekListe.Add(new BaskiServisi.Dilek(
+                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt, foto));
+        }
 
         BaskiServisi.Hazirla(ortam.ContentRootPath);
 
@@ -78,13 +113,14 @@ public static class KurasyonUclari
             KapakAltBaslik: kurasyon.KapakAltBaslik ?? "",
             IthafMetni: kurasyon.IthafMetni,
             KapanisMetni: kurasyon.KapanisMetni,
-            QrKoprusuAktif: kurasyon.QrKoprusuAktif,
+            TarihGoster: kurasyon.TarihGoster,
             Es1Ad: etkinlik.Es1Ad,
             Es2Ad: etkinlik.Es2Ad,
-            DijitalDefterUrl: dijitalUrl,
-            Dilekler: dilekler
-                .Select(d => new BaskiServisi.Dilek(d.DavetliAd, d.Mesaj, d.KaynakEs, d.CreatedAt))
-                .ToList(),
+            Dilekler: dilekListe,
+            KapakGorseli: kapakG,
+            IthafGorseli: ithafG,
+            KapanisGorseli: kapanisG,
+            BolumGorselleri: bolumG,
             Filigranli: onizleme);
 
         var pdf = BaskiServisi.DefterUret(eser);
@@ -101,7 +137,7 @@ public static class KurasyonUclari
                 tema = kurasyon.Tema,
                 gruplama = kurasyon.GruplamaTipi,
                 kapak = kurasyon.KapakBaslik,
-                qr = kurasyon.QrKoprusuAktif,
+                tarih = kurasyon.TarihGoster,
             }),
             Filigranli = onizleme,
             DilekSayisi = dilekler.Count,
@@ -207,7 +243,7 @@ public static class KurasyonUclari
                 IthafMetni = v.IthafMetni,
                 KapanisMetni = v.KapanisMetni,
                 GruplamaTipi = "taraf",
-                QrKoprusuAktif = true,
+                TarihGoster = true,
                 Durum = "taslak",
                 CreatedAt = simdi,
                 UpdatedAt = simdi,
@@ -284,7 +320,7 @@ public static class KurasyonUclari
             ithaf_metni = kurasyon.IthafMetni,
             kapanis_metni = kurasyon.KapanisMetni,
             gruplama_tipi = kurasyon.GruplamaTipi,
-            qr_koprusu_aktif = kurasyon.QrKoprusuAktif,
+            tarih_goster = kurasyon.TarihGoster,
             durum = kurasyon.Durum,
             tamamlanma_zamani = kurasyon.TamamlanmaZamani,
             // Baglam (onizleme icin)
@@ -331,7 +367,7 @@ public static class KurasyonUclari
         if (istek.KapakGorselUrl != null) kurasyon.KapakGorselUrl = istek.KapakGorselUrl.Trim();
         if (istek.IthafMetni != null) kurasyon.IthafMetni = istek.IthafMetni.Trim();
         if (istek.KapanisMetni != null) kurasyon.KapanisMetni = istek.KapanisMetni.Trim();
-        if (istek.QrKoprusuAktif.HasValue) kurasyon.QrKoprusuAktif = istek.QrKoprusuAktif.Value;
+        if (istek.TarihGoster.HasValue) kurasyon.TarihGoster = istek.TarihGoster.Value;
 
         kurasyon.UpdatedAt = DateTimeOffset.UtcNow;
         await Denetim(db, etkinlikId, kullaniciId, "KURASYON_GUNCELLENDI", kurasyon.Id,

@@ -17,10 +17,6 @@
     <!-- Baskiya hazir PDF (Asama 6): gercek tipografi, sayfa akisi, print-ready cikti.
          Community lisansi: yillik gelir esigi altinda ucretsiz. -->
     <PackageReference Include="QuestPDF" Version="2024.12.3" />
-    <!-- QR uretimi: PngByteQRCode (saf C#, System.Drawing bagimliligi YOK).
-         Kitap-ici QR koprusu basili defterde OKUNMAK ZORUNDA - test edilmis kutuphane
-         kullanilir; kendi implementasyonumuzu yazmayiz. -->
-    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <!-- Marka fontlari (Fraunces + Inter, statik instance, tam Turkce).

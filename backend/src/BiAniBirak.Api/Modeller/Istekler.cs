@@ -29,6 +29,7 @@ public record KatkiBirakIstek(
     string DavetliAd,
     string DavetliEmail,
     string DavetliTelefon,
+    string DavetliIliski,
     string Mesaj);
 
 // Web Push cihaz kaydi (abone).
@@ -86,8 +87,12 @@ public record KurasyonGuncelleIstek(
     string? IthafMetni,
     string? KapanisMetni,
     string? GruplamaTipi,
-    bool? QrKoprusuAktif);
+    bool? TarihGoster);
 
 public record OgeGuncelleIstek(bool? Dahil, string? BolumBasligi);
 
 public record SiralaIstek(Guid[]? KatkiIdler);
+
+// ---- GORSELLER ----
+public record GorselGuncelleIstek(string? Konum, string? Altyazi);
+public record GorselSiralaIstek(Guid[]? Idler);
