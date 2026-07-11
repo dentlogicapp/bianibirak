@@ -193,6 +193,39 @@ export type CopKutusu = {
   }[];
 };
 
+// Baskiya hazir defteri indir (PDF - blob, JSON degil).
+// onizleme=true -> filigranli surum (satin alma oncesi).
+export async function defteriIndir(onizleme = false): Promise<{ ok: true } | { ok: false; mesaj: string }> {
+  try {
+    const yanit = await fetch(
+      `/api/etkinlik/aktif/kurasyon/defter.pdf${onizleme ? "?onizleme=true" : ""}`,
+      { credentials: "include" }
+    );
+    if (!yanit.ok) {
+      const govde = await yanit.json().catch(() => ({}));
+      return { ok: false, mesaj: govde.mesaj ?? "Defter oluşturulamadı." };
+    }
+
+    const blob = await yanit.blob();
+    // Dosya adini Content-Disposition'dan al
+    const cd = yanit.headers.get("content-disposition") ?? "";
+    const eslesme = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+    const dosyaAdi = eslesme ? decodeURIComponent(eslesme[1]) : "ani-defteri.pdf";
+
+    const url = URL.createObjectURL(blob);
+    const baglanti = document.createElement("a");
+    baglanti.href = url;
+    baglanti.download = dosyaAdi;
+    document.body.appendChild(baglanti);
+    baglanti.click();
+    document.body.removeChild(baglanti);
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Sunucuya ulaşılamadı." };
+  }
+}
+
 // ---- KURASYON (Asama 6 - miras) ----
 export type KurasyonOgesi = {
   katki_id: string;

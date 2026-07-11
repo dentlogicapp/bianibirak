@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
+import { api, defteriIndir, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
@@ -82,6 +82,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   // Ogeler (yerel - anlik guncelleme)
   const [ogeler, setOgeler] = useState<KurasyonOgesi[]>(ilk.ogeler);
   const [tamamlaniyor, setTamamlaniyor] = useState(false);
+  const [uretiliyor, setUretiliyor] = useState<"onizleme" | "baski" | null>(null);
   const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
 
   const degisti =
@@ -143,6 +144,21 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       toast.error(c.mesaj);
       setOgeler(ogeler);
     }
+  }
+
+  async function defterUret(onizleme: boolean) {
+    setUretiliyor(onizleme ? "onizleme" : "baski");
+    const c = await defteriIndir(onizleme);
+    setUretiliyor(null);
+    if (!c.ok) {
+      toast.error(c.mesaj);
+      return;
+    }
+    toast.success(
+      onizleme
+        ? "Önizleme indirildi - filigranlı, baskıya uygun değil."
+        : "Baskıya hazır defterin indirildi."
+    );
   }
 
   async function mirasiTamamla() {
@@ -445,31 +461,79 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         </div>
       </div>
 
-      {/* Mirasi tamamla */}
-      <div className="mt-6 rounded-3xl border border-yaldiz/40 bg-yaldiz/5 p-6 text-center sm:p-8">
-        {tamamlandi ? (
-          <>
-            <p className="font-display text-xl text-murekkep">Mirasın hazır</p>
-            <p className="metin-yasli mx-auto mt-2 max-w-md font-govde text-sm leading-relaxed text-ikincil">
-              {dahilOgeler.length} dilek esere alındı. Baskıya hazır defter ve slayt çıktısı
-              bir sonraki adımda açılacak.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="font-display text-xl text-murekkep">Mirasını mühürle</p>
-            <p className="metin-yasli mx-auto mt-2 max-w-md font-govde text-sm leading-relaxed text-ikincil">
-              Kurgun bittiğinde mirasını tamamla. Sonrasında da düzenlemeye devam
-              edebilirsin - bu bir kilit değil, bir imza.
+      {/* CIKTI MERKEZI - eserin kagida dokuldugu yer */}
+      <div className="mt-6 rounded-3xl border border-yaldiz/40 bg-yaldiz/5 p-6 sm:p-8">
+        <div className="text-center">
+          <p className="font-display text-xl text-murekkep">
+            {tamamlandi ? "Mirasın hazır" : "Eserini kağıda dök"}
+          </p>
+          <p className="metin-yasli mx-auto mt-2 max-w-lg font-govde text-sm leading-relaxed text-ikincil">
+            {dahilOgeler.length} dilek, seçtiğin düzenle baskıya hazır bir deftere dönüşür.
+            Gerçek tipografi, kitap ölçüsü ve cilt payıyla - matbaaya doğrudan verebilirsin.
+          </p>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {/* Onizleme (filigranli) */}
+          <button
+            onClick={() => defterUret(true)}
+            disabled={uretiliyor !== null || dahilOgeler.length === 0}
+            className="flex min-w-0 items-center gap-3 rounded-2xl border border-ayrac bg-yuzey p-5 text-left transition-colors hover:border-sarap disabled:opacity-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ikincil/10 text-ikincil">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth={1.6} fill="none" />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-govde text-sm font-medium text-murekkep">
+                {uretiliyor === "onizleme" ? "Hazırlanıyor..." : "Önizlemeyi indir"}
+              </span>
+              <span className="block font-govde text-xs text-ikincil">
+                Filigranlı - kalitesini gör, sonra karar ver
+              </span>
+            </span>
+          </button>
+
+          {/* Baskiya hazir */}
+          <button
+            onClick={() => defterUret(false)}
+            disabled={uretiliyor !== null || dahilOgeler.length === 0}
+            className="flex min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parsomen/20 text-parsomen">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="M12 3v11m0 0 4-4m-4 4-4-4" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" fill="none" />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-govde text-sm font-medium text-parsomen">
+                {uretiliyor === "baski" ? "Eser hazırlanıyor..." : "Baskıya hazır defteri indir"}
+              </span>
+              <span className="block font-govde text-xs text-parsomen/75">
+                A5, cilt paylı, gömülü tipografi - matbaaya hazır
+              </span>
+            </span>
+          </button>
+        </div>
+
+        {/* Muhurleme */}
+        {!tamamlandi && (
+          <div className="mt-5 border-t border-yaldiz/30 pt-5 text-center">
+            <p className="metin-yasli mx-auto max-w-md font-govde text-xs leading-relaxed text-ikincil">
+              Kurgun bittiğinde mirasını mühürle. Bu bir kilit değil, bir imza - sonrasında
+              da düzenlemeye devam edebilirsin.
             </p>
             <button
               onClick={mirasiTamamla}
               disabled={tamamlaniyor || dahilOgeler.length === 0}
-              className="mt-5 rounded-full bg-sarap px-8 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+              className="mt-3 rounded-full border border-sarap px-7 py-2.5 font-govde text-sm font-medium text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-50"
             >
               {tamamlaniyor ? "Mühürleniyor..." : "Mirasımı tamamla"}
             </button>
-          </>
+          </div>
         )}
       </div>
 

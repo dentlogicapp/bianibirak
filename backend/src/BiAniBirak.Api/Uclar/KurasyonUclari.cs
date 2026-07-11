@@ -3,6 +3,7 @@ using System.Text.Json;
 using BiAniBirak.Api.Data;
 using BiAniBirak.Api.Entities;
 using BiAniBirak.Api.Modeller;
+using BiAniBirak.Api.Servisler;
 using Microsoft.EntityFrameworkCore;
 
 namespace BiAniBirak.Api.Uclar;
@@ -24,6 +25,116 @@ public static class KurasyonUclari
         app.MapPut("/api/etkinlik/aktif/kurasyon/oge/{katkiId:guid}", OgeGuncelle).RequireAuthorization();
         app.MapPost("/api/etkinlik/aktif/kurasyon/sirala", Sirala).RequireAuthorization();
         app.MapPost("/api/etkinlik/aktif/kurasyon/tamamla", Tamamla).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/kurasyon/defter.pdf", DefterPdf).RequireAuthorization();
+    }
+
+    // BASKIYA HAZIR DEFTER (Belge 01 - asil deger).
+    // onizleme=true -> filigranli (satin alma oncesi; Belge 05 paywall matrisi).
+    private static async Task<IResult> DefterPdf(
+        HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam, bool onizleme = false)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var etkinlik = await db.Etkinlikler.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == etkinlikId && !e.SilindiMi);
+        if (etkinlik == null)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadı.");
+
+        var kurasyon = await db.Kurasyonlar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        // Esere DAHIL edilen dilekler, kurulan sirayla
+        var dilekler = await db.KurasyonOgeleri.AsNoTracking()
+            .Where(o => o.KurasyonId == kurasyon.Id && o.Dahil)
+            .OrderBy(o => o.Sira)
+            .Join(db.Katkilar.AsNoTracking().Where(k => !k.SilindiMi),
+                o => o.KatkiId, k => k.Id,
+                (o, k) => new { k.DavetliAd, k.Mesaj, k.KaynakEs, k.CreatedAt })
+            .ToListAsync();
+
+        if (dilekler.Count == 0)
+            return Hata(400, "DILEK_YOK", "Esere en az bir dilek eklemelisin.");
+
+        // Kitap-ici QR koprusu: bu esin paylasim baglantisi (dijital deftere gotururur)
+        var token = await db.PaylasimBaglantilari.AsNoTracking()
+            .Where(p => p.EtkinlikId == etkinlikId)
+            .Select(p => p.Token)
+            .FirstOrDefaultAsync();
+        var taban = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+        var dijitalUrl = token == null ? taban : $"{taban}/k/{token}";
+
+        BaskiServisi.Hazirla(ortam.ContentRootPath);
+
+        var eser = new BaskiServisi.EserVerisi(
+            Tema: kurasyon.Tema,
+            GruplamaTipi: kurasyon.GruplamaTipi,
+            KapakBaslik: kurasyon.KapakBaslik ?? $"{etkinlik.Es1Ad} & {etkinlik.Es2Ad}",
+            KapakAltBaslik: kurasyon.KapakAltBaslik ?? "",
+            IthafMetni: kurasyon.IthafMetni,
+            KapanisMetni: kurasyon.KapanisMetni,
+            QrKoprusuAktif: kurasyon.QrKoprusuAktif,
+            Es1Ad: etkinlik.Es1Ad,
+            Es2Ad: etkinlik.Es2Ad,
+            DijitalDefterUrl: dijitalUrl,
+            Dilekler: dilekler
+                .Select(d => new BaskiServisi.Dilek(d.DavetliAd, d.Mesaj, d.KaynakEs, d.CreatedAt))
+                .ToList(),
+            Filigranli: onizleme);
+
+        var pdf = BaskiServisi.DefterUret(eser);
+
+        // Surumleme (B6): her cikti kaydedilir - kim, ne zaman, hangi ayarlarla
+        db.KurasyonCiktilari.Add(new KurasyonCiktisi
+        {
+            Id = Guid.NewGuid(),
+            KurasyonId = kurasyon.Id,
+            EtkinlikId = etkinlikId,
+            Tip = "defter_pdf",
+            AyarlarAnlik = JsonSerializer.Serialize(new
+            {
+                tema = kurasyon.Tema,
+                gruplama = kurasyon.GruplamaTipi,
+                kapak = kurasyon.KapakBaslik,
+                qr = kurasyon.QrKoprusuAktif,
+            }),
+            Filigranli = onizleme,
+            DilekSayisi = dilekler.Count,
+            OlusturanKullaniciId = kullaniciId,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await Denetim(db, etkinlikId, kullaniciId,
+            onizleme ? "ESER_ONIZLENDI" : "ESER_INDIRILDI", kurasyon.Id,
+            new { dilek_sayisi = dilekler.Count, tema = kurasyon.Tema });
+        await db.SaveChangesAsync();
+
+        var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri")
+                       + (onizleme ? "-onizleme" : "") + ".pdf";
+
+        return Results.File(pdf, "application/pdf", dosyaAdi);
+    }
+
+    // Dosya adi icin ASCII-guvenli sadelestirme (Turkce karakterler indirmede bozulmasin)
+    private static string Temizle(string ham)
+    {
+        var esleme = new Dictionary<char, char>
+        {
+            ['ç'] = 'c', ['Ç'] = 'C', ['ğ'] = 'g', ['Ğ'] = 'G', ['ı'] = 'i', ['İ'] = 'I',
+            ['ö'] = 'o', ['Ö'] = 'O', ['ş'] = 's', ['Ş'] = 'S', ['ü'] = 'u', ['Ü'] = 'U',
+        };
+        var yapi = new System.Text.StringBuilder();
+        foreach (var h in ham)
+        {
+            var c = esleme.TryGetValue(h, out var yerine) ? yerine : h;
+            if (char.IsLetterOrDigit(c) || c == '-') yapi.Append(c);
+            else if (c == ' ') yapi.Append('-');
+        }
+        return yapi.ToString().ToLowerInvariant();
     }
 
     private static IResult Hata(int kod, string hataKodu, string mesaj)
