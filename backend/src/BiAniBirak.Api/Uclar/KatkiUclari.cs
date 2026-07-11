@@ -146,7 +146,7 @@ public static class KatkiUclari
             var baslik = "Yeni bir anı bırakıldı";
             var govde = $"{ad}, {etkinlik.Es1Ad} & {etkinlik.Es2Ad} defterinize bir dilek bıraktı. Onayını bekliyor.";
             _ = push.GonderAsync(sahipUyelik.KullaniciId, baslik, govde,
-                url: "/panel/etkinlik", etkinlikId: etkinlik.Id);
+                url: $"/panel/etkinlik?focus={katki.Id}", etkinlikId: etkinlik.Id);
         }
 
         // Teyit (davetliye minimal yanit - okuma yuzeyi yok)

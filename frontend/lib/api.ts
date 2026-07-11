@@ -210,6 +210,14 @@ export const api = {
   // --- Moderasyon (Asama 4; izolasyonlu kuyruk + onay/ret + birlesik defter) ---
   katkiKuyruk: () => istek<Katki[]>("/api/etkinlik/aktif/kuyruk"),
   katkiDefter: () => istek<Katki[]>("/api/etkinlik/aktif/defter"),
+  katkiDurum: (id: string) =>
+    istek<{
+      id: string;
+      durum: string;
+      kaynak_es: string;
+      davetli_ad: string;
+      benim_kuyrugumda: boolean;
+    }>(`/api/etkinlik/aktif/katki/${id}`),
   denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
 
   // Uygulama-ici bildirimler (avatar cani)

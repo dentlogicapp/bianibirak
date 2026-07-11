@@ -74,7 +74,11 @@ export function UserMenu() {
       void api.bildirimOkundu(b.id);
     }
     setAcik(false);
-    if (b.url) router.push(b.url);
+    if (!b.url) return;
+
+    // Hedef sayfaya git; ?focus={katkiId} varsa defter sayfasi scroll + vurgu yapar,
+    // dilek onaylanmis/reddedilmis ise uygun uyariyi gosterir (durum sunucudan okunur).
+    router.push(b.url);
   }
 
   async function bildirimSil(id: string) {

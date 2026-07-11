@@ -31,6 +31,7 @@ public static class EtkinlikUclari
         app.MapGet("/api/etkinlik/aktif/kuyruk", AktifKuyruk).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/defter", AktifDefter).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/denetim", AktifDenetim).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/katki/{id:guid}", AktifKatkiDurum).RequireAuthorization();
         app.MapPost("/api/katki/{id}/onayla", KatkiOnayla).RequireAuthorization();
         app.MapPost("/api/katki/{id}/reddet", KatkiReddet).RequireAuthorization();
     }
@@ -464,6 +465,32 @@ public static class EtkinlikUclari
     }
 
     // Denetim gunlugu: aktif etkinligin son 100 kaydi (tenant-scoped; seffaflik).
+    // Bildirimden gelen focus icin: dilegin GUNCEL durumu (beklemede/onaylandi/reddedildi).
+    // Frontend buna gore dogru yere scroll + highlight yapar ya da uyari gosterir.
+    private static async Task<IResult> AktifKatkiDurum(Guid id, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        var katki = await db.Katkilar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.Id == id && k.EtkinlikId == etkinlikId);
+        if (katki == null)
+            return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");
+
+        return Results.Json(new
+        {
+            id = katki.Id,
+            durum = katki.Durum,
+            kaynak_es = katki.KaynakEs,
+            davetli_ad = katki.DavetliAd,
+            // Bu dilek benim kuyrugumda mi (beklemede + benim tarafim)?
+            benim_kuyrugumda = katki.Durum == "beklemede" && katki.KaynakEs == rol,
+        });
+    }
+
     private static async Task<IResult> AktifDenetim(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
@@ -610,7 +637,7 @@ public static class EtkinlikUclari
                 _ = push.GonderAsync(digerUye.KullaniciId,
                     "Ortak deftere bir anı eklendi",
                     $"{katki.DavetliAd} tarafından bırakılan bir dilek onaylandı ve ortak defterinize eklendi.",
-                    url: "/panel/etkinlik", etkinlikId: etkinlikId);
+                    url: $"/panel/etkinlik?focus={katki.Id}", etkinlikId: etkinlikId);
             }
         }
 

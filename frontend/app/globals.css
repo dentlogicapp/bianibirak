@@ -206,3 +206,37 @@ html.dark .marka-ani {
   text-justify: inter-word;
   hyphens: auto;
 }
+
+/* ====================== FOCUS HIGHLIGHT (bildirimden dilege) ====================== */
+/* Planlama deseni: bildirimden gelince dilek cercevesi vurgulanir, sonra soner. */
+@keyframes odakVurgu {
+  0% {
+    box-shadow: 0 0 0 0 rgba(110, 36, 56, 0);
+    transform: scale(1);
+  }
+  12% {
+    box-shadow: 0 0 0 6px rgba(110, 36, 56, 0.5);
+    transform: scale(1.012);
+  }
+  60% {
+    box-shadow: 0 0 0 5px rgba(110, 36, 56, 0.4);
+    transform: scale(1.008);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(110, 36, 56, 0);
+    transform: scale(1);
+  }
+}
+.odak-vurgu {
+  animation: odakVurgu 4.5s ease-in-out;
+}
+/* Koyu modda yaldiz/sarap tonuyla vurgulama */
+html.dark .odak-vurgu {
+  animation: odakVurguKoyu 4.5s ease-in-out;
+}
+@keyframes odakVurguKoyu {
+  0% { box-shadow: 0 0 0 0 rgba(193, 122, 74, 0); transform: scale(1); }
+  12% { box-shadow: 0 0 0 6px rgba(193, 122, 74, 0.55); transform: scale(1.012); }
+  60% { box-shadow: 0 0 0 5px rgba(193, 122, 74, 0.45); transform: scale(1.008); }
+  100% { box-shadow: 0 0 0 0 rgba(193, 122, 74, 0); transform: scale(1); }
+}

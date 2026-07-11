@@ -86,14 +86,19 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Bildirime tiklaninca ilgili sayfayi ac/odakla
+// Bildirime tiklaninca ilgili sayfayi ac/odakla.
+// Acik bir sekme varsa: odakla + postMessage ile client-side yonlendir (reload yok;
+// ?focus={id} korunur -> dilege scroll + vurgu). Yoksa yeni pencere ac.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const hedef = event.notification.data?.url || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((liste) => {
       for (const istemci of liste) {
-        if (istemci.url.includes(hedef) && "focus" in istemci) return istemci.focus();
+        if ("focus" in istemci) {
+          istemci.postMessage({ type: "bianibirak-odak", url: hedef });
+          return istemci.focus();
+        }
       }
       return self.clients.openWindow(hedef);
     })
