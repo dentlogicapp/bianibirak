@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { api, type Kullanici } from "@/lib/api";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
@@ -21,6 +22,9 @@ export function ProfilimModal({
   const [ad, setAd] = useState(kullanici.ad);
   const [cinsiyet, setCinsiyet] = useState<string | null>(kullanici.cinsiyet);
   const [hata, setHata] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // ESC ile kapat + govde scroll kilidi
   useEffect(() => {
@@ -55,9 +59,11 @@ export function ProfilimModal({
   const durum = useOtoKaydet(JSON.stringify({ ad, cinsiyet }), degistiMi, kaydet);
   const gosterge = otoKayitEtiket(durum);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-murekkep/40 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-murekkep/50 p-4 backdrop-blur-sm sm:items-center"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onKapat();
       }}
@@ -161,6 +167,7 @@ export function ProfilimModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

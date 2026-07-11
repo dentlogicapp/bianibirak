@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
+import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
 
 // Enterprise app-shell (dunya-devi deseni):
 // - Mobil: sabit ALT tab bar (basparmak erisimi, buyuk hedefler - Belge 07 mobil-oncelik)
@@ -71,6 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-parsomen">
+      <BildirimBaslatici />
       {/* Masaustu ust bar */}
       <header className="sticky top-0 z-40 hidden border-b border-ayrac/60 bg-parsomen/80 backdrop-blur md:block">
         <div className="mx-auto flex max-w-icerik items-center justify-between gap-4 px-6 py-4">

@@ -85,3 +85,40 @@ export async function pushCikar(): Promise<void> {
   const sub = await reg.pushManager.getSubscription();
   if (sub) await sub.unsubscribe();
 }
+
+// Sessiz senkronizasyon: izin verilmisse aboneligi backend'e (yeniden) kaydeder.
+// Uygulama her acilisinda cagirilir; bayat/kayip abonelik sorununu kalici cozer.
+// Izin yoksa ISTEMEZ (jest gerektirir) - sadece mevcut izinliyi tazeler.
+export async function pushSenkronEt(): Promise<void> {
+  try {
+    if (!pushDestekleniyorMu()) return;
+    if (Notification.permission !== "granted") return; // izin yoksa dokunma
+
+    const anahtarCevap = await api.pushAnahtar();
+    if (!anahtarCevap.ok || !anahtarCevap.veri.anahtar) return;
+    const vapidPublic = anahtarCevap.veri.anahtar;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      // izin var ama abonelik yok -> sessizce olustur
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublic) as BufferSource,
+      });
+    }
+    const json = sub.toJSON();
+    if (!json.endpoint) return;
+
+    // Backend'e (yeniden) kaydet - upsert; zaten varsa gunceller, yoksa ekler.
+    await api.cihazKaydet({
+      pushToken: json.endpoint,
+      platform: platformBul(),
+      p256dh: json.keys?.p256dh,
+      auth: json.keys?.auth,
+      cihazAdi: varsayilanCihazAdi(),
+    });
+  } catch {
+    // sessiz: senkronizasyon best-effort
+  }
+}
