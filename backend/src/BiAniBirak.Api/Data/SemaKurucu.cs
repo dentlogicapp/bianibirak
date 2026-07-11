@@ -296,6 +296,8 @@ public static class SemaKurucu
         -- Davetli: iliski (kim oldugunu hatirlatir) + tek fotograf
         ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "DavetliIliski" text NOT NULL DEFAULT '';
         ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "FotoAnahtari" text NULL;
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "FotoGenislik" integer NOT NULL DEFAULT 0;
+        ALTER TABLE katkilar ADD COLUMN IF NOT EXISTS "FotoYukseklik" integer NOT NULL DEFAULT 0;
 
         -- Kurasyon: QR koprusu KALDIRILDI (Musa karari); tarih gosterimi eklendi
         ALTER TABLE kurasyonlar ADD COLUMN IF NOT EXISTS "TarihGoster" boolean NOT NULL DEFAULT true;

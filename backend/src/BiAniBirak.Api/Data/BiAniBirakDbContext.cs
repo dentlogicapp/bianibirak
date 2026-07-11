@@ -195,6 +195,8 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.DavetliTelefon).HasColumnName("DavetliTelefon").IsRequired();
             e.Property(x => x.DavetliIliski).HasColumnName("DavetliIliski");
             e.Property(x => x.FotoAnahtari).HasColumnName("FotoAnahtari");
+            e.Property(x => x.FotoGenislik).HasColumnName("FotoGenislik");
+            e.Property(x => x.FotoYukseklik).HasColumnName("FotoYukseklik");
             e.Property(x => x.Mesaj).HasColumnName("Mesaj").IsRequired();
             e.Property(x => x.Tur).HasColumnName("Tur").IsRequired();
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();

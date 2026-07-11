@@ -29,6 +29,11 @@ public class Katki
     // Depolama anahtari; dilegin yanina deftere basilir.
     public string? FotoAnahtari { get; set; }
 
+    // Foto olculeri: deftere YATAY/DIKEY oranina gore yerlestirilir.
+    // Olcu bilinmeden dogru cerceve kurulamaz - bu yuzden yuklemede kaydedilir.
+    public int FotoGenislik { get; set; }
+    public int FotoYukseklik { get; set; }
+
     public string Mesaj { get; set; } = string.Empty;
 
     // dilek | foto  (gelecek: ses | video). Asama 3'te daima dilek.

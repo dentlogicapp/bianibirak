@@ -453,6 +453,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             ithaf={ithaf}
             kapanis={kapanis}
             ogeler={dahilOgeler}
+            gorseller={ilk.gorseller}
+            tarihGoster={tarihGoster}
             es1Ad={ilk.es1_ad}
             es2Ad={ilk.es2_ad}
             sekme={sekme}
@@ -561,6 +563,8 @@ function EserOnizleme({
   es1Ad,
   es2Ad,
   sekme,
+  gorseller,
+  tarihGoster,
 }: {
   tema: string;
   gruplama: string;
@@ -572,6 +576,8 @@ function EserOnizleme({
   es1Ad: string;
   es2Ad: string;
   sekme: Sekme;
+  gorseller: { url: string; konum: string; altyazi: string | null }[];
+  tarihGoster: boolean;
 }) {
   // Kapak sekmesinde kapak sayfasi, digerlerinde ic sayfa gosterilir
   const kapakGoster = sekme === "kapak";
@@ -596,9 +602,15 @@ function EserOnizleme({
             baslik={kapakBaslik}
             altBaslik={kapakAltBaslik}
             ithaf={ithaf}
+            kapakGorsel={gorseller.find((g) => g.konum === "kapak")?.url ?? null}
           />
         ) : (
-          <IcSayfa tema={tema} gruplu={gruplu} kapanis={kapanis} />
+          <IcSayfa
+            tema={tema}
+            gruplu={gruplu}
+            kapanis={kapanis}
+            tarihGoster={tarihGoster}
+          />
         )}
       </div>
 
@@ -614,17 +626,33 @@ function KapakSayfasi({
   baslik,
   altBaslik,
   ithaf,
+  kapakGorsel,
 }: {
   tema: string;
   baslik: string;
   altBaslik: string;
   ithaf: string;
+  kapakGorsel: string | null;
 }) {
   const ortali = tema !== "modern";
   const italik = tema === "zarif";
 
   return (
     <div className={`text-[#211a17] ${ortali ? "text-center" : "text-left"}`}>
+      {/* KAPAK FOTOGRAFI - muze cercevesi (yaldiz hat + pasepartu) */}
+      {kapakGorsel && (
+        <div className={`mb-7 ${ortali ? "mx-auto" : ""} w-fit`}>
+          <div className="border border-[#a8823c] bg-white p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={kapakGorsel}
+              alt=""
+              className="max-h-44 w-auto max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Ust ayrac */}
       {tema === "klasik" && (
         <div className="mx-auto mb-8 flex items-center justify-center gap-2">
@@ -678,10 +706,12 @@ function IcSayfa({
   tema,
   gruplu,
   kapanis,
+  tarihGoster,
 }: {
   tema: string;
   gruplu: { baslik: string | null; ogeler: KurasyonOgesi[] }[];
   kapanis: string;
+  tarihGoster: boolean;
 }) {
   const italik = tema === "zarif";
   const ortali = tema !== "modern";
@@ -714,6 +744,20 @@ function IcSayfa({
           <div className="mt-5 space-y-6">
             {grup.ogeler.slice(0, 4).map((o) => (
               <div key={o.katki_id} className={ortali ? "text-center" : "text-left"}>
+                {/* DAVETLI FOTOGRAFI - muze cercevesi, kirpma yok (oran korunur) */}
+                {o.foto_url && (
+                  <div className={`mb-3 ${ortali ? "mx-auto" : ""} w-fit`}>
+                    <div className="border border-[#a8823c] bg-white p-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={o.foto_url}
+                        alt=""
+                        className="max-h-32 w-auto max-w-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <p
                   className={`font-govde text-[0.82rem] leading-relaxed text-[#2a221d] ${
                     ortali ? "" : "text-justify"
@@ -724,6 +768,20 @@ function IcSayfa({
                 <p className="mt-2 font-display text-[0.75rem] text-[#6e2438]">
                   {o.davetli_ad}
                 </p>
+                {o.davetli_iliski && (
+                  <p className="mt-0.5 font-govde text-[0.6rem] text-[#6c5f50]">
+                    {o.davetli_iliski}
+                  </p>
+                )}
+                {tarihGoster && (
+                  <p className="mt-0.5 font-govde text-[0.55rem] text-[#a8823c]">
+                    {new Date(o.birakilma).toLocaleDateString("tr-TR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                )}
               </div>
             ))}
           </div>

@@ -226,11 +226,16 @@ export async function gorselYukle(
 export async function davetliFotoYukle(
   token: string,
   katkiId: string,
-  dosya: File
+  dosya: File,
+  genislik: number,
+  yukseklik: number
 ): Promise<{ ok: boolean; mesaj?: string }> {
   try {
     const form = new FormData();
     form.append("dosya", dosya);
+    // Olcu: deftere YATAY/DIKEY oranina gore yerlestirilir (kirpma yok)
+    form.append("genislik", String(genislik));
+    form.append("yukseklik", String(yukseklik));
     const yanit = await fetch(`/api/k/${token}/foto/${katkiId}`, {
       method: "POST",
       body: form,
@@ -299,6 +304,8 @@ export type KurasyonOgesi = {
   dahil: boolean;
   sira: number;
   bolum_basligi: string | null;
+  davetli_iliski: string;
+  foto_url: string | null;
 };
 
 export type Kurasyon = {
@@ -317,6 +324,7 @@ export type Kurasyon = {
   tur: string;
   etkinlik_tarihi: string;
   ogeler: KurasyonOgesi[];
+  gorseller: { url: string; konum: string; altyazi: string | null }[];
 };
 
 // Denetim gunlugu kaydi.

@@ -64,6 +64,8 @@ public static class KurasyonUclari
                     k.KaynakEs,
                     k.CreatedAt,
                     k.FotoAnahtari,
+                    k.FotoGenislik,
+                    k.FotoYukseklik,
                 })
             .ToListAsync();
 
@@ -80,7 +82,9 @@ public static class KurasyonUclari
         {
             if (g == null) return null;
             var veri = await depo.OkuAsync(g.DepolamaAnahtari);
-            return veri == null ? null : new BaskiServisi.Gorsel(veri, g.Altyazi);
+            return veri == null
+                ? null
+                : new BaskiServisi.Gorsel(veri, g.Altyazi, g.Genislik, g.Yukseklik);
         }
 
         var kapakG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapak"));
@@ -101,7 +105,8 @@ public static class KurasyonUclari
             byte[]? foto = null;
             if (d.FotoAnahtari != null) foto = await depo.OkuAsync(d.FotoAnahtari);
             dilekListe.Add(new BaskiServisi.Dilek(
-                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt, foto));
+                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt,
+                foto, d.FotoGenislik, d.FotoYukseklik));
         }
 
         BaskiServisi.Hazirla(ortam.ContentRootPath);
@@ -301,14 +306,28 @@ public static class KurasyonUclari
             {
                 katki_id = k.Id,
                 davetli_ad = k.DavetliAd,
+                davetli_iliski = k.DavetliIliski,
                 mesaj = k.Mesaj,
                 kaynak_es = k.KaynakEs,
                 birakilma = k.CreatedAt,
+                foto_url = k.FotoAnahtari != null ? "/api/gorsel/" + k.FotoAnahtari : null,
                 dahil = o.Dahil,
                 sira = o.Sira,
                 bolum_basligi = o.BolumBasligi,
             })
             .OrderBy(x => x.sira)
+            .ToListAsync();
+
+        // Cift gorselleri - canli onizleme GERCEGI gostermeli
+        var gorseller = await db.EtkinlikGorselleri.AsNoTracking()
+            .Where(g => g.EtkinlikId == etkinlikId)
+            .OrderBy(g => g.Sira)
+            .Select(g => new
+            {
+                url = "/api/gorsel/" + g.DepolamaAnahtari,
+                konum = g.Konum,
+                altyazi = g.Altyazi,
+            })
             .ToListAsync();
 
         return Results.Json(new
@@ -329,6 +348,7 @@ public static class KurasyonUclari
             tur = etkinlik.Tur,
             etkinlik_tarihi = etkinlik.EtkinlikTarihi,
             ogeler,
+            gorseller,
         });
     }
 

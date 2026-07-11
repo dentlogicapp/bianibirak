@@ -59,10 +59,52 @@ public static class BaskiServisi
         string Mesaj,
         string KaynakEs,
         DateTimeOffset Birakilma,
-        byte[]? Foto);        // davetli basina en fazla 1
+        byte[]? Foto,         // davetli basina en fazla 1
+        int FotoGenislik,
+        int FotoYukseklik);
 
     // Cift gorseli (kapak/ithaf/bolum/kapanis)
-    public sealed record Gorsel(byte[] Veri, string? Altyazi);
+    public sealed record Gorsel(byte[] Veri, string? Altyazi, int Genislik, int Yukseklik);
+
+    // ---------------- CERCEVE MIMARISI ----------------
+    // Bir fotografin oranini bilmeden dogru cerceve kurulamaz. Muze/albüm mantigi:
+    // cerceve fotografin oranina UYAR, fotograf cerceveye zorlanmaz. Kirpma YOK -
+    // davetlinin cektigi kare oldugu gibi kagida gecer (FitArea).
+    private enum Yon { Yatay, Kare, Dikey }
+
+    private static Yon YonBul(int g, int y)
+    {
+        if (g <= 0 || y <= 0) return Yon.Yatay; // olcu yoksa guvenli varsayilan
+        var oran = (float)g / y;
+        if (oran >= 1.2f) return Yon.Yatay;
+        if (oran <= 0.85f) return Yon.Dikey;
+        return Yon.Kare;
+    }
+
+    // Verilen YUKSEKLIK butcesine gore, orana saygili (genislik, yukseklik) dondurur.
+    private static (float G, float Y) Olcule(int g, int y, float yukseklikButcesi, float azamiGenislik)
+    {
+        var oran = g > 0 && y > 0 ? (float)g / y : 4f / 3f;
+        var yy = yukseklikButcesi;
+        var gg = yy * oran;
+        if (gg > azamiGenislik)
+        {
+            gg = azamiGenislik;
+            yy = gg / oran;
+        }
+        return (gg, yy);
+    }
+
+    // MUZE CERCEVESI: ince yaldiz hat + beyaz pasepartu (mat) + ic golge hissi.
+    // Photoshop/Canva'nin yaptigi "sticker" degil; gercek bir albumde fotograf boyle durur.
+    private static void Cerceveli(IContainer kap, byte[] veri, float g, float y)
+    {
+        kap.Width(g).Height(y)
+            .Border(0.7f).BorderColor(Yaldiz)   // yaldiz hat
+            .Background("#FFFFFF")               // pasepartu
+            .Padding(3.5f)                       // mat payi
+            .Image(veri).FitArea();
+    }
 
     // Eserin tum kurgusu
     public sealed record EserVerisi(
@@ -166,17 +208,24 @@ public static class BaskiServisi
 
         kap.Column(sutun =>
         {
-            // KAPAK GORSELI (varsa): ust blok, yaldiz cerceveli.
+            // KAPAK GORSELI (varsa): YARIM SAYFAYA yaklasan, oran-duyarli, muze cerceveli.
             // YOKSA: saf tipografik kapak - eser kalitesi dusmez (Musa karari).
             if (eser.KapakGorseli != null)
             {
-                sutun.Item().Height(8);
-                sutun.Item().AlignCenter()
-                    .Width(120).Height(90)
-                    .Border(0.8f).BorderColor(Yaldiz)
-                    .Padding(3)
-                    .Image(eser.KapakGorseli.Veri).FitArea();
-                sutun.Item().Height(26);
+                var kg = eser.KapakGorseli;
+                var yon = YonBul(kg.Genislik, kg.Yukseklik);
+                // Dikey fotograf kapakta gorkemlidir; yatay daha genis ama alcak durur.
+                var butce = yon switch
+                {
+                    Yon.Dikey => 250f,
+                    Yon.Kare => 220f,
+                    _ => 185f,
+                };
+                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik, butce, 300f);
+
+                sutun.Item().Height(6);
+                sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y));
+                sutun.Item().Height(24);
             }
             else
             {
@@ -236,10 +285,11 @@ public static class BaskiServisi
         {
             if (eser.IthafGorseli != null)
             {
-                sutun.Item().AlignCenter().Width(110).Height(80)
-                    .Border(0.8f).BorderColor(Yaldiz).Padding(3)
-                    .Image(eser.IthafGorseli.Veri).FitArea();
-                sutun.Item().Height(20);
+                var ig = eser.IthafGorseli;
+                var (g, y) = Olcule(ig.Genislik, ig.Yukseklik,
+                    YonBul(ig.Genislik, ig.Yukseklik) == Yon.Dikey ? 215f : 165f, 290f);
+                sutun.Item().AlignCenter().Element(c => Cerceveli(c, ig.Veri, g, y));
+                sutun.Item().Height(22);
             }
 
             sutun.Item().AlignCenter().Width(40).Height(1).Background(Yaldiz);
@@ -281,10 +331,34 @@ public static class BaskiServisi
 
         kap.Column(sutun =>
         {
+            var bolumSayaci = 0;
+
             foreach (var (baslik, dilekler) in bloklar)
             {
                 if (baslik != null)
                 {
+                    // BOLUM AYRACI GORSELI (varsa): basligin ustunde, bolume nefes verir
+                    if (bolumSayaci < eser.BolumGorselleri.Count)
+                    {
+                        var bg = eser.BolumGorselleri[bolumSayaci];
+                        var (g, y) = Olcule(bg.Genislik, bg.Yukseklik,
+                            YonBul(bg.Genislik, bg.Yukseklik) == Yon.Dikey ? 175f : 135f, 290f);
+                        sutun.Item().PaddingTop(10).ShowEntire().Column(bc =>
+                        {
+                            var kap2 = ortali ? bc.Item().AlignCenter() : bc.Item();
+                            kap2.Element(c => Cerceveli(c, bg.Veri, g, y));
+                            if (!string.IsNullOrWhiteSpace(bg.Altyazi))
+                            {
+                                bc.Item().Height(5);
+                                var ak = ortali ? bc.Item().AlignCenter() : bc.Item();
+                                ak.Text(bg.Altyazi)
+                                    .FontFamily(GovdeFont).FontSize(7.5f)
+                                    .FontColor(Ikincil).Italic();
+                            }
+                        });
+                    }
+                    bolumSayaci++;
+
                     sutun.Item().PaddingTop(14).PaddingBottom(4).Element(b =>
                     {
                         var bk = ortali ? b.AlignCenter() : b;
@@ -305,18 +379,30 @@ public static class BaskiServisi
 
                 foreach (var d in dilekler)
                 {
-                    // Her dilek BOLUNMEZ bir birim (sayfa ortasindan kesilmez - ShowEntire)
-                    sutun.Item().PaddingBottom(20).ShowEntire().Column(dc =>
+                    // DILEK BLOGU - bolunmez birim (ShowEntire: sayfa ortasindan kesilmez).
+                    //
+                    // FOTOGRAFLI dilek yaklasik YARIM SAYFA yukseklik alir; boylece iki
+                    // fotografli dilek bir sayfayi DOGAL olarak doldurur, ucuncusu yeni
+                    // sayfaya akar. Manuel sayfa kirma YOK - dizgi kendi ritmini bulur.
+                    // (Icerik yuksekligi ~487pt; fotografli blok ~230pt.)
+                    sutun.Item().PaddingBottom(d.Foto != null ? 22 : 20).ShowEntire().Column(dc =>
                     {
-                        // DAVETLI FOTOGRAFI (varsa): dilegin ustunde, olculu boyut.
-                        // Sayfa dolgusu degil, ani; kucuk ve zarif tutulur.
                         if (d.Foto != null)
                         {
+                            // Oran-duyarli olculeme: dikey fotograf uzar, yatay genisler.
+                            // Kirpma yok - davetlinin kadraji korunur.
+                            var yon = YonBul(d.FotoGenislik, d.FotoYukseklik);
+                            var butce = yon switch
+                            {
+                                Yon.Dikey => 186f,  // dikey: yukseklige yaslanir
+                                Yon.Kare => 168f,
+                                _ => 150f,          // yatay: genisler, daha az yukseklik yer
+                            };
+                            var (fg, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, butce, 300f);
+
                             var fotoKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                            fotoKap.Width(78).Height(58)
-                                .Border(0.6f).BorderColor(Yaldiz).Padding(2)
-                                .Image(d.Foto).FitArea();
-                            dc.Item().Height(9);
+                            fotoKap.Element(c => Cerceveli(c, d.Foto, fg, fy));
+                            dc.Item().Height(12);
                         }
 
                         var metinKap = ortali ? dc.Item().AlignCenter() : dc.Item();
@@ -340,7 +426,6 @@ public static class BaskiServisi
                                 .LetterSpacing(0.06f);
                         }
 
-                        // TARIH (cift toggle'lar): 20 yil sonra anlam kazanir
                         if (eser.TarihGoster)
                         {
                             dc.Item().Height(2);
@@ -379,9 +464,10 @@ public static class BaskiServisi
             // KAPANIS GORSELI (varsa) - eserin son nefesi
             if (eser.KapanisGorseli != null)
             {
-                sutun.Item().AlignCenter().Width(110).Height(80)
-                    .Border(0.8f).BorderColor(Yaldiz).Padding(3)
-                    .Image(eser.KapanisGorseli.Veri).FitArea();
+                var kg = eser.KapanisGorseli;
+                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik,
+                    YonBul(kg.Genislik, kg.Yukseklik) == Yon.Dikey ? 215f : 165f, 290f);
+                sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y));
 
                 if (!string.IsNullOrWhiteSpace(eser.KapanisGorseli.Altyazi))
                 {

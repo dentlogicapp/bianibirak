@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { api, davetliFotoYukle, type KatkiKarsilama } from "@/lib/api";
 import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
+import { FotoSoleni } from "@/components/site/FotoSoleni";
 
 // Public davetli katki sayfasi (login YOK; surtunme sifir - Belge 01).
 // Karsilama -> form (ad/email/telefon/mesaj + KVKK riza) -> teyit.
@@ -130,7 +131,12 @@ function KatkiFormu({
   const [mesaj, setMesaj] = useState("");
   const [iliski, setIliski] = useState("");
   const [iliskiSerbest, setIliskiSerbest] = useState("");
-  const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
+  const [foto, setFoto] = useState<{
+    dosya: File;
+    onizleme: string;
+    genislik: number;
+    yukseklik: number;
+  } | null>(null);
   const [riza, setRiza] = useState(false);
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -186,7 +192,13 @@ function KatkiFormu({
 
     // Fotograf 2. adimda gider: dilek ZATEN kaydedildi, foto basarisiz olsa bile kaybolmaz.
     if (foto) {
-      const f = await davetliFotoYukle(token, cevap.veri.katki_id, foto.dosya);
+      const f = await davetliFotoYukle(
+        token,
+        cevap.veri.katki_id,
+        foto.dosya,
+        foto.genislik,
+        foto.yukseklik
+      );
       if (!f.ok) {
         // Dilek gitti; yalniz foto gitmedi - davetliyi bosuna kaygilandirma
         setYukleniyor(false);
@@ -208,7 +220,12 @@ function KatkiFormu({
       // Tarayicida kucult + EXIF/GPS temizle - sunucuya 8 MB degil ~700 KB gider
       const hazir = await gorselHazirla(ham);
       if (foto) URL.revokeObjectURL(foto.onizleme);
-      setFoto({ dosya: hazir.dosya, onizleme: hazir.onizlemeUrl });
+      setFoto({
+        dosya: hazir.dosya,
+        onizleme: hazir.onizlemeUrl,
+        genislik: hazir.genislik,
+        yukseklik: hazir.yukseklik,
+      });
     } catch (h) {
       setHata(h instanceof Error ? h.message : "Fotoğraf işlenemedi.");
     }
@@ -223,27 +240,9 @@ function KatkiFormu({
 
         {/* Karsilama */}
         <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
-          {/* CIFT GORSELLERI: davetli cift'i gorur -> duygusal bag -> daha ictem dilek.
-              Kapak once gelir. Gorsel yoksa tipografi zaten yeterli. */}
-          {veri.gorseller.length > 0 && (
-            <div className={veri.gorseller.length === 1 ? "" : "flex gap-0.5"}>
-              {veri.gorseller.slice(0, 3).map((g, i) => (
-                <div
-                  key={i}
-                  className={`relative overflow-hidden bg-parsomen ${
-                    veri.gorseller.length === 1 ? "aspect-[16/10] w-full" : "aspect-square flex-1"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={g.url}
-                    alt={g.altyazi ?? ciftAdi}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          {/* CIFT GORSELLERI: davetli cift'i gorur -> duygusal bag -> daha icten dilek.
+              TUM fotograflar dongude; sabit sergi degil, nefes alan bir vitrin. */}
+          <FotoSoleni fotograflar={veri.gorseller} baslik={ciftAdi} />
 
           <div className="p-8 text-center">
           <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
