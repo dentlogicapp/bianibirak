@@ -193,6 +193,36 @@ export type CopKutusu = {
   }[];
 };
 
+// ---- KURASYON (Asama 6 - miras) ----
+export type KurasyonOgesi = {
+  katki_id: string;
+  davetli_ad: string;
+  mesaj: string;
+  kaynak_es: string;
+  birakilma: string;
+  dahil: boolean;
+  sira: number;
+  bolum_basligi: string | null;
+};
+
+export type Kurasyon = {
+  tema: string;
+  kapak_baslik: string | null;
+  kapak_alt_baslik: string | null;
+  kapak_gorsel_url: string | null;
+  ithaf_metni: string | null;
+  kapanis_metni: string | null;
+  gruplama_tipi: string;
+  qr_koprusu_aktif: boolean;
+  durum: string;
+  tamamlanma_zamani: string | null;
+  es1_ad: string;
+  es2_ad: string;
+  tur: string;
+  etkinlik_tarihi: string;
+  ogeler: KurasyonOgesi[];
+};
+
 // Denetim gunlugu kaydi.
 export type DenetimKaydi = {
   id: string;
@@ -392,6 +422,49 @@ export const api = {
     istek<{ ok: boolean }>(`/api/super/kvkk/talep/${id}`, {
       method: "POST",
       body: JSON.stringify({ Durum: durum, SonucNotu: sonucNotu ?? null }),
+    }),
+
+  // ---- KURASYON ----
+  kurasyonGetir: () => istek<Kurasyon>("/api/etkinlik/aktif/kurasyon"),
+  kurasyonGuncelle: (v: Partial<{
+    tema: string;
+    kapakBaslik: string;
+    kapakAltBaslik: string;
+    kapakGorselUrl: string;
+    ithafMetni: string;
+    kapanisMetni: string;
+    gruplamaTipi: string;
+    qrKoprusuAktif: boolean;
+  }>) =>
+    istek<{ ok: boolean }>("/api/etkinlik/aktif/kurasyon", {
+      method: "PUT",
+      body: JSON.stringify({
+        Tema: v.tema ?? null,
+        KapakBaslik: v.kapakBaslik ?? null,
+        KapakAltBaslik: v.kapakAltBaslik ?? null,
+        KapakGorselUrl: v.kapakGorselUrl ?? null,
+        IthafMetni: v.ithafMetni ?? null,
+        KapanisMetni: v.kapanisMetni ?? null,
+        GruplamaTipi: v.gruplamaTipi ?? null,
+        QrKoprusuAktif: v.qrKoprusuAktif ?? null,
+      }),
+    }),
+  kurasyonOgeGuncelle: (katkiId: string, v: { dahil?: boolean; bolumBasligi?: string }) =>
+    istek<{ ok: boolean }>(`/api/etkinlik/aktif/kurasyon/oge/${katkiId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        Dahil: v.dahil ?? null,
+        BolumBasligi: v.bolumBasligi ?? null,
+      }),
+    }),
+  kurasyonSirala: (katkiIdler: string[]) =>
+    istek<{ ok: boolean }>("/api/etkinlik/aktif/kurasyon/sirala", {
+      method: "POST",
+      body: JSON.stringify({ KatkiIdler: katkiIdler }),
+    }),
+  kurasyonTamamla: () =>
+    istek<{ ok: boolean; dilek_sayisi: number }>("/api/etkinlik/aktif/kurasyon/tamamla", {
+      method: "POST",
     }),
 
   denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),

@@ -5,7 +5,7 @@
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
 > repodan; bu dosya "neden/ne kararlaştırıldı/sırada ne var" hafızasıdır.
 
-Son güncelleme: 2026-07-10 (Aşama 10-A Push tamamlandıktan sonra)
+Son güncelleme: 2026-07-11 (Süper Panel tamamlandı; Aşama 6 Kürasyon başlıyor)
 
 ---
 
@@ -49,47 +49,88 @@ cihazlar, ertelenen_bildirimler).
 
 ---
 
+### Bu oturumda tamamlananlar (2026-07-11)
+
+- **UI Mükemmelleştirme (6 öbek)** - koyu-mod yaldız wordmark + animasyonlu "Anı"; davetli
+  yönlendirme metni (kaynak_es); otomatik kaydetme (useOtoKaydet, 1.2sn debounce);
+  Profilim modalı (createPortal - stacking context dersi); push kalıcı çözüm
+  (pushSenkronEt: her açılışta sessiz yeniden abonelik).
+- **Eş kimliği bug fix** - EtkinlikOlustur'da `Rol="es1"` HARDCODED idi; kurucu her zaman
+  es1 oluyordu. Form artık "Bu hesap hangi eşe ait?" sorar (KurucuEs).
+- **Uygulama-içi bildirim (avatar çanı)** - `bildirimler` tablosu. KRİTİK TASARIM: bildirim
+  push'tan ve sessiz saatten BAĞIMSIZ oluşur (PushGonderici içinde VAPID kontrolünden ÖNCE).
+  Push sadece "anlık haber verme" katmanı; çan her zaman dolar. 15sn polling + focus refresh.
+- **Bildirimden dileğe odak** - `?focus={katkiId}` + useOdakKatki (retry'lı scroll + 4.5sn
+  çerçeve vurgusu). Dilek onaylı/reddedilmişse toast uyarısı. SW push tıklaması global
+  dinleyiciyle (AppShell) client-side yönlendirir.
+- **sonner toast** (planlama birebir) - uyarılar açılır pencerede, satır içi banner DEĞİL.
+- **Anlık güncelleme prensibi** - onaylanan dilek O AN kuyruktan ortak deftere taşınır
+  (optimistic, yenileme yok). Bu prensip tüm uygulamada standart.
+- **Menü mimarisi (v2)** - alt sekme barı TAMAMEN kaldırıldı; tek navigasyon = avatar menüsü.
+  Sıra (planlama): Profilim → Defter → Paylaşım → Yönetim → Süper Panel → Diğer etkinliklerin
+  → Tema → Bildirimler → Çıkış. **Yönetim bir SAYFA** (/panel/yonetim): araç ızgarası +
+  "+ Eşini Ekle" barı + üye listesi.
+- **Bağlamsal üst bar** - kökte wordmark, alt sayfalarda `‹ Başlık`. Geri = EBEVEYN sayfa
+  (tarayıcı geçmişi değil - deterministik). Kaydırınca inceltme + 160ms sayfa geçişi.
+- **Etkinlik & Görünüm** - 3 sekme (Etkinlik / Davetli Ekranı / Sayaç), her sekmede sağda
+  CANLI ÖNİZLEME. Sayaç açık/kapalı toggle + cümleler. TÜR-BAZLI VARSAYILANLAR
+  (Sabitler.TureGoreVarsayilan): düğün/nişan/nikah için ayrı kusursuz Türkçe bloklar -
+  çift hiçbir şeye dokunmasa bile etkinlik kusursuz çalışır.
+- **Eşini Ekle (davet)** - mail servisi YOK; paylaşılabilir davet linki + QR + Web Share.
+  Tek kullanımlık token (uye_davetleri). Katılınca JWT yenilenir, doğrudan deftere düşer,
+  kurucuya push + çan bildirimi.
+- **İzolasyon sıkılaştırma** - eşler YALNIZ kendi paylaşım bağlantısını görür
+  (AktifLinkler'de `WHERE Es == rol`). Yanlış link paylaşımı = çift-link izolasyonunun
+  çökmesi. UI'da gizlemek YETMEZ - backend filtresi.
+- **SÜPER PANEL** - `super_admin` yetkisi (JWT claim + DB doğrulaması). 5 sekme:
+  Defterler / Kullanıcılar / Çöp Kutusu / KVKK / Canlı Akış.
+  - **Görüntüleme modu (impersonation)**: geçici JWT (1 saat), `goruntuleme_modu=true`.
+    **Global write-guard middleware** (Program.cs, UseAuthentication sonrası): claim + yazma
+    metodu + tenant yolu → 403 + audit. OTORİTE JWT CLAIM'İ; frontend header'ına ASLA
+    güvenilmez (OWASP A01). İstisna: /api/super/* + /api/kimlik/* (kilitlenme önleme).
+    Süper admin o deftere ZATEN ÜYE ise normal yetkiyle girer (görüntüleme modu kapalı).
+  - **İki aşamalı silme**: çöpe at (SilindiMi) → kalıcı sil (çift adı teyidi + aktif defter
+    koruması). Denetim izi KORUNUR (EtkinlikId null'a düşer).
+  - **Dondurma** (kötüye kullanım): davetli YAZIMI reddedilir (guest token dahil - backend).
+  - **Moderasyon**: uygunsuz dilek kaldırma → çöp kutusu (çiftin kuyruk/defterinden de düşer).
+  - **KVKK yönetimi**: `sistem_metinleri` (yasal metinler, hardcoded yasak) + `kvkk_talepleri`
+    (erişim/düzeltme/silme/itiraz, 30 gün yasal süre takibi).
+  - **Canlı akış**: tüm sistem denetim günlüğü, 10sn yenileme, Türkçe eylem sözlüğü.
+  - **Korumalar**: son süper admin kendini kaldıramaz/silinemez; kendini askıya alamaz;
+    `(EtkinlikId, KullaniciId)` unique (aynı kişi bir deftere iki rolle giremez).
+  - Kullanıcı askıya alma (soft delete, DeletedAt) + kalıcı silme (e-posta teyidi).
+  - Yetim defter (üyesi kalmamış) + hareketsiz defter (30 gün) işaretleri.
+
 ## 2. KESİN KARARLAR - Sıradaki Büyük İşler (Musa onayladı, yapılacak)
 
-### A) Akıllı Paylaşım (10-B) - "Tek Hamlede Davet Gönderimi"
-Eş, uygulamadan çıkmadan davetlisine QR/link + davetiye görseli/notu/mesajı TEK
-paylaşımda gönderebilmeli. Tüm iş uygulama içinde bitsin.
+### AŞAMA 6 - KÜRASYON STÜDYOSU + MİRAS ÇIKTISI (ŞU AN BAŞLIYOR - Kuzey Yıldızı)
 
-Teknik gerçek (öngörü): Web/PWA ham rehber erişimi vermez. Contact Picker API yalnız
-Android Chrome + her seferinde kullanıcı seçer; iOS Safari'de YOK. Bu yüzden:
-- OMURGA: Web Share API Level 2 (navigator.share ile link + görsel/dosya + metin tek
-  paylaşımda - her yerde çalışır). Kullanıcı paylaşım sayfasından kişi seçer.
-- BONUS katman: Contact Picker (destekleyen cihazda) - rehberden doğrudan seçim.
-- Native (Capacitor, ileride): gerçek rehber erişimi + tam native paylaşım. "Rehbere
-  direkt erişim" vizyonu TAM burada gerçekleşir. Additive (bugünkü mimariyi bozmaz).
+Belge 01: "Rakip ZIP verir; biz editöryel, baskıya-hazır bir ESER üretiriz."
+Belge 03 Akış 6. Bu adımın tamamlanması = Kuzey Yıldızı metriği "tamamlanan miras".
 
-Onaylanan bonuslar:
-1. **Görsel/dosya ekleme (ÇEKİRDEK):** eş telefonundaki davetiye görselini/PDF'ini
-   link+QR ile aynı paylaşımda gönderir (navigator.share({files,url,text})). Musa'nın
-   asıl istediği buydu.
-2. **QR'lı davetiye üretimi (OPSİYONEL):** eşin yüklediği davetiye görseline QR + kısa
-   çağrı otomatik bindirilip tek görsel üretilir. SEÇENEK olarak sunulur - davetiyesinin
-   bozulmasını istemeyen eş atlar, isteyen kullanır. Zorlama YOK.
-3. **Hazır mesaj şablonu:** tenant-ayarından gelen, kişiselleştirilebilir paylaşım metni
-   (hardcoded değil).
-4. **Paylaşım sayacı:** kaç kez paylaşıldı (viral K-faktörü ölçümü, Belge 06). Musa çok
-   değerli buldu.
+**Teknik karar (Musa onayladı):**
+- **PDF: QuestPDF (backend, .NET)** - print-ready. Gerçek tipografi (Fraunces/Inter
+  self-host), sayfa akışı, kırım payı, yüksek çözünürlük. Frontend PDF kütüphaneleri
+  (jsPDF/html2canvas) ekran-görüntüsü kalitesi verir = "export", "eser" DEĞİL → konumlandırmaya aykırı, REDDEDİLDİ.
+- **Slayt: web tabanlı oynatıcı** (tam ekran, geçişli, klavye/dokunmatik) + PDF slayt export.
 
-Riskler: Contact Picker iOS'ta yok → Web Share fallback zorunlu. Rehber verisi ASLA
-sunucuya gitmez (KVKK, Belge 08) - sadece cihazda paylaşım için. Web Share files desteği
-tarayıcıya göre değişir → feature detection + zarif fallback.
+**3 tur:**
+1. Kürasyon veri modeli + stüdyo ekranı (seçim / sıralama / gruplama / tema / kapak / ithaf)
+2. PDF üretimi (QuestPDF) + filigranlı önizleme (paywall köprüsü)
+3. Slayt oynatıcı + teşekkür kartı + AI kürasyon
 
-Doğru yer: Aşama 2'nin (paylaşım) genişlemesi ama native yetenek gerektirdiği için PWA
-cila ailesi (10). Push'tan (10-A) sonra 10-B olarak.
-
-### B) Viral Hediye Döngüsü (Büyüme Motoru)
-Davetli dilek bıraktıktan sonra teyit ekranında:
-"[Çift] gibi sen de kendi anını ölümsüzleştir ya da bir yakınına hediye et"
-→ "Kendim için oluştur" / "Hediye et" → birkaç adımda kendi etkinliği.
-Davetliyi müşteriye çeviren K-faktörü döngüsü (Belge 06). ÖDEME (Aşama 7) ile tam
-bağlanır (hediye = satın alma), ama teyit CTA + landing şimdi/ödemeyle birlikte kurulur.
-
----
+**Onaylanan bonuslar:**
+- B1 **AI-destekli kürasyon** (Belge 05'te tam pakete dahil): tema gruplaması, bölüm
+  başlığı önerisi, sıralama önerisi. Çift onaylar/reddeder. "Kürasyon stüdyosu"
+  iddiasını gerçek kılan şey.
+- B2 **Teşekkür kartı export** (Belge 05, tam paket): davetliye özel kart (adı + alıntı).
+  Viral döngü: kartı alan kendi düğününde ister.
+- B3 **Filigranlı önizleme**: satın alma öncesi çift mirasını GÖRÜR, indiremez
+  (Belge 05 paywall matrisi). Ödeme aşamasına köprü.
+- B4 **İthaf sayfası**: çiftin kendi paragrafı. Mirasa ruh katar.
+- B5 **Kitap-içi QR köprüsü** (Belge 05 "lansman sonrası"): basılı defterin son sayfasında
+  QR → dijital defter. Altyapı şimdi konur.
+- B6 **Çıktı sürümleme**: her export kaydedilir (kim/ne zaman/hangi ayarlarla), geri alınabilir.
 
 ## 3. AÇIK KONULAR - Çözülmesi Gerekenler
 
@@ -107,15 +148,15 @@ bırakır.
 tarihi gelince mi (job/okuma-anı-hesap) yoksa ödeme sonrası mı? KARAR: ödeme sonrası
 aktifleşir (Musa: "ödeme almadan aktif olmaması zaten"). Aşama 7'ye bağlı.
 
-### K3) es2 üyeliği yokken push gidecek kimse yok
-es2 linkinden gelen katkı için es2 üyesi yoksa push tetiklenmez (doğru davranış). Eş
-daveti akışı (#3 mail) tamamlanınca çözülür. Şimdilik beklenen.
+### K3) es2 üyeliği - ÇÖZÜLDÜ (2026-07-11)
+Eşini Ekle akışı kuruldu: paylaşılabilir davet linki (mail servisi gerekmiyor).
+Eş katılınca üyelik oluşur, JWT yenilenir, kendi kuyruğunu yönetir, push alır.
 
-### K4) Eş daveti + mail servisi (#3)
-es2'yi uygulamaya davet akışı + SMTP mail servisi henüz yok. Planlama'da kanıtlı SMTP +
-şablon deseni var. es2 katılınca kendi kuyruğunu görür + push alır.
 
----
+### K4) Mail servisi - KAPSAM DIŞI (karar)
+Davet linki paylaşımıyla çözüldü; mail servisi lansman için gerekmiyor.
+KVKK talep kanalı için ileride e-posta gerekebilir (Aşama 7+ ile birlikte değerlendirilir).
+
 
 ## 4. STANDART AŞAMA SIRASI (Belge 09) & Durum
 
@@ -152,6 +193,35 @@ es2'yi uygulamaya davet akışı + SMTP mail servisi henüz yok. Planlama'da kan
   (iki kez deploy etme).
 
 ---
+
+### Bu oturumda öğrenilenler (2026-07-11)
+
+- **VAR-SAY-MA (en pahalı ders, defalarca tekrarlandı).** Kodu/DB'yi OKUMADAN değer
+  varsaymak, tekrar tekrar bug üretti:
+  - Katkı durum değerleri `beklemede`/`onayli`/`red` — ben `onaylandi`/`reddedildi`
+    varsaydım, hiç eşleşmedi, onay/red uyarıları hiç çıkmadı.
+  - `super_admin` kolonu ZATEN vardı (snake_case). Kontrol etmeden ikinci eşleme +
+    PascalCase kolon ekledim → EF yanlış kolonu okudu, süper panel açılmadı.
+  - `email` kolonu snake_case (PostgreSQL ekosistem standardı - Türkçeleştirilmez,
+    PascalCase yapılmaz). SQL'de `"Email"` yazdım, patladı.
+  → **Kural: her alan/kolon/imza için önce grep ile GERÇEK kodu oku, sonra yaz.**
+- **Referansı kopyala, "benzerini" yazma.** Planlama Defteri elimde çalışır haldeyken,
+  onu okumak yerine kendi versiyonumu yazdım → toast yerine banner, tıklama akışında
+  gereksiz ağ isteği, 5 tur kayıp. Planlama'nın GERÇEK kodunu oku ve deseni kopyala.
+- **Tıklama handler'ında ağ isteği = sürtünme.** Planlama durum kontrolünü tıklama anında
+  yapıyor çünkü HEDEF ROTA DEĞİŞİYOR. Bizde hedef sabit (/panel/etkinlik) → ağ isteğini
+  tıklamaya koymak akışı kırdı (ilk tık yutuluyordu). Navigasyon SENKRON olmalı;
+  durum kontrolü hedef sayfada.
+- **Wrapper bileşenler prop'u ezer.** MarkaKilidi'nin `animasyonlu=false` varsayılanı,
+  Wordmark'ın `true` varsayılanını eziyordu. Sarmalayıcıda prop'u geçir.
+- **Modal → createPortal(document.body).** Avatar menüsünün stacking context'i modalı
+  gizliyordu (açılıyor ama görünmüyor).
+- **min-w-0 zinciri.** Grid/flex çocuklarında `min-width:auto` varsayılanı, uzun URL'in
+  `truncate`'ini kırıp konteyneri genişletiyor → mobilde yatay taşma. Kart + kutu + buton
+  satırına `min-w-0`, butona `shrink-0`.
+- **Kullanıcıya görünen metin TÜRKÇE, identifier ASCII.** Push metinlerini ve hata
+  mesajlarını ASCII yazdım (kural: identifier'lar ASCII, string/UI metinleri Türkçe).
+- **Expand-Archive yapılmadan git "nothing to commit" der.** Zip açılmadıysa dosya değişmez.
 
 ## 6. KALICI MİMARİ HATIRLATMALAR (instruction'dan, sık dokunulan)
 

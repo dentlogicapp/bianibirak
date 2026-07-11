@@ -1,0 +1,323 @@
+using System.Security.Claims;
+using System.Text.Json;
+using BiAniBirak.Api.Data;
+using BiAniBirak.Api.Entities;
+using BiAniBirak.Api.Modeller;
+using Microsoft.EntityFrameworkCore;
+
+namespace BiAniBirak.Api.Uclar;
+
+// KURASYON STUDYOSU (Belge 03 - Akis 6). Toplanani ESERE ceviren katman.
+//
+// TASARIM DISIPLINI:
+//  - Katkinin METNI dokunulmaz (Karar 2 - ozgunluk). Yalniz secim/sira/duzen kurgulanir.
+//  - Kurasyon acilinca onayli dilekler OTOMATIK oge olur; sonradan onaylananlar
+//    her erisimde SENKRONIZE edilir (dilek kaybi imkansiz).
+//  - Silinen (moderasyonla kaldirilan) dilegin ogesi otomatik dusurulur.
+//  - Her yazim tenant filtreli (AktifEtkinlikId) + audit.
+public static class KurasyonUclari
+{
+    public static void KurasyonUclariniEkle(this WebApplication app)
+    {
+        app.MapGet("/api/etkinlik/aktif/kurasyon", KurasyonGetir).RequireAuthorization();
+        app.MapPut("/api/etkinlik/aktif/kurasyon", KurasyonGuncelle).RequireAuthorization();
+        app.MapPut("/api/etkinlik/aktif/kurasyon/oge/{katkiId:guid}", OgeGuncelle).RequireAuthorization();
+        app.MapPost("/api/etkinlik/aktif/kurasyon/sirala", Sirala).RequireAuthorization();
+        app.MapPost("/api/etkinlik/aktif/kurasyon/tamamla", Tamamla).RequireAuthorization();
+    }
+
+    private static IResult Hata(int kod, string hataKodu, string mesaj)
+        => Results.Json(new { hata = hataKodu, mesaj }, statusCode: kod);
+
+    private static bool KullaniciKimligi(HttpContext ctx, out Guid id)
+    {
+        var ham = ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? ctx.User.FindFirstValue("sub");
+        return Guid.TryParse(ham, out id);
+    }
+
+    private static async Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
+        HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
+    {
+        var claim = ctx.User.FindFirstValue("aktif_etkinlik_id");
+        if (!Guid.TryParse(claim, out var etkinlikId))
+            return (false, Guid.Empty, "");
+        var uyelik = await db.EtkinlikUyelikleri.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
+        if (uyelik == null) return (false, Guid.Empty, "");
+        return (true, etkinlikId, uyelik.Rol);
+    }
+
+    private static async Task Denetim(
+        BiAniBirakDbContext db, Guid etkinlikId, Guid kullaniciId,
+        string eylem, Guid? varlikId, object? degisen = null)
+    {
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kullaniciId,
+            Eylem = eylem,
+            Varlik = "kurasyonlar",
+            VarlikId = varlikId,
+            DegisenAlanlar = degisen == null ? null : JsonSerializer.Serialize(degisen),
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+    }
+
+    // Kurasyonu getir (yoksa TURE GORE varsayilanlarla olustur) + onayli dilekleri SENKRONIZE et.
+    private static async Task<IResult> KurasyonGetir(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var etkinlik = await db.Etkinlikler.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == etkinlikId);
+        if (etkinlik == null)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadı.");
+
+        var simdi = DateTimeOffset.UtcNow;
+        var kurasyon = await db.Kurasyonlar.FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+
+        if (kurasyon == null)
+        {
+            var v = Sabitler.KurasyonVarsayilan(etkinlik.Tur, etkinlik.Es1Ad, etkinlik.Es2Ad,
+                etkinlik.EtkinlikTarihi);
+            kurasyon = new Kurasyon
+            {
+                Id = Guid.NewGuid(),
+                EtkinlikId = etkinlikId,
+                Tema = "klasik",
+                KapakBaslik = v.KapakBaslik,
+                KapakAltBaslik = v.KapakAltBaslik,
+                IthafMetni = v.IthafMetni,
+                KapanisMetni = v.KapanisMetni,
+                GruplamaTipi = "taraf",
+                QrKoprusuAktif = true,
+                Durum = "taslak",
+                CreatedAt = simdi,
+                UpdatedAt = simdi,
+            };
+            db.Kurasyonlar.Add(kurasyon);
+            await Denetim(db, etkinlikId, kullaniciId, "KURASYON_BASLATILDI", kurasyon.Id);
+            await db.SaveChangesAsync();
+        }
+
+        // SENKRONIZASYON: onayli + silinmemis dilekler oge olarak var mi?
+        var onayliKatkilar = await db.Katkilar.AsNoTracking()
+            .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli" && !k.SilindiMi)
+            .OrderBy(k => k.CreatedAt)
+            .ToListAsync();
+
+        var mevcutOgeler = await db.KurasyonOgeleri
+            .Where(o => o.KurasyonId == kurasyon.Id)
+            .ToListAsync();
+
+        var mevcutKatkiIdler = mevcutOgeler.Select(o => o.KatkiId).ToHashSet();
+        var onayliIdler = onayliKatkilar.Select(k => k.Id).ToHashSet();
+
+        var degisti = false;
+        var siraSayaci = mevcutOgeler.Count == 0 ? 0 : mevcutOgeler.Max(o => o.Sira) + 1;
+
+        // Yeni onaylananlari ekle (kayip imkansiz)
+        foreach (var k in onayliKatkilar.Where(k => !mevcutKatkiIdler.Contains(k.Id)))
+        {
+            db.KurasyonOgeleri.Add(new KurasyonOgesi
+            {
+                Id = Guid.NewGuid(),
+                KurasyonId = kurasyon.Id,
+                KatkiId = k.Id,
+                Dahil = true,
+                Sira = siraSayaci++,
+                CreatedAt = simdi,
+            });
+            degisti = true;
+        }
+
+        // Artik onayli olmayan (geri alinan / moderasyonla kaldirilan) ogeleri dusur
+        var dusecekler = mevcutOgeler.Where(o => !onayliIdler.Contains(o.KatkiId)).ToList();
+        if (dusecekler.Count > 0)
+        {
+            db.KurasyonOgeleri.RemoveRange(dusecekler);
+            degisti = true;
+        }
+
+        if (degisti) await db.SaveChangesAsync();
+
+        // Tam veri (oge + katki birlesimi)
+        var ogeler = await db.KurasyonOgeleri.AsNoTracking()
+            .Where(o => o.KurasyonId == kurasyon.Id)
+            .Join(db.Katkilar.AsNoTracking(), o => o.KatkiId, k => k.Id, (o, k) => new
+            {
+                katki_id = k.Id,
+                davetli_ad = k.DavetliAd,
+                mesaj = k.Mesaj,
+                kaynak_es = k.KaynakEs,
+                birakilma = k.CreatedAt,
+                dahil = o.Dahil,
+                sira = o.Sira,
+                bolum_basligi = o.BolumBasligi,
+            })
+            .OrderBy(x => x.sira)
+            .ToListAsync();
+
+        return Results.Json(new
+        {
+            tema = kurasyon.Tema,
+            kapak_baslik = kurasyon.KapakBaslik,
+            kapak_alt_baslik = kurasyon.KapakAltBaslik,
+            kapak_gorsel_url = kurasyon.KapakGorselUrl,
+            ithaf_metni = kurasyon.IthafMetni,
+            kapanis_metni = kurasyon.KapanisMetni,
+            gruplama_tipi = kurasyon.GruplamaTipi,
+            qr_koprusu_aktif = kurasyon.QrKoprusuAktif,
+            durum = kurasyon.Durum,
+            tamamlanma_zamani = kurasyon.TamamlanmaZamani,
+            // Baglam (onizleme icin)
+            es1_ad = etkinlik.Es1Ad,
+            es2_ad = etkinlik.Es2Ad,
+            tur = etkinlik.Tur,
+            etkinlik_tarihi = etkinlik.EtkinlikTarihi,
+            ogeler,
+        });
+    }
+
+    // Kurasyon ayarlari (tema, kapak, ithaf, gruplama, kapanis)
+    private static async Task<IResult> KurasyonGuncelle(
+        KurasyonGuncelleIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var kurasyon = await db.Kurasyonlar.FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        var gecerliTemalar = new[] { "klasik", "modern", "zarif" };
+        if (istek.Tema != null)
+        {
+            if (!gecerliTemalar.Contains(istek.Tema))
+                return Hata(400, "DOGRULAMA_HATASI", "Geçersiz tema.");
+            kurasyon.Tema = istek.Tema;
+        }
+
+        var gecerliGruplama = new[] { "taraf", "kronolojik", "bolum" };
+        if (istek.GruplamaTipi != null)
+        {
+            if (!gecerliGruplama.Contains(istek.GruplamaTipi))
+                return Hata(400, "DOGRULAMA_HATASI", "Geçersiz gruplama tipi.");
+            kurasyon.GruplamaTipi = istek.GruplamaTipi;
+        }
+
+        if (istek.KapakBaslik != null) kurasyon.KapakBaslik = istek.KapakBaslik.Trim();
+        if (istek.KapakAltBaslik != null) kurasyon.KapakAltBaslik = istek.KapakAltBaslik.Trim();
+        if (istek.KapakGorselUrl != null) kurasyon.KapakGorselUrl = istek.KapakGorselUrl.Trim();
+        if (istek.IthafMetni != null) kurasyon.IthafMetni = istek.IthafMetni.Trim();
+        if (istek.KapanisMetni != null) kurasyon.KapanisMetni = istek.KapanisMetni.Trim();
+        if (istek.QrKoprusuAktif.HasValue) kurasyon.QrKoprusuAktif = istek.QrKoprusuAktif.Value;
+
+        kurasyon.UpdatedAt = DateTimeOffset.UtcNow;
+        await Denetim(db, etkinlikId, kullaniciId, "KURASYON_GUNCELLENDI", kurasyon.Id,
+            new { tema = kurasyon.Tema, gruplama = kurasyon.GruplamaTipi });
+        await db.SaveChangesAsync();
+
+        return Results.Json(new { ok = true });
+    }
+
+    // Tek ogenin dahil/haric ve bolum basligi
+    private static async Task<IResult> OgeGuncelle(
+        Guid katkiId, OgeGuncelleIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var kurasyon = await db.Kurasyonlar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        var oge = await db.KurasyonOgeleri
+            .FirstOrDefaultAsync(o => o.KurasyonId == kurasyon.Id && o.KatkiId == katkiId);
+        if (oge == null)
+            return Hata(404, "OGE_BULUNAMADI", "Bu dilek eserde bulunamadı.");
+
+        if (istek.Dahil.HasValue) oge.Dahil = istek.Dahil.Value;
+        if (istek.BolumBasligi != null)
+            oge.BolumBasligi = string.IsNullOrWhiteSpace(istek.BolumBasligi)
+                ? null : istek.BolumBasligi.Trim();
+
+        await db.SaveChangesAsync();
+        return Results.Json(new { ok = true });
+    }
+
+    // Toplu siralama (surukle-birak / yukari-asagi sonucu)
+    private static async Task<IResult> Sirala(
+        SiralaIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var kurasyon = await db.Kurasyonlar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        if (istek.KatkiIdler == null || istek.KatkiIdler.Length == 0)
+            return Hata(400, "DOGRULAMA_HATASI", "Sıralama listesi boş.");
+
+        var ogeler = await db.KurasyonOgeleri
+            .Where(o => o.KurasyonId == kurasyon.Id)
+            .ToListAsync();
+
+        // Gelen sirayla yeniden numaralandir (atomik)
+        for (var i = 0; i < istek.KatkiIdler.Length; i++)
+        {
+            var oge = ogeler.FirstOrDefault(o => o.KatkiId == istek.KatkiIdler[i]);
+            if (oge != null) oge.Sira = i;
+        }
+        await db.SaveChangesAsync();
+
+        return Results.Json(new { ok = true });
+    }
+
+    // Mirasi TAMAMLA - Kuzey Yildizi metrigi (Belge 01).
+    private static async Task<IResult> Tamamla(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var kurasyon = await db.Kurasyonlar.FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        var dahilSayi = await db.KurasyonOgeleri
+            .CountAsync(o => o.KurasyonId == kurasyon.Id && o.Dahil);
+        if (dahilSayi == 0)
+            return Hata(400, "DILEK_YOK", "Esere en az bir dilek eklemelisin.");
+
+        kurasyon.Durum = "tamamlandi";
+        kurasyon.TamamlanmaZamani = DateTimeOffset.UtcNow;
+        kurasyon.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await Denetim(db, etkinlikId, kullaniciId, "MIRAS_TAMAMLANDI", kurasyon.Id,
+            new { dilek_sayisi = dahilSayi, tema = kurasyon.Tema });
+        await db.SaveChangesAsync();
+
+        return Results.Json(new { ok = true, dilek_sayisi = dahilSayi });
+    }
+}

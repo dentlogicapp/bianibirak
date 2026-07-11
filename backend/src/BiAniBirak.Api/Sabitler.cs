@@ -73,4 +73,60 @@ public static class Sabitler
 
     public const string VarsayilanPromptMetni =
         "Bize bir dilek, bir hatıra ya da bir tavsiye bırak.";
+
+    // ---- KURASYON VARSAYILANLARI (Asama 6) ----
+    // Cift hicbir seye dokunmasa bile ESER kusursuz cikar. Editoryel Turkce.
+    public sealed record KurasyonVarsayilanBloku(
+        string KapakBaslik,
+        string KapakAltBaslik,
+        string IthafMetni,
+        string KapanisMetni);
+
+    public static KurasyonVarsayilanBloku KurasyonVarsayilan(
+        string tur, string es1Ad, string es2Ad, DateTimeOffset etkinlikTarihi)
+    {
+        var kultur = new System.Globalization.CultureInfo("tr-TR");
+        var tarihMetni = etkinlikTarihi.ToLocalTime().ToString("d MMMM yyyy", kultur);
+
+        var turAdi = tur switch
+        {
+            "nisan" => "Nişanımız",
+            "nikah" => "Nikahımız",
+            _ => "Düğünümüz",
+        };
+
+        var ithaf = tur switch
+        {
+            "nisan" =>
+                "Bu defter, birlikte yürüyeceğimiz yolun ilk adımında yanımızda olan herkese aittir. " +
+                "Bıraktığınız her satır, yazmaya yeni başladığımız hikâyenin ilk sayfalarında yaşayacak.",
+            "nikah" =>
+                "Bu defter, birbirimize 'evet' dediğimiz gün bizimle olan herkese aittir. " +
+                "Sözleriniz, bir ömür boyu döneceğimiz bu sayfalarda kalacak.",
+            _ =>
+                "Bu defter, hayatımızın en güzel gününde yanımızda olan herkese aittir. " +
+                "Yazdıklarınız yıllar sonra çocuklarımıza okuyacağımız satırlar olacak. " +
+                "Bizi biz yapan sevginiz için teşekkür ederiz.",
+        };
+
+        var kapanis = tur switch
+        {
+            "nisan" =>
+                "Bu satırlar burada bitiyor; hikâyemiz daha yeni başlıyor.",
+            "nikah" =>
+                "Bugün yazılanlar burada kalacak; sevginiz bizimle yürüyecek.",
+            _ =>
+                "Bu defter kapanıyor ama bıraktıklarınız bizimle kalıyor. " +
+                "Bir gün bu sayfaları çocuklarımızla birlikte açacağız.",
+        };
+
+        return new KurasyonVarsayilanBloku(
+            KapakBaslik: $"{es1Ad} & {es2Ad}",
+            KapakAltBaslik: $"{turAdi} · {tarihMetni}",
+            IthafMetni: ithaf,
+            KapanisMetni: kapanis);
+    }
+
+    // Editoryel temalar (PDF + onizleme ortak sozlugu)
+    public static readonly string[] Temalar = { "klasik", "modern", "zarif" };
 }

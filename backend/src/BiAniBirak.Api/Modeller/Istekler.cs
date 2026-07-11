@@ -75,3 +75,19 @@ public record KvkkTalepIsleIstek(string Durum, string? SonucNotu);
 
 // Kullanici kalici silme: e-posta teyidi
 public record KullaniciSilIstek(string? Teyit);
+
+// ---- KURASYON (Asama 6) ----
+
+public record KurasyonGuncelleIstek(
+    string? Tema,
+    string? KapakBaslik,
+    string? KapakAltBaslik,
+    string? KapakGorselUrl,
+    string? IthafMetni,
+    string? KapanisMetni,
+    string? GruplamaTipi,
+    bool? QrKoprusuAktif);
+
+public record OgeGuncelleIstek(bool? Dahil, string? BolumBasligi);
+
+public record SiralaIstek(Guid[]? KatkiIdler);

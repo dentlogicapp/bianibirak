@@ -206,6 +206,15 @@ export function UserMenu() {
               Defter
             </MenuLink>
 
+            <MenuLink href="/panel/kurasyon" onClick={() => setAcik(false)} ikon={
+              <>
+                <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="m11 9 1 2.2 2.2 1-2.2 1L11 15.4 10 13.2 7.8 12.2 10 11.2 11 9Z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" fill="none" />
+              </>
+            }>
+              Kürasyon Stüdyosu
+            </MenuLink>
+
             <MenuLink href="/panel/paylasim" onClick={() => setAcik(false)} ikon={
               <>
                 <circle cx="18" cy="5" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />

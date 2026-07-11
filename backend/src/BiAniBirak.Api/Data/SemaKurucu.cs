@@ -229,6 +229,55 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_kvkk_talepleri_durum ON kvkk_talepleri ("Durum");
 
+        -- ================= KURASYON (Asama 6 - Kuzey Yildizi) =================
+        -- Toplanani ESERE ceviren katman. Katkilar dokunulmaz (ozgunluk - Karar 2).
+        CREATE TABLE IF NOT EXISTS kurasyonlar (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
+            "Tema" text NOT NULL DEFAULT 'klasik',
+            "KapakBaslik" text NULL,
+            "KapakAltBaslik" text NULL,
+            "KapakGorselUrl" text NULL,
+            "IthafMetni" text NULL,
+            "KapanisMetni" text NULL,
+            "GruplamaTipi" text NOT NULL DEFAULT 'taraf',
+            "QrKoprusuAktif" boolean NOT NULL DEFAULT true,
+            "Durum" text NOT NULL DEFAULT 'taslak',
+            "TamamlanmaZamani" timestamptz NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_kurasyonlar_etkinlik ON kurasyonlar ("EtkinlikId");
+
+        CREATE TABLE IF NOT EXISTS kurasyon_ogeleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KurasyonId" uuid NOT NULL REFERENCES kurasyonlar ("Id") ON DELETE CASCADE,
+            "KatkiId" uuid NOT NULL REFERENCES katkilar ("Id") ON DELETE CASCADE,
+            "Dahil" boolean NOT NULL DEFAULT true,
+            "Sira" integer NOT NULL DEFAULT 0,
+            "BolumBasligi" text NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_kurasyon_ogeleri_kurasyon_katki
+            ON kurasyon_ogeleri ("KurasyonId", "KatkiId");
+        CREATE INDEX IF NOT EXISTS ix_kurasyon_ogeleri_sira
+            ON kurasyon_ogeleri ("KurasyonId", "Sira");
+
+        CREATE TABLE IF NOT EXISTS kurasyon_ciktilari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KurasyonId" uuid NOT NULL,
+            "EtkinlikId" uuid NOT NULL,
+            "Tip" text NOT NULL,
+            "AyarlarAnlik" jsonb NOT NULL DEFAULT '{}'::jsonb,
+            "Filigranli" boolean NOT NULL DEFAULT false,
+            "SayfaSayisi" integer NOT NULL DEFAULT 0,
+            "DilekSayisi" integer NOT NULL DEFAULT 0,
+            "OlusturanKullaniciId" uuid NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_kurasyon_ciktilari_etkinlik
+            ON kurasyon_ciktilari ("EtkinlikId");
+
         -- Push: kullanicilara sessiz saat kolonlari (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatBaslangic" text NULL;

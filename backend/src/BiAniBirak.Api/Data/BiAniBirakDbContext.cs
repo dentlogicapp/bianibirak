@@ -28,6 +28,9 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
     public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
+    public DbSet<Kurasyon> Kurasyonlar => Set<Kurasyon>();
+    public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
+    public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -318,6 +321,65 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.IslemZamani).HasColumnName("IslemZamani");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => x.Durum);
+        });
+
+        // ---- kurasyonlar (miras kurgusu - Belge 03 Akis 6) ----
+        model.Entity<Kurasyon>(e =>
+        {
+            e.ToTable("kurasyonlar");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Tema).HasColumnName("Tema").IsRequired();
+            e.Property(x => x.KapakBaslik).HasColumnName("KapakBaslik");
+            e.Property(x => x.KapakAltBaslik).HasColumnName("KapakAltBaslik");
+            e.Property(x => x.KapakGorselUrl).HasColumnName("KapakGorselUrl");
+            e.Property(x => x.IthafMetni).HasColumnName("IthafMetni");
+            e.Property(x => x.KapanisMetni).HasColumnName("KapanisMetni");
+            e.Property(x => x.GruplamaTipi).HasColumnName("GruplamaTipi").IsRequired();
+            e.Property(x => x.QrKoprusuAktif).HasColumnName("QrKoprusuAktif");
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.TamamlanmaZamani).HasColumnName("TamamlanmaZamani");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => x.EtkinlikId).IsUnique(); // etkinlik basina TEK kurasyon
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
+
+        // ---- kurasyon_ogeleri (dilegin eserdeki yeri) ----
+        model.Entity<KurasyonOgesi>(e =>
+        {
+            e.ToTable("kurasyon_ogeleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KurasyonId).HasColumnName("KurasyonId");
+            e.Property(x => x.KatkiId).HasColumnName("KatkiId");
+            e.Property(x => x.Dahil).HasColumnName("Dahil");
+            e.Property(x => x.Sira).HasColumnName("Sira");
+            e.Property(x => x.BolumBasligi).HasColumnName("BolumBasligi");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => new { x.KurasyonId, x.KatkiId }).IsUnique();
+            e.HasIndex(x => new { x.KurasyonId, x.Sira });
+            e.HasOne<Kurasyon>().WithMany().HasForeignKey(x => x.KurasyonId);
+            e.HasOne<Katki>().WithMany().HasForeignKey(x => x.KatkiId);
+        });
+
+        // ---- kurasyon_ciktilari (surumleme - B6) ----
+        model.Entity<KurasyonCiktisi>(e =>
+        {
+            e.ToTable("kurasyon_ciktilari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KurasyonId).HasColumnName("KurasyonId");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Tip).HasColumnName("Tip").IsRequired();
+            e.Property(x => x.AyarlarAnlik).HasColumnName("AyarlarAnlik").HasColumnType("jsonb");
+            e.Property(x => x.Filigranli).HasColumnName("Filigranli");
+            e.Property(x => x.SayfaSayisi).HasColumnName("SayfaSayisi");
+            e.Property(x => x.DilekSayisi).HasColumnName("DilekSayisi");
+            e.Property(x => x.OlusturanKullaniciId).HasColumnName("OlusturanKullaniciId");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.EtkinlikId);
         });
     }
 }
