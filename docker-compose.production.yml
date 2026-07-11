@@ -44,6 +44,11 @@ services:
       - Jwt__Issuer=bianibirak
       - Jwt__Audience=bianibirak
       - Jwt__GecerlilikGun=7
+      # Web Push (Asama 10-A). Degerler sunucudaki .env dosyasindan gelir;
+      # gizli anahtarlar repoya GIRMEZ, yalniz referans burada durur.
+      - Vapid__PublicKey=${VAPID_PUBLIC_KEY}
+      - Vapid__PrivateKey=${VAPID_PRIVATE_KEY}
+      - Vapid__Subject=${VAPID_SUBJECT}
       - Depolama__Kok=/veri/medya
     volumes:
       # Gorseller KALICI olmali - container yeniden kurulunca ucmasin.
