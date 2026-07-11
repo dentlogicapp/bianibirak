@@ -306,8 +306,28 @@ public static class SemaKurucu
         END $$;
         """;
 
+    // DDL'yi HAM olarak calistirir.
+    //
+    // NEDEN ExecuteSqlRaw DEGIL: EF Core'un ExecuteSqlRaw'i SQL'i String.Format'tan
+    // gecirir. DDL'de gecen her suslu parantez bir format yer tutucusu sanilir; ornegin
+    // jsonb bos-nesne varsayilani FormatException firlatir ("Expected an ASCII digit").
+    // Ham ADO.NET komutu boyle bir donusum YAPMAZ - jsonb varsayilanlari, PL/pgSQL
+    // bloklari ve suslu parantez iceren her ifade guvenle yazilabilir.
     public static void Uygula(BiAniBirakDbContext db)
     {
-        db.Database.ExecuteSqlRaw(Ddl);
+        var baglanti = db.Database.GetDbConnection();
+        var acikMiydi = baglanti.State == System.Data.ConnectionState.Open;
+        if (!acikMiydi) baglanti.Open();
+        try
+        {
+            using var komut = baglanti.CreateCommand();
+            komut.CommandText = Ddl;
+            komut.CommandTimeout = 120; // buyuk semada guvenli pay
+            komut.ExecuteNonQuery();
+        }
+        finally
+        {
+            if (!acikMiydi) baglanti.Close();
+        }
     }
 }
