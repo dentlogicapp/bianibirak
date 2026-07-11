@@ -29,9 +29,23 @@ export default function GirisSayfasi() {
     const cevap = kayitMi
       ? await api.kayit({ ad, email, sifre })
       : await api.giris({ email, sifre });
+    if (!cevap.ok) {
+      setYukleniyor(false);
+      setHata(cevap.mesaj);
+      return;
+    }
+
+    // Akilli yonlendirme: etkinlik yoksa olusturma, TEK etkinlik varsa dogrudan defter,
+    // birden fazla varsa secim ekrani (/panel).
+    const liste = await api.etkinliklerim();
     setYukleniyor(false);
-    if (cevap.ok) router.push("/panel");
-    else setHata(cevap.mesaj);
+    if (liste.ok && liste.veri.length === 1) {
+      const tek = liste.veri[0];
+      await api.etkinlikAktifYap(tek.id);
+      router.push("/panel/etkinlik");
+      return;
+    }
+    router.push("/panel");
   }
 
   return (

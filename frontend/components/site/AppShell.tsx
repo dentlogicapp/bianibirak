@@ -20,20 +20,6 @@ type Sekme = {
 
 const SEKMELER: Sekme[] = [
   {
-    ad: "Etkinlikler",
-    yol: "/panel",
-    ikon: (a) => (
-      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden>
-        <path
-          d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
-          stroke="currentColor"
-          strokeWidth={a ? 2 : 1.6}
-        />
-        <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={a ? 2 : 1.6} strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     ad: "Defter",
     yol: "/panel/etkinlik",
     ikon: (a) => (

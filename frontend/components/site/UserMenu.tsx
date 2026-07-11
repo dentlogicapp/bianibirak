@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, type Kullanici, type Bildirim } from "@/lib/api";
+import { api, type Kullanici, type Bildirim, type Etkinlik } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
 
@@ -19,6 +19,9 @@ export function UserMenu() {
   const [profilAcik, setProfilAcik] = useState(false);
   const [bildirimler, setBildirimler] = useState<Bildirim[]>([]);
   const [okunmamis, setOkunmamis] = useState(0);
+  const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
+  const [aktifId, setAktifId] = useState<string | null>(null);
+  const [gecis, setGecis] = useState(false);
   const [tema, temaTersle] = useTema();
   const kutuRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +68,30 @@ export function UserMenu() {
       window.removeEventListener("focus", odak);
     };
   }, [oturum]);
+
+  // Etkinlikler + aktif etkinlik (switcher icin - planlama workspace deseni).
+  useEffect(() => {
+    if (oturum !== "var") return;
+    api.etkinliklerim().then((c) => {
+      if (c.ok) setEtkinlikler(c.veri);
+    });
+    api.etkinlikAktif().then((c) => {
+      if (c.ok) setAktifId(c.veri.id);
+    });
+  }, [oturum]);
+
+  // Etkinlik degistir -> JWT yenilenir -> hard refresh (planlama deseni)
+  function etkinlikDegistir(id: string) {
+    if (gecis) return;
+    setGecis(true);
+    api.etkinlikAktifYap(id).then((c) => {
+      if (c.ok) {
+        window.location.href = "/panel/etkinlik";
+      } else {
+        setGecis(false);
+      }
+    });
+  }
 
   function bildirimeTikla(b: Bildirim) {
     if (!b.url) return;
@@ -153,15 +180,15 @@ export function UserMenu() {
             </div>
           </div>
 
-          {/* Bolum 1 - Etkinlik */}
+          {/* Bolum 1 - Yonetim */}
           <div className="border-b border-ayrac p-1.5">
             <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-              Etkinlik
+              Yönetim
             </p>
             <MenuLink href="/panel/duzenle" onClick={() => setAcik(false)} ikon={
               <path d="M4 20h4l10-10-4-4L4 16v4Z M13.5 6.5l4 4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             }>
-              Etkinlik Ayarları
+              Etkinlik &amp; Görünüm
             </MenuLink>
             <MenuLink href="/panel/denetim" onClick={() => setAcik(false)} ikon={
               <>
@@ -172,6 +199,41 @@ export function UserMenu() {
               Denetim Günlüğü
             </MenuLink>
           </div>
+
+          {/* Diger etkinliklerin (yalniz 2+ etkinlik varsa - planlama workspace switcher) */}
+          {etkinlikler.length >= 2 && (
+            <div className="border-b border-ayrac p-1.5">
+              <p className="px-3 pb-1 pt-1.5 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                Diğer etkinliklerin
+              </p>
+              {etkinlikler
+                .filter((e) => e.id !== aktifId)
+                .map((e) => (
+                  <button
+                    key={e.id}
+                    disabled={gecis}
+                    onClick={() => etkinlikDegistir(e.id)}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+                      <path
+                        d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
+                        stroke="currentColor"
+                        strokeWidth={1.6}
+                        fill="none"
+                      />
+                      <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                    </svg>
+                    <span className="flex-1 truncate">
+                      {e.es1_ad} &amp; {e.es2_ad}
+                    </span>
+                    <span className="shrink-0 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                      {turKisa(e.tur)}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
 
           {/* Bolum 2 - Hesap */}
           <div className="p-1.5">
@@ -379,4 +441,12 @@ function gecenSure(iso: string): string {
   if (gun === 1) return "dün";
   if (gun < 7) return `${gun} gün önce`;
   return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+}
+
+// Etkinlik turu kisa etiketi (switcher rozeti)
+function turKisa(tur: string): string {
+  if (tur === "dugun") return "Düğün";
+  if (tur === "nisan") return "Nişan";
+  if (tur === "nikah") return "Nikah";
+  return tur;
 }
