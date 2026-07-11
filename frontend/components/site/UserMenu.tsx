@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, type Kullanici, type Bildirim } from "@/lib/api";
 import { useTema } from "@/lib/tema";
-import { toast } from "sonner";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
 
 // Avatar menusu (planlama deseni): bolumlu dropdown.
@@ -68,48 +67,22 @@ export function UserMenu() {
   }, [oturum]);
 
   function bildirimeTikla(b: Bildirim) {
-    // 1) Okundu (soluklasir, listede kalir) - ates-et-unut, navigasyonu bloklamaz
+    if (!b.url) return;
+
+    // TEK TIK, SIFIR SURTUNME: navigasyon SENKRON ve ONCE.
+    // Ag istegi (durum kontrolu) tiklama anina KOYULMAZ - hedef rota zaten sabit
+    // (/panel/etkinlik). Dilegin durumu (onayli/red/yok) defter sayfasinda islenir.
+    const eslesme = b.url.match(/focus=([0-9a-fA-F-]{36})/);
+    const hedef = eslesme ? `/panel/etkinlik?focus=${eslesme[1]}` : b.url;
+    router.push(hedef);
+
+    // Navigasyondan SONRA: menuyu kapat + okundu isaretle (ates-et-unut).
+    setAcik(false);
     if (!b.okundu_mu) {
       setBildirimler((o) => o.map((x) => (x.id === b.id ? { ...x, okundu_mu: true } : x)));
       setOkunmamis((s) => Math.max(0, s - 1));
       void api.bildirimOkundu(b.id);
     }
-    setAcik(false);
-    if (!b.url) return;
-
-    // 2) Dilek bildirimi mi? (url'de ?focus={katkiId})
-    const eslesme = b.url.match(/focus=([0-9a-fA-F-]{36})/);
-    if (!eslesme) {
-      const hedef = b.url;
-      setTimeout(() => router.push(hedef), 0);
-      return;
-    }
-    const katkiId = eslesme[1];
-
-    // 3) Dilegin GUNCEL durumunu sunucudan oku (planlama: cache'e GUVENME).
-    //    Gercek durum degerleri: "beklemede" | "onayli" | "red"
-    //    Uyarilar TOAST ile (planlama deseni) - acilir, kendiliginden kapanir.
-    api
-      .katkiDurum(katkiId)
-      .then((c) => {
-        if (!c.ok) {
-          toast.error("Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.");
-          return;
-        }
-        if (c.veri.durum === "red") {
-          toast.error(
-            "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor."
-          );
-          return;
-        }
-        if (c.veri.durum === "onayli") {
-          toast.success("Bu dilek onaylanmış ve ortak deftere eklenmiş - aşağıda vurgulanıyor.");
-        }
-        setTimeout(() => router.push(`/panel/etkinlik?focus=${katkiId}`), 0);
-      })
-      .catch(() => {
-        toast.error("Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.");
-      });
   }
 
   async function bildirimSil(id: string) {

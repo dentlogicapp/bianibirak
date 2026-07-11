@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Etkinlik, type Katki } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
@@ -56,6 +56,43 @@ function DefterIcerik() {
 
   // Odak: dilek yuklendikten sonra scroll + vurgu
   useOdakKatki(durum === "hazir");
+
+  // Bildirimden gelen dilek yerel listelerde var mi? Yoksa durumunu cek + toast.
+  const odakIslendi = useRef<string | null>(null);
+  useEffect(() => {
+    if (!odakId || durum !== "hazir") return;
+    if (odakIslendi.current === odakId) return; // ayni odak icin tek kez
+
+    const kuyruktaVar = kuyruk.some((k) => k.id === odakId);
+    const defterdeVar = defter.some((k) => k.id === odakId);
+
+    if (kuyruktaVar) {
+      odakIslendi.current = odakId;
+      return; // bekleyen dilek - odak hook scroll+vurgu yapar
+    }
+    if (defterdeVar) {
+      odakIslendi.current = odakId;
+      toast.success("Bu dilek onaylanmış ve ortak deftere eklenmiş - aşağıda vurgulanıyor.");
+      return;
+    }
+
+    // Listelerde yok: reddedilmis / silinmis / baska esin kuyrugunda.
+    odakIslendi.current = odakId;
+    api.katkiDurum(odakId).then((c) => {
+      if (!c.ok) {
+        toast.error("Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.");
+        return;
+      }
+      if (c.veri.durum === "red") {
+        toast.error(
+          "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor."
+        );
+      } else {
+        toast.error("Ulaşmaya çalıştığın dilek bu defterde görüntülenemiyor.");
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [odakId, durum, kuyruk.length, defter.length]);
 
   async function islem(k: Katki, onay: boolean) {
     if (islenen) return;
