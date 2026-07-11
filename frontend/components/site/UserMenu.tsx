@@ -67,7 +67,7 @@ export function UserMenu() {
   }, [oturum]);
 
   async function bildirimeTikla(b: Bildirim) {
-    // Tikla -> okundu (soluklasir, listede kalir) + yonlendir.
+    // 1) Okundu (soluklasir, listede kalir)
     if (!b.okundu_mu) {
       setBildirimler((o) => o.map((x) => (x.id === b.id ? { ...x, okundu_mu: true } : x)));
       setOkunmamis((s) => Math.max(0, s - 1));
@@ -76,9 +76,30 @@ export function UserMenu() {
     setAcik(false);
     if (!b.url) return;
 
-    // Hedef sayfaya git; ?focus={katkiId} varsa defter sayfasi scroll + vurgu yapar,
-    // dilek onaylanmis/reddedilmis ise uygun uyariyi gosterir (durum sunucudan okunur).
-    router.push(b.url);
+    // 2) Dilek bildirimi mi? (url'de ?focus={katkiId})
+    const eslesme = b.url.match(/focus=([0-9a-fA-F-]{36})/);
+    if (!eslesme) {
+      setTimeout(() => router.push(b.url as string), 0);
+      return;
+    }
+    const katkiId = eslesme[1];
+
+    // 3) Dilegin GUNCEL durumunu sunucudan oku (planlama: cache'e guvenme).
+    //    Duruma gore hedefi kur -> defter sayfasi uyariyi + odagi isler.
+    const c = await api.katkiDurum(katkiId);
+    let hedef: string;
+    if (!c.ok) {
+      hedef = `/panel/etkinlik?uyari=bulunamadi`;
+    } else if (c.veri.durum === "onaylandi") {
+      hedef = `/panel/etkinlik?focus=${katkiId}&uyari=onaylandi`;
+    } else if (c.veri.durum === "reddedildi") {
+      hedef = `/panel/etkinlik?uyari=reddedildi`;
+    } else {
+      hedef = `/panel/etkinlik?focus=${katkiId}`;
+    }
+
+    // 4) setTimeout(0): menu kapanirken navigasyonun yarida kalmasini onler (planlama deseni)
+    setTimeout(() => router.push(hedef), 0);
   }
 
   async function bildirimSil(id: string) {
@@ -128,7 +149,7 @@ export function UserMenu() {
       >
         {basHarf}
         {okunmamis > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yaldiz px-1 font-govde text-[0.6rem] font-bold text-murekkep ring-2 ring-parsomen">
+          <span className="rozet-nabiz absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-yaldiz px-1 font-govde text-[0.6rem] font-bold text-murekkep ring-2 ring-parsomen">
             {okunmamis > 9 ? "9+" : okunmamis}
           </span>
         )}
@@ -246,8 +267,26 @@ export function UserMenu() {
                   {bildirimler.slice(0, 8).map((b) => (
                     <div
                       key={b.id}
-                      className="group flex items-start gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-yuzeyKoyu"
+                      className="group flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-yuzeyKoyu"
                     >
+                      {/* Tip ikonu */}
+                      <span
+                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                          b.okundu_mu ? "bg-yuzeyKoyu text-ikincil" : "bg-sarap/12 text-sarap"
+                        }`}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                          <path
+                            d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"
+                            stroke="currentColor"
+                            strokeWidth={1.6}
+                            strokeLinejoin="round"
+                            fill="none"
+                          />
+                          <path d="M8 9h6M8 12h4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                        </svg>
+                      </span>
+
                       <button
                         onClick={() => bildirimeTikla(b)}
                         className="min-w-0 flex-1 text-left"
@@ -270,6 +309,12 @@ export function UserMenu() {
                           {gecenSure(b.created_at)}
                         </p>
                       </button>
+
+                      {/* Okunmamis noktasi */}
+                      {!b.okundu_mu && (
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sarap" aria-hidden />
+                      )}
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

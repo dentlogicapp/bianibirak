@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
 import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
+import { useSwOdakDinleyici } from "@/lib/odak";
 
 // Enterprise app-shell (dunya-devi deseni):
 // - Mobil: sabit ALT tab bar (basparmak erisimi, buyuk hedefler - Belge 07 mobil-oncelik)
@@ -64,6 +65,7 @@ const SEKMELER: Sekme[] = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  useSwOdakDinleyici(); // push tiklamasi -> client-side yonlendirme (her sayfada)
 
   function aktifMi(yol: string) {
     if (yol === "/panel") return pathname === "/panel";

@@ -34,9 +34,10 @@ function DefterIcerik() {
   const [defter, setDefter] = useState<Katki[]>([]);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
   const [islenen, setIslenen] = useState<string | null>(null);
-  const [uyari, setUyari] = useState("");
+  const [uyari, setUyari] = useState<{ tip: "bilgi" | "red"; metin: string } | null>(null);
 
   const odakId = arama.get("focus");
+  const uyariKodu = arama.get("uyari");
 
   useEffect(() => {
     (async () => {
@@ -54,26 +55,32 @@ function DefterIcerik() {
     })();
   }, [router]);
 
-  // Bildirimden gelen dilek onaylanmis/reddedilmis ise kullaniciyi bilgilendir.
+  // Bildirimden gelen uyari kodu -> mesaj (UserMenu dilegin durumunu okuyup kodu yolladi).
   useEffect(() => {
-    if (!odakId || durum !== "hazir") return;
-    (async () => {
-      const c = await api.katkiDurum(odakId);
-      if (!c.ok) {
-        setUyari("Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.");
-        return;
-      }
-      if (c.veri.durum === "onaylandi") {
-        setUyari(
-          "Ulaşmaya çalıştığın dilek onaylanmış ve ortak deftere eklenmiş. Aşağıda gösteriliyor."
-        );
-      } else if (c.veri.durum === "reddedildi") {
-        setUyari(
-          "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor."
-        );
-      }
-    })();
-  }, [odakId, durum]);
+    if (!uyariKodu) return;
+    if (uyariKodu === "onaylandi") {
+      setUyari({
+        tip: "bilgi",
+        metin:
+          "Ulaşmaya çalıştığın dilek onaylanmış ve ortak deftere eklenmiş. Aşağıda vurgulanıyor.",
+      });
+    } else if (uyariKodu === "reddedildi") {
+      setUyari({
+        tip: "red",
+        metin:
+          "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor.",
+      });
+    } else if (uyariKodu === "bulunamadi") {
+      setUyari({
+        tip: "red",
+        metin: "Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.",
+      });
+    }
+    // Odak yoksa uyari parametresini hemen temizle (odak varsa useOdakKatki temizler).
+    if (!odakId) {
+      router.replace("/panel/etkinlik", { scroll: false });
+    }
+  }, [uyariKodu, odakId, router]);
 
   // Odak: dilek yuklendikten sonra scroll + vurgu
   useOdakKatki(durum === "hazir");
@@ -131,18 +138,37 @@ function DefterIcerik() {
         </p>
       </div>
 
-      {/* Bildirimden gelen uyari (onaylanmis/reddedilmis dilek) */}
+      {/* Bildirimden gelen uyari - tipe gore gorsel */}
       {uyari && (
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-yaldiz/40 bg-yaldiz/10 px-5 py-4">
-          <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-yaldiz" aria-hidden>
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.6} fill="none" />
-            <path d="M12 8h.01M11 12h1v4h1" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-          </svg>
+        <div
+          className={`mt-4 flex items-start gap-3 rounded-2xl border px-5 py-4 ${
+            uyari.tip === "red"
+              ? "border-sarap/40 bg-sarap/10"
+              : "border-yaldiz/40 bg-yaldiz/10"
+          }`}
+        >
+          <span
+            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+              uyari.tip === "red" ? "bg-sarap/15 text-sarap" : "bg-yaldiz/20 text-yaldiz"
+            }`}
+          >
+            {uyari.tip === "red" ? (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.8} fill="none" />
+                <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.8} fill="none" />
+                <path d="m8.5 12.5 2.5 2.5 4.5-5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            )}
+          </span>
           <p className="metin-yasli flex-1 font-govde text-sm leading-relaxed text-murekkep">
-            {uyari}
+            {uyari.metin}
           </p>
           <button
-            onClick={() => setUyari("")}
+            onClick={() => setUyari(null)}
             aria-label="Kapat"
             className="shrink-0 text-ikincil transition-colors hover:text-murekkep"
           >

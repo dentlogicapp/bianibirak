@@ -38,8 +38,13 @@ export function useOdakKatki(hazir: boolean) {
       clearTimeout(zaman);
     };
   }, [odakId, hazir, router, yol]);
+}
 
-  // Push bildirimine tiklaninca SW'den gelen mesaj -> client-side yonlendirme (reload yok).
+// GLOBAL: push bildirimine tiklaninca SW'den gelen mesaj -> client-side yonlendirme.
+// AppShell'de monte edilir; boylece kullanici hangi sayfadaysa olsun push tiklamasi calisir.
+export function useSwOdakDinleyici() {
+  const router = useRouter();
+
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     function isle(olay: MessageEvent) {
