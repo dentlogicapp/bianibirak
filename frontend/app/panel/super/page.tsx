@@ -14,13 +14,16 @@ import {
   type CopKutusu,
 } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { OlcumSekmesi } from "@/components/site/SuperOlcum";
+import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
-type Sekme = "defterler" | "kullanicilar" | "cop" | "kvkk" | "akis";
+type Sekme = "defterler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "defterler", etiket: "Defterler" },
+  { kod: "olcum", etiket: "Ölçüm" },
   { kod: "kullanicilar", etiket: "Kullanıcılar" },
   { kod: "cop", etiket: "Çöp Kutusu" },
   { kod: "kvkk", etiket: "KVKK" },
@@ -99,6 +102,7 @@ export default function SuperPanelSayfasi() {
 
       <div className="mt-6">
         {sekme === "defterler" && <DefterlerSekmesi />}
+        {sekme === "olcum" && <OlcumSekmesi />}
         {sekme === "kullanicilar" && <KullanicilarSekmesi />}
         {sekme === "cop" && <CopSekmesi />}
         {sekme === "kvkk" && <KvkkSekmesi />}
@@ -163,6 +167,7 @@ function OzetIzgara({ ozet }: { ozet: SuperOzet }) {
 // ---------------- DEFTERLER ----------------
 function DefterlerSekmesi() {
   const [defterler, setDefterler] = useState<SuperDefter[]>([]);
+  const [detayId, setDetayId] = useState<string | null>(null);
   const [ara, setAra] = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islenen, setIslenen] = useState<string | null>(null);
@@ -264,6 +269,8 @@ function DefterlerSekmesi() {
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
+                  {/* SAGLIK: yonetici, batan defteri LISTEDEN gorur - acmasi gerekmez */}
+                  <SaglikRozeti skor={d.saglik} />
                   <Rozet metin={durumEtiketi(d.durum)} />
                   {d.donduruldu && <Rozet metin="Dondurulmuş" tip="uyari" />}
                   {d.yetim && <Rozet metin="Yetim" tip="uyari" />}
@@ -294,6 +301,14 @@ function DefterlerSekmesi() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
+                {/* TESHIS: deftere GIRMEDEN sorunu gor. Impersonation'a alternatif -
+                    daha az yetki, ayni fayda. */}
+                <button
+                  onClick={() => setDetayId(d.id)}
+                  className="rounded-full border border-yaldiz/50 px-4 py-2 font-govde text-xs text-yaldiz transition-colors hover:bg-yaldiz/10"
+                >
+                  İncele
+                </button>
                 <button
                   onClick={() => goruntule(d)}
                   disabled={islenen === d.id}
@@ -330,6 +345,11 @@ function DefterlerSekmesi() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* TESHIS MODALI - saglik, yasam dongusu, dilek dagilimi, medya + RONTGEN */}
+      {detayId && (
+        <DefterDetayModal defterId={detayId} onKapat={() => setDetayId(null)} />
       )}
 
       {/* Kalici silme onayi - cift adi teyidi */}

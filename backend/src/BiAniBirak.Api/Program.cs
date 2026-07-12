@@ -145,6 +145,7 @@ app.CihazUclariniEkle();
 app.BildirimUclariniEkle();
 app.DavetUclariniEkle();
 app.SuperUclariniEkle();
+app.SuperTeshisUclariniEkle();   // Teshis: saglik skoru, defter detayi, olcum, rontgen
 app.KurasyonUclariniEkle();
 app.GorselUclariniEkle();
 

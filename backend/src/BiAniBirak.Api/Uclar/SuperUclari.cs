@@ -184,6 +184,15 @@ public static class SuperUclari
             })
             .ToDictionaryAsync(x => x.Key, x => new { x.Toplam, x.Beklemede });
 
+        // Aktif paylasim baglantisi olan defterler (saglik skorunun en kritik ceyregi:
+        // link paylasilmadan defter DOLAMAZ).
+        var linkliSet = (await db.PaylasimBaglantilari.AsNoTracking()
+            .Where(p => idler.Contains(p.EtkinlikId) && p.Aktif)
+            .Select(p => p.EtkinlikId)
+            .Distinct()
+            .ToListAsync())
+            .ToHashSet();
+
         // Hareketsizlik: son 30 gunde denetim kaydi yok mu?
         var otuzGunOnce = DateTimeOffset.UtcNow.AddDays(-30);
         var hareketli = await db.DenetimGunlukleri.AsNoTracking()
@@ -215,6 +224,18 @@ public static class SuperUclari
             dilek_sayisi = dilekSayilari.TryGetValue(e.Id, out var ds) ? ds.Toplam : 0,
             bekleyen_dilek = dilekSayilari.TryGetValue(e.Id, out var ds2) ? ds2.Beklemede : 0,
             hareketsiz = !hareketli.Contains(e.Id) && e.CreatedAt < otuzGunOnce,
+
+            // SAGLIK SKORU - 4 ceyrek x 25 puan (Planlama Defteri deseni, urune uyarlandi):
+            //   kurulum : es adlari + tarih dolu mu?
+            //   link    : aktif paylasim baglantisi var mi?  <- en kritik esik
+            //   katki   : en az bir dilek geldi mi?          <- deger kaniti
+            //   aktif   : son 30 gunde hareket var mi?
+            // Yonetici, LISTEDEN batan defteri gorur; detaya inmesi gerekmez.
+            saglik =
+                (!string.IsNullOrWhiteSpace(e.Es1Ad) && !string.IsNullOrWhiteSpace(e.Es2Ad) ? 25 : 0)
+                + (linkliSet.Contains(e.Id) ? 25 : 0)
+                + ((dilekSayilari.TryGetValue(e.Id, out var ds3) ? ds3.Toplam : 0) > 0 ? 25 : 0)
+                + (hareketli.Contains(e.Id) ? 25 : 0),
         }));
     }
 

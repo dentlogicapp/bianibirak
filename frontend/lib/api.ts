@@ -143,6 +143,7 @@ export type SuperDefter = {
   dilek_sayisi: number;
   bekleyen_dilek: number;
   hareketsiz: boolean;
+  saglik: number;
 };
 
 export type SuperKullanici = {
@@ -512,6 +513,11 @@ export const api = {
   superCop: () => istek<CopKutusu>("/api/super/cop"),
   superKullanicilar: (ara?: string) =>
     istek<SuperKullanici[]>(`/api/super/kullanicilar${ara ? `?ara=${encodeURIComponent(ara)}` : ""}`),
+  // --- Teshis: defter detayi, olcum, rontgen (Tur S) ---
+  superDefterDetay: (id: string) =>
+    istek<SuperDefterDetay>(`/api/super/defter/${id}/detay`),
+  superOlcum: () => istek<SuperOlcum>("/api/super/olcum"),
+
   superAdminAta: (id: string, superAdmin: boolean) =>
     istek<{ ok: boolean; super_admin: boolean }>(`/api/super/kullanici/${id}/super-admin`, {
       method: "POST",
@@ -677,3 +683,130 @@ export const api = {
       }
     ),
 };
+
+// ---------------- SUPER PANEL TESHIS (Tur S) ----------------
+
+export type SuperDefterDetay = {
+  id: string;
+  es1_ad: string;
+  es2_ad: string;
+  tur: string;
+  durum: string;
+  donduruldu: boolean;
+  silindi: boolean;
+  created_at: string;
+  updated_at: string;
+
+  acilis_tarihi: string;
+  etkinlik_tarihi: string;
+  kapanis_tarihi: string;
+  kapandi: boolean;
+  imha_tarihi: string;
+  imhaya_kalan_gun: number;
+
+  saglik: number;
+  saglik_detay: {
+    kurulum: boolean;
+    link: boolean;
+    katki: boolean;
+    aktif_30_gun: boolean;
+  };
+  son_hareket: string;
+
+  uyeler: {
+    id: string;
+    ad: string;
+    email: string;
+    rol: string;
+    super_admin: boolean;
+    askida: boolean;
+    katildi: string;
+  }[];
+
+  linkler: { es: string; aktif: boolean; created_at: string }[];
+
+  katki: {
+    toplam: number;
+    beklemede: number;
+    onayli: number;
+    red: number;
+    fotografli: number;
+    es1: number;
+    es2: number;
+    son_katki: string | null;
+  };
+
+  kurasyon: {
+    durum: string;
+    tema: string;
+    esere_dahil: number;
+    tamamlanma: string | null;
+  } | null;
+
+  ciktilar: {
+    tip: string;
+    filigranli: boolean;
+    dilek_sayisi: number;
+    created_at: string;
+  }[];
+
+  medya: { adet: number; bayt: number };
+};
+
+export type SuperOlcum = {
+  huni: {
+    defter_acildi: number;
+    link_paylasildi: number;
+    ilk_dilek_geldi: number;
+    kurasyon_yapildi: number;
+    eser_indirildi: number;
+  };
+  yasam_dongusu: {
+    acik: number;
+    kapali: number;
+    imha_gecikmis: number;
+    saklama_gun: number;
+  };
+  riskli: {
+    id: string;
+    es1_ad: string;
+    es2_ad: string;
+    created_at: string;
+    gun: number;
+    sebep: string;
+  }[];
+  imha_yaklasan: {
+    id: string;
+    es1_ad: string;
+    es2_ad: string;
+    imha_tarihi: string;
+    kalan_gun: number;
+  }[];
+  ilk_dilek_gecikme_saat: number | null;
+  son_30_gun: { yeni_defter: number; yeni_dilek: number };
+};
+
+// Defter rontgeni - yonetici, cift'in gordugu PDF'i uretir (filigranli, destek amacli)
+export async function rontgenIndir(defterId: string): Promise<{ ok: boolean; mesaj: string }> {
+  try {
+    const yanit = await fetch(`/api/super/defter/${defterId}/rontgen.pdf`, {
+      credentials: "include",
+    });
+    if (!yanit.ok) {
+      const govde = await yanit.json().catch(() => null);
+      return { ok: false, mesaj: govde?.mesaj ?? "Röntgen üretilemedi." };
+    }
+    const blob = await yanit.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rontgen-${defterId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true, mesaj: "Röntgen indirildi." };
+  } catch {
+    return { ok: false, mesaj: "Röntgen üretilemedi." };
+  }
+}

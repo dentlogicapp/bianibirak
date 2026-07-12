@@ -45,112 +45,24 @@ public static class KurasyonUclari
         if (etkinlik == null)
             return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadı.");
 
-        var kurasyon = await db.Kurasyonlar.AsNoTracking()
-            .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
-        if (kurasyon == null)
-            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+        // PDF uretimi TEK yerde: DefterDerleyici. Super panel "Defter Rontgeni" de
+        // ayni servisi cagirir - iki kopya olsaydi kacinilmaz olarak ayrisir ve
+        // yonetici, cift'in gordugunden BASKA bir PDF gorurdu.
+        var (derleme, derlemeHatasi) = await DefterDerleyici.DerleAsync(
+            etkinlikId, db, depo, ortam.ContentRootPath, filigranli: onizleme);
 
-        // Esere DAHIL edilen dilekler, kurulan sirayla
-        var dilekler = await db.KurasyonOgeleri.AsNoTracking()
-            .Where(o => o.KurasyonId == kurasyon.Id && o.Dahil)
-            .OrderBy(o => o.Sira)
-            .Join(db.Katkilar.AsNoTracking().Where(k => !k.SilindiMi),
-                o => o.KatkiId, k => k.Id,
-                (o, k) => new
-                {
-                    k.DavetliAd,
-                    k.DavetliIliski,
-                    k.Mesaj,
-                    k.KaynakEs,
-                    k.CreatedAt,
-                    k.FotoAnahtari,
-                    k.FotoGenislik,
-                    k.FotoYukseklik,
-                })
-            .ToListAsync();
+        if (derlemeHatasi != null)
+            return Hata(
+                derlemeHatasi.Kod == "DILEK_YOK" ? 400 : 404,
+                derlemeHatasi.Kod,
+                derlemeHatasi.Kod == "KURASYON_BULUNAMADI"
+                    ? "Önce kürasyon stüdyosunu aç."
+                    : derlemeHatasi.Kod == "DILEK_YOK"
+                        ? "Esere en az bir dilek eklemelisin."
+                        : derlemeHatasi.Mesaj);
 
-        if (dilekler.Count == 0)
-            return Hata(400, "DILEK_YOK", "Esere en az bir dilek eklemelisin.");
-
-        // Cift gorselleri (konumlara gore)
-        var gorseller = await db.EtkinlikGorselleri.AsNoTracking()
-            .Where(g => g.EtkinlikId == etkinlikId)
-            .OrderBy(g => g.Sira)
-            .ToListAsync();
-
-        async Task<BaskiServisi.Gorsel?> GorselYukle(EtkinlikGorseli? g)
-        {
-            if (g == null) return null;
-            var veri = await depo.OkuAsync(g.DepolamaAnahtari);
-            if (veri == null) return null;
-
-            // Eski kayitlarda olcu 0 olabilir (istemci-olcu bug'i oncesi). Bayttan coz -
-            // yanlis olcu, cercevede beyaz bosluk demektir; buna izin verilmez.
-            var gg = g.Genislik;
-            var yy = g.Yukseklik;
-            if (gg <= 0 || yy <= 0)
-            {
-                var olcu = GorselOlcer.Coz(veri);
-                gg = olcu?.Genislik ?? 0;
-                yy = olcu?.Yukseklik ?? 0;
-            }
-            return new BaskiServisi.Gorsel(veri, gg, yy);
-        }
-
-        var kapakG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapak"));
-        var ithafG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "ithaf"));
-        var kapanisG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapanis"));
-
-        var bolumG = new List<BaskiServisi.Gorsel>();
-        foreach (var g in gorseller.Where(g => g.Konum == "bolum"))
-        {
-            var y = await GorselYukle(g);
-            if (y != null) bolumG.Add(y);
-        }
-
-        // Davetli fotograflari
-        var dilekListe = new List<BaskiServisi.Dilek>();
-        foreach (var d in dilekler)
-        {
-            byte[]? foto = null;
-            var fg = d.FotoGenislik;
-            var fy = d.FotoYukseklik;
-
-            if (d.FotoAnahtari != null)
-            {
-                foto = await depo.OkuAsync(d.FotoAnahtari);
-                if (foto != null && (fg <= 0 || fy <= 0))
-                {
-                    var olcu = GorselOlcer.Coz(foto);
-                    fg = olcu?.Genislik ?? 0;
-                    fy = olcu?.Yukseklik ?? 0;
-                }
-            }
-
-            dilekListe.Add(new BaskiServisi.Dilek(
-                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt, foto, fg, fy));
-        }
-
-        BaskiServisi.Hazirla(ortam.ContentRootPath);
-
-        var eser = new BaskiServisi.EserVerisi(
-            Tema: kurasyon.Tema,
-            GruplamaTipi: kurasyon.GruplamaTipi,
-            KapakBaslik: kurasyon.KapakBaslik ?? $"{etkinlik.Es1Ad} & {etkinlik.Es2Ad}",
-            KapakAltBaslik: kurasyon.KapakAltBaslik ?? "",
-            IthafMetni: kurasyon.IthafMetni,
-            KapanisMetni: kurasyon.KapanisMetni,
-            TarihGoster: kurasyon.TarihGoster,
-            Es1Ad: etkinlik.Es1Ad,
-            Es2Ad: etkinlik.Es2Ad,
-            Dilekler: dilekListe,
-            KapakGorseli: kapakG,
-            IthafGorseli: ithafG,
-            KapanisGorseli: kapanisG,
-            BolumGorselleri: bolumG,
-            Filigranli: onizleme);
-
-        var pdf = BaskiServisi.DefterUret(eser);
+        var kurasyon = derleme!.Kurasyon;
+        var pdf = derleme.Pdf;
 
         // Surumleme (B6): her cikti kaydedilir - kim, ne zaman, hangi ayarlarla
         db.KurasyonCiktilari.Add(new KurasyonCiktisi
@@ -167,13 +79,13 @@ public static class KurasyonUclari
                 tarih = kurasyon.TarihGoster,
             }),
             Filigranli = onizleme,
-            DilekSayisi = dilekler.Count,
+            DilekSayisi = derleme.DilekSayisi,
             OlusturanKullaniciId = kullaniciId,
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await Denetim(db, etkinlikId, kullaniciId,
             onizleme ? "ESER_ONIZLENDI" : "ESER_INDIRILDI", kurasyon.Id,
-            new { dilek_sayisi = dilekler.Count, tema = kurasyon.Tema });
+            new { dilek_sayisi = derleme.DilekSayisi, tema = kurasyon.Tema });
         await db.SaveChangesAsync();
 
         var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri")
