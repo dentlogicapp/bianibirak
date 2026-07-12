@@ -539,15 +539,33 @@ public static class EtkinlikUclari
             sayac_bitti_cumle = a.SayacBittiCumle,
         };
 
+    // Katki yaniti - ESIN gordugu tam kayit.
+    //
+    // Es, kendi kuyrugundaki dilegi ONAYLARKEN neye onay verdigini TAM olarak
+    // gormeli: metin, fotograf, iliski ve davetlinin iletisim bilgileri. Yarim
+    // bilgiyle onay, kor onaydir.
+    //
+    // PII NOTU: telefon/e-posta YALNIZ etkinlik uyesi eslere doner (bu uclarin
+    // hepsi RequireAuthorization + tenant + KaynakEs izolasyonu altinda). Davetli
+    // hicbir sekilde baska bir davetlinin bilgisini goremez - onun ucu /api/k/{token}
+    // ve orada boyle bir liste YOKTUR.
     private static object KatkiYaniti(Katki k)
         => new
         {
             id = k.Id,
             kaynak_es = k.KaynakEs,
             davetli_ad = k.DavetliAd,
+            davetli_iliski = k.DavetliIliski,
+            davetli_telefon = k.DavetliTelefon,
+            davetli_email = k.DavetliEmail,
             mesaj = k.Mesaj,
             durum = k.Durum,
             created_at = k.CreatedAt,
+
+            // Fotograf: deftere basilacak haliyle gosterilebilmesi icin olcu de gerekir
+            foto_url = k.FotoAnahtari != null ? "/api/gorsel/" + k.FotoAnahtari : null,
+            foto_genislik = k.FotoGenislik,
+            foto_yukseklik = k.FotoYukseklik,
         };
 
     // Onay kuyrugu: YALNIZ oturumdaki esin rolune ait bekleyen katkilar (izolasyon).

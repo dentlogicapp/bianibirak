@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type Etkinlik, type Katki } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { DilekInceleme } from "@/components/site/DilekInceleme";
 import { esTarafiKisa } from "@/lib/es";
 import { useOdakKatki } from "@/lib/odak";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ function DefterIcerik() {
   const [defter, setDefter] = useState<Katki[]>([]);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
   const [islenen, setIslenen] = useState<string | null>(null);
+  const [inceleme, setInceleme] = useState<Katki | null>(null);
 
   const odakId = arama.get("focus");
 
@@ -107,6 +109,7 @@ function DefterIcerik() {
 
     // ANLIK: kuyruktan cikar; onaylandiysa ORTAK DEFTERE ekle (yenileme gerekmez).
     setKuyruk((o) => o.filter((x) => x.id !== k.id));
+    setInceleme(null);
     if (onay) {
       setDefter((o) => [{ ...k, durum: "onayli" }, ...o]);
       toast.success("Dilek onaylandı ve ortak deftere eklendi.");
@@ -170,15 +173,54 @@ function DefterIcerik() {
               <div
                 key={k.id}
                 data-katki-id={k.id}
-                className="rounded-2xl border border-ayrac bg-parsomen p-5"
+                className="overflow-hidden rounded-2xl border border-ayrac bg-parsomen"
               >
-                <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-                  {k.davetli_ad}
-                </p>
-                <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-murekkep">
-                  {k.mesaj}
-                </p>
-                <div className="mt-4 flex gap-2">
+                {/* KART GOVDESI TIKLANABILIR: es, onay vermeden ONCE dilegi
+                    deftere girecegi HALIYLE gorur. Kor onay olmaz. */}
+                <button
+                  type="button"
+                  onClick={() => setInceleme(k)}
+                  className="group block w-full p-5 text-left transition-colors hover:bg-yuzey"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-govde text-xs uppercase tracking-etiket text-yaldiz">
+                      {k.davetli_ad}
+                    </p>
+
+                    {/* Fotograf rozeti - iceride ne oldugunu listede de belli et */}
+                    {k.foto_url && (
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-yaldiz/12 px-2 py-0.5 font-govde text-[0.6rem] text-yaldiz">
+                        <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden>
+                          <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none" />
+                          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.7} fill="none" />
+                        </svg>
+                        Fotoğraf
+                      </span>
+                    )}
+                  </div>
+
+                  {k.davetli_iliski && (
+                    <p className="mt-1 font-govde text-[0.7rem] text-ikincil">
+                      {k.davetli_iliski}
+                    </p>
+                  )}
+
+                  <p className="metin-yasli mt-2.5 line-clamp-3 font-govde text-sm leading-relaxed text-murekkep">
+                    {k.mesaj}
+                  </p>
+
+                  {/* CAGRI - "hemen tikla" */}
+                  <span className="mt-3 inline-flex items-center gap-1.5 font-govde text-[0.72rem] font-medium text-sarap transition-colors group-hover:text-sarapKoyu">
+                    {k.davetli_ad} tarafından bırakılan dileği incelemek için tıkla
+                    <svg viewBox="0 0 24 24" className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden>
+                      <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  </span>
+                </button>
+
+                {/* Hizli eylemler - incelemeden de onaylanabilir, ama karar kolay
+                    olsun diye burada da durur. */}
+                <div className="flex gap-2 border-t border-ayrac px-5 py-3">
                   <button
                     onClick={() => islem(k, true)}
                     disabled={islenen === k.id}
@@ -210,26 +252,56 @@ function DefterIcerik() {
           </p>
           <div className="mt-5 space-y-3">
             {defter.map((k) => (
-              <div
+              // Onaylanmis dilekler de incelenebilir - cift, deftere ne girdigini
+              // her an tam haliyle gorebilmeli.
+              <button
+                type="button"
                 key={k.id}
                 data-katki-id={k.id}
-                className="rounded-2xl border border-ayrac bg-parsomen p-5"
+                onClick={() => setInceleme(k)}
+                className="group block w-full rounded-2xl border border-ayrac bg-parsomen p-5 text-left transition-colors hover:border-yaldiz/50 hover:bg-yuzey"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
+                  <p className="min-w-0 truncate font-govde text-xs uppercase tracking-etiket text-yaldiz">
                     {k.davetli_ad}
                   </p>
-                  <span className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-                    {esTarafiKisa(k.kaynak_es, etkinlik.es1_ad, etkinlik.es2_ad)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {k.foto_url && (
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-yaldiz" aria-hidden>
+                        <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none" />
+                        <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.7} fill="none" />
+                      </svg>
+                    )}
+                    <span className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                      {esTarafiKisa(k.kaynak_es, etkinlik.es1_ad, etkinlik.es2_ad)}
+                    </span>
+                  </div>
                 </div>
-                <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-murekkep">
+
+                {k.davetli_iliski && (
+                  <p className="mt-1 font-govde text-[0.7rem] text-ikincil">
+                    {k.davetli_iliski}
+                  </p>
+                )}
+
+                <p className="metin-yasli mt-2 line-clamp-3 font-govde text-sm leading-relaxed text-murekkep">
                   {k.mesaj}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
         </section>
+      )}
+
+      {/* INCELEME - onay vermeden once dilegin KAGITTAKI halini gor */}
+      {inceleme && (
+        <DilekInceleme
+          katki={inceleme}
+          yukleniyor={islenen === inceleme.id}
+          onOnayla={() => islem(inceleme, true)}
+          onReddet={() => islem(inceleme, false)}
+          onKapat={() => setInceleme(null)}
+        />
       )}
     </AppShell>
   );

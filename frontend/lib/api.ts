@@ -84,9 +84,15 @@ export type Katki = {
   id: string;
   kaynak_es: string;
   davetli_ad: string;
+  davetli_iliski: string;
+  davetli_telefon: string;
+  davetli_email: string;
   mesaj: string;
   durum: string;
   created_at: string;
+  foto_url: string | null;
+  foto_genislik: number;
+  foto_yukseklik: number;
 };
 
 // Uygulama-ici bildirim (avatar cani).
