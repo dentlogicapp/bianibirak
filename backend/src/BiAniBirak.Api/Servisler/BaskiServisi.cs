@@ -4,24 +4,36 @@ using QuestPDF.Infrastructure;
 
 namespace BiAniBirak.Api.Servisler;
 
-// BASKIYA HAZIR DEFTER (Belge 01: "Rakip ZIP verir; biz ESER uretiriz").
+// BASKIYA HAZIR DEFTER - eserin kendisi.
 //
-// TASARIM:
-//  - Gercek tipografi: marka fontlari (Fraunces + Inter) PDF'e GOMULUR. Container'da
-//    sistem fontu yok; gomme olmazsa Turkce karakterler bozulur ve eser coper.
-//  - Baski paylari: A5 dikey, ic kenar (cilt payi) daha genis - gercek kitap olcusu.
-//  - 3 editoryel sablon: klasik (ortali, susleme) / modern (sola yasli, ferah) /
-//    zarif (italik, yaldiz vurgu).
-//  - Filigran: satin alma oncesi onizleme (Belge 05 paywall matrisi).
+// TASARIM ILKELERI (onceki dizginin kusurlarindan ogrenildi):
+//
+//  1. SAHIPLIK NET OLMALI. Onceki dizgide fotograf dilegin ustunde, imza altinda
+//     duruyordu; okuyan "bu fotograf hangi dilege ait?" diye durakliyordu. Cozum:
+//     her dilek KAPALI BIR KART. Fotograf, metin ve imza ayni cercevede - sahiplik
+//     bir bakista anlasilir.
+//
+//  2. FOTOGRAF BUYUK VE ORANINA SADIK. Cerceve fotografa uyar, fotograf cerceveye
+//     zorlanmaz. Kutu orani fotografin oranina ESIT kurulur - yanda beyaz bosluk
+//     KALMAZ (onceki surumun en bariz kusuru buydu). Olcu, fotografin kendi
+//     baytlarindan okunur; istemciye guvenilmez.
+//
+//  3. SUSLEME TASIYICI OLMALI, DEKOR DEGIL. Ayraclar sayfayi bolumler, goze
+//     duraklama noktasi verir. Tema degisince susleme dili de degisir.
+//
+//  4. TIPOGRAFI SESSIZ OLMALI. Fraunces yalniz baslik/imza; Inter govde metni.
+//     Hiyerarsi net, satir araligi genis - goz yorulmadan sayfalarca okur.
 public static class BaskiServisi
 {
-    // Marka paleti (baski - CMYK'ya yakin, ekran degil kagit icin secildi)
-    private const string Murekkep = "#211A17";
+    // Baski paleti - kagit icin secildi, ekran icin degil
     private const string MurekkepYumusak = "#3A2F28";
     private const string Sarap = "#6E2438";
     private const string Yaldiz = "#A8823C";
+    private const string YaldizSolgun = "#C9A96A";
     private const string Ikincil = "#6C5F50";
     private const string Kagit = "#FDF9F0";
+    private const string KartYuzey = "#FFFDF8";  // karti kagittan bir tik ayirir
+    private const string KartHat = "#E8DCC4";
 
     private const string BaslikFont = "Fraunces Basli";
     private const string GovdeFont = "Inter Govde";
@@ -29,14 +41,12 @@ public static class BaskiServisi
     private static bool _hazir;
     private static readonly object _kilit = new();
 
-    // Fontlari bir kez kaydet (uygulama omru boyunca).
     public static void Hazirla(string kokDizin)
     {
         if (_hazir) return;
         lock (_kilit)
         {
             if (_hazir) return;
-
             QuestPDF.Settings.License = LicenseType.Community;
 
             var fontDizin = Path.Combine(kokDizin, "Varliklar", "Fontlar");
@@ -52,61 +62,19 @@ public static class BaskiServisi
         }
     }
 
-    // Esere girecek tek dilek
+    // ---------------- VERI ----------------
     public sealed record Dilek(
         string DavetliAd,
-        string Iliski,        // "Gelinin universite arkadasi" - 20 yil sonra kim oldugunu hatirlatir
+        string Iliski,
         string Mesaj,
         string KaynakEs,
         DateTimeOffset Birakilma,
-        byte[]? Foto,         // davetli basina en fazla 1
+        byte[]? Foto,
         int FotoGenislik,
         int FotoYukseklik);
 
-    // Cift gorseli (kapak/ithaf/bolum/kapanis)
     public sealed record Gorsel(byte[] Veri, string? Altyazi, int Genislik, int Yukseklik);
 
-    // ---------------- CERCEVE MIMARISI ----------------
-    // Bir fotografin oranini bilmeden dogru cerceve kurulamaz. Muze/albüm mantigi:
-    // cerceve fotografin oranina UYAR, fotograf cerceveye zorlanmaz. Kirpma YOK -
-    // davetlinin cektigi kare oldugu gibi kagida gecer (FitArea).
-    private enum Yon { Yatay, Kare, Dikey }
-
-    private static Yon YonBul(int g, int y)
-    {
-        if (g <= 0 || y <= 0) return Yon.Yatay; // olcu yoksa guvenli varsayilan
-        var oran = (float)g / y;
-        if (oran >= 1.2f) return Yon.Yatay;
-        if (oran <= 0.85f) return Yon.Dikey;
-        return Yon.Kare;
-    }
-
-    // Verilen YUKSEKLIK butcesine gore, orana saygili (genislik, yukseklik) dondurur.
-    private static (float G, float Y) Olcule(int g, int y, float yukseklikButcesi, float azamiGenislik)
-    {
-        var oran = g > 0 && y > 0 ? (float)g / y : 4f / 3f;
-        var yy = yukseklikButcesi;
-        var gg = yy * oran;
-        if (gg > azamiGenislik)
-        {
-            gg = azamiGenislik;
-            yy = gg / oran;
-        }
-        return (gg, yy);
-    }
-
-    // MUZE CERCEVESI: ince yaldiz hat + beyaz pasepartu (mat) + ic golge hissi.
-    // Photoshop/Canva'nin yaptigi "sticker" degil; gercek bir albumde fotograf boyle durur.
-    private static void Cerceveli(IContainer kap, byte[] veri, float g, float y)
-    {
-        kap.Width(g).Height(y)
-            .Border(0.7f).BorderColor(Yaldiz)   // yaldiz hat
-            .Background("#FFFFFF")               // pasepartu
-            .Padding(3.5f)                       // mat payi
-            .Image(veri).FitArea();
-    }
-
-    // Eserin tum kurgusu
     public sealed record EserVerisi(
         string Tema,
         string GruplamaTipi,
@@ -118,49 +86,83 @@ public static class BaskiServisi
         string Es1Ad,
         string Es2Ad,
         IReadOnlyList<Dilek> Dilekler,
-        // Cift gorselleri - YOKSA tipografik kapak yine de eser kalitesinde
-        // (Musa: "Foto zenginlestirme, zorunluluk degil")
         Gorsel? KapakGorseli,
         Gorsel? IthafGorseli,
         Gorsel? KapanisGorseli,
         IReadOnlyList<Gorsel> BolumGorselleri,
         bool Filigranli);
 
+    // ---------------- OLCU MANTIGI ----------------
+    private enum Yon { Yatay, Kare, Dikey }
+
+    private static Yon YonBul(int g, int y)
+    {
+        if (g <= 0 || y <= 0) return Yon.Yatay;
+        var oran = (float)g / y;
+        if (oran >= 1.15f) return Yon.Yatay;
+        if (oran <= 0.87f) return Yon.Dikey;
+        return Yon.Kare;
+    }
+
+    // Orana SADIK olculeme: fotograf hangi tavana once carparsa ona gore kucultulur.
+    // Donen kutu, fotografin orani ile AYNI - bu yuzden icinde bosluk kalmaz.
+    private static (float G, float Y) Olcule(int g, int y, float azamiG, float azamiY)
+    {
+        var oran = g > 0 && y > 0 ? (float)g / y : 3f / 2f;
+
+        var gg = azamiG;
+        var yy = gg / oran;
+
+        if (yy > azamiY)
+        {
+            yy = azamiY;
+            gg = yy * oran;
+        }
+        return (gg, yy);
+    }
+
+    // FOTOGRAF CERCEVESI: yaldiz hat + beyaz pasepartu (mat). Gercek bir albumde
+    // fotograf boyle durur - "yapistirilmis" degil, CERCEVELENMIS.
+    private static void Cerceveli(IContainer kap, byte[] veri, float g, float y, float mat = 4f)
+    {
+        kap.Width(g + mat * 2).Height(y + mat * 2)
+            .Background("#FFFFFF")
+            .Border(0.7f).BorderColor(Yaldiz)
+            .Padding(mat)
+            .Image(veri).FitArea();
+    }
+
+    // ---------------- BELGE ----------------
     public static byte[] DefterUret(EserVerisi eser)
     {
         var belge = Document.Create(kapsayici =>
         {
-            // --- KAPAK ---
             kapsayici.Page(sayfa =>
             {
-                SayfaKur(sayfa, eser.Filigranli);
+                SayfaKur(sayfa, eser, altbilgi: false);
                 sayfa.Content().Element(k => Kapak(k, eser));
             });
 
-            // --- ITHAF ---
-            if (!string.IsNullOrWhiteSpace(eser.IthafMetni))
+            if (!string.IsNullOrWhiteSpace(eser.IthafMetni) || eser.IthafGorseli != null)
             {
                 kapsayici.Page(sayfa =>
                 {
-                    SayfaKur(sayfa, eser.Filigranli);
+                    SayfaKur(sayfa, eser, altbilgi: false);
                     sayfa.Content().Element(k => Ithaf(k, eser));
                 });
             }
 
-            // --- DILEKLER (akan sayfalar; QuestPDF sayfa kirilimini kendi yonetir) ---
             kapsayici.Page(sayfa =>
             {
-                SayfaKur(sayfa, eser.Filigranli);
+                SayfaKur(sayfa, eser, altbilgi: true);
                 sayfa.Content().Element(k => Dilekler(k, eser));
-                AltbilgiKur(sayfa);
             });
 
-            // --- KAPANIS ---
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.KapanisGorseli != null)
             {
                 kapsayici.Page(sayfa =>
                 {
-                    SayfaKur(sayfa, eser.Filigranli);
+                    SayfaKur(sayfa, eser, altbilgi: false);
                     sayfa.Content().Element(k => Kapanis(k, eser));
                 });
             }
@@ -169,102 +171,109 @@ public static class BaskiServisi
         return belge.GeneratePdf();
     }
 
-    // ---------- SAYFA ISKELETI ----------
-    private static void SayfaKur(PageDescriptor sayfa, bool filigranli)
+    private static void SayfaKur(PageDescriptor sayfa, EserVerisi eser, bool altbilgi)
     {
         sayfa.Size(PageSizes.A5);
-        // Baski paylari: ic kenar (cilt) genis, dis kenar dar - gercek kitap olcusu
-        sayfa.MarginTop(20, Unit.Millimetre);
-        sayfa.MarginBottom(18, Unit.Millimetre);
-        sayfa.MarginLeft(22, Unit.Millimetre);
-        sayfa.MarginRight(16, Unit.Millimetre);
+        sayfa.MarginTop(18, Unit.Millimetre);
+        sayfa.MarginBottom(16, Unit.Millimetre);
+        sayfa.MarginLeft(20, Unit.Millimetre);   // cilt payi
+        sayfa.MarginRight(15, Unit.Millimetre);
         sayfa.PageColor(Kagit);
-        sayfa.DefaultTextStyle(x => x.FontFamily(GovdeFont).FontSize(10).FontColor(MurekkepYumusak));
+        sayfa.DefaultTextStyle(x =>
+            x.FontFamily(GovdeFont).FontSize(10).FontColor(MurekkepYumusak));
 
-        if (filigranli)
+        if (altbilgi)
         {
-            // Onizleme filigrani (Belge 05: satin alma oncesi GORUR, indiremez).
-            // Rotasyon KULLANILMIYOR - QuestPDF surumleri arasinda Rotate imzasi degisiyor;
-            // filigranin gorevi caydiricilik, dekor degil. Sade ve garanti calisan yol.
+            // Sayfa numarasi: yaldiz hatlar arasinda - kitap hissi
+            sayfa.Footer().PaddingTop(10).AlignCenter().Row(satir =>
+            {
+                satir.AutoItem().PaddingTop(5).Width(16).Height(0.5f).Background(YaldizSolgun);
+                satir.AutoItem().PaddingHorizontal(9).Text(t =>
+                {
+                    t.DefaultTextStyle(x =>
+                        x.FontFamily(BaslikFont).FontSize(8.5f).FontColor(Ikincil));
+                    t.CurrentPageNumber();
+                });
+                satir.AutoItem().PaddingTop(5).Width(16).Height(0.5f).Background(YaldizSolgun);
+            });
+        }
+
+        if (eser.Filigranli)
+        {
             sayfa.Foreground().AlignCenter().AlignMiddle().Text("ÖNİZLEME")
-                .FontFamily(BaslikFont).FontSize(56).FontColor("#6E243814");
+                .FontFamily(BaslikFont).FontSize(52).FontColor("#6E243810");
         }
     }
 
-    private static void AltbilgiKur(PageDescriptor sayfa)
+    // ---------------- SUSLEME ----------------
+    // Tema, susleme DILINI degistirir: klasik simetrik ve toren gibi; zarif ince ve
+    // sessiz; modern tek hat, kararli.
+    private static void Ayrac(IContainer kap, string tema, float genislik = 60)
     {
-        sayfa.Footer().AlignCenter().Text(metin =>
+        switch (tema)
         {
-            metin.DefaultTextStyle(x => x.FontFamily(GovdeFont).FontSize(7).FontColor(Ikincil));
-            metin.CurrentPageNumber();
-        });
+            case "klasik":
+                kap.AlignCenter().Row(r =>
+                {
+                    r.AutoItem().PaddingTop(4).Width(genislik / 2 - 9).Height(0.7f)
+                        .Background(Yaldiz);
+                    r.AutoItem().PaddingHorizontal(6).Text("◆").FontSize(5.5f).FontColor(Yaldiz);
+                    r.AutoItem().PaddingTop(4).Width(genislik / 2 - 9).Height(0.7f)
+                        .Background(Yaldiz);
+                });
+                break;
+
+            case "zarif":
+                kap.AlignCenter().Column(c =>
+                {
+                    c.Item().AlignCenter().Width(genislik).Height(0.5f).Background(Yaldiz);
+                    c.Item().Height(2.5f);
+                    c.Item().AlignCenter().Width(genislik * 0.42f).Height(0.5f)
+                        .Background(YaldizSolgun);
+                });
+                break;
+
+            default: // modern - tek kararli hat
+                kap.AlignCenter().Width(genislik * 0.5f).Height(1.4f).Background(Yaldiz);
+                break;
+        }
     }
 
-    // ---------- KAPAK ----------
+    // ---------------- KAPAK ----------------
     private static void Kapak(IContainer kap, EserVerisi eser)
     {
-        var ortali = eser.Tema != "modern";
         var italik = eser.Tema == "zarif";
 
         kap.Column(sutun =>
         {
-            // KAPAK GORSELI (varsa): YARIM SAYFAYA yaklasan, oran-duyarli, muze cerceveli.
-            // YOKSA: saf tipografik kapak - eser kalitesi dusmez (Musa karari).
+            // KAPAK FOTOGRAFI - buyuk, orana sadik, merkezde
             if (eser.KapakGorseli != null)
             {
                 var kg = eser.KapakGorseli;
-                var yon = YonBul(kg.Genislik, kg.Yukseklik);
-                // Dikey fotograf kapakta gorkemlidir; yatay daha genis ama alcak durur.
-                var butce = yon switch
-                {
-                    Yon.Dikey => 250f,
-                    Yon.Kare => 220f,
-                    _ => 185f,
-                };
-                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik, butce, 300f);
+                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik, azamiG: 296f, azamiY: 258f);
 
-                sutun.Item().Height(6);
-                sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y));
-                sutun.Item().Height(24);
+                sutun.Item().Height(2);
+                sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y, mat: 5f));
+                sutun.Item().Height(26);
             }
             else
             {
-                sutun.Item().Height(40);
+                sutun.Item().Height(74);
             }
 
-            // Ust susleme
-            if (eser.Tema == "klasik")
-            {
-                sutun.Item().AlignCenter().Row(satir =>
-                {
-                    satir.AutoItem().Width(30).Height(1).Background(Yaldiz);
-                    satir.AutoItem().PaddingHorizontal(6).PaddingTop(-3)
-                        .Text("◆").FontSize(6).FontColor(Yaldiz);
-                    satir.AutoItem().Width(30).Height(1).Background(Yaldiz);
-                });
-                sutun.Item().Height(28);
-            }
-            else if (eser.Tema == "zarif")
-            {
-                sutun.Item().Height(1).Background(Yaldiz);
-                sutun.Item().Height(28);
-            }
+            sutun.Item().Element(c => Ayrac(c, eser.Tema, 70));
+            sutun.Item().Height(24);
 
-            // Baslik
-            var baslikKap = ortali ? sutun.Item().AlignCenter() : sutun.Item();
-            baslikKap.Text(eser.KapakBaslik)
-                .FontFamily(BaslikFont).FontSize(30).FontColor(Sarap)
-                .Italic(italik);
+            sutun.Item().AlignCenter().Text(eser.KapakBaslik)
+                .FontFamily(BaslikFont).FontSize(30).FontColor(Sarap).Italic(italik);
 
-            sutun.Item().Height(10);
+            sutun.Item().Height(11);
 
-            var altKap = ortali ? sutun.Item().AlignCenter() : sutun.Item();
-            altKap.Text(eser.KapakAltBaslik.ToUpperInvariant())
-                .FontFamily(GovdeFont).FontSize(8).FontColor(Ikincil).LetterSpacing(0.22f);
+            sutun.Item().AlignCenter().Text(eser.KapakAltBaslik.ToUpperInvariant())
+                .FontFamily(GovdeFont).FontSize(8).FontColor(Ikincil).LetterSpacing(0.24f);
 
-            sutun.Item().Height(60);
+            sutun.Item().Height(48);
 
-            // Marka kilidi (tam lockup - miras ani)
             sutun.Item().AlignCenter().Column(marka =>
             {
                 marka.Item().AlignCenter().Text("Bi Anı Bırak")
@@ -276,7 +285,7 @@ public static class BaskiServisi
         });
     }
 
-    // ---------- ITHAF ----------
+    // ---------------- ITHAF ----------------
     private static void Ithaf(IContainer kap, EserVerisi eser)
     {
         var italik = eser.Tema == "zarif";
@@ -286,36 +295,35 @@ public static class BaskiServisi
             if (eser.IthafGorseli != null)
             {
                 var ig = eser.IthafGorseli;
-                var (g, y) = Olcule(ig.Genislik, ig.Yukseklik,
-                    YonBul(ig.Genislik, ig.Yukseklik) == Yon.Dikey ? 215f : 165f, 290f);
+                var (g, y) = Olcule(ig.Genislik, ig.Yukseklik, azamiG: 276f, azamiY: 208f);
                 sutun.Item().AlignCenter().Element(c => Cerceveli(c, ig.Veri, g, y));
+                sutun.Item().Height(26);
+            }
+
+            sutun.Item().Element(c => Ayrac(c, eser.Tema, 50));
+            sutun.Item().Height(22);
+
+            if (!string.IsNullOrWhiteSpace(eser.IthafMetni))
+            {
+                sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.IthafMetni)
+                    .FontFamily(GovdeFont).FontSize(11).LineHeight(1.8f)
+                    .FontColor(MurekkepYumusak).Italic(italik);
                 sutun.Item().Height(22);
             }
 
-            sutun.Item().AlignCenter().Width(40).Height(1).Background(Yaldiz);
-            sutun.Item().Height(22);
+            sutun.Item().Element(c => Ayrac(c, eser.Tema, 50));
+            sutun.Item().Height(18);
 
-            sutun.Item().PaddingHorizontal(10).Text(eser.IthafMetni ?? "")
-                .FontFamily(GovdeFont).FontSize(11).LineHeight(1.75f)
-                .FontColor(MurekkepYumusak).Italic(italik);
-
-            sutun.Item().Height(22);
-            sutun.Item().AlignCenter().Width(40).Height(1).Background(Yaldiz);
-
-            sutun.Item().Height(16);
             sutun.Item().AlignCenter().Text($"{eser.Es1Ad} & {eser.Es2Ad}")
-                .FontFamily(BaslikFont).FontSize(12).FontColor(Sarap);
+                .FontFamily(BaslikFont).FontSize(13).FontColor(Sarap);
         });
     }
 
-    // ---------- DILEKLER ----------
+    // ---------------- DILEKLER ----------------
     private static void Dilekler(IContainer kap, EserVerisi eser)
     {
-        var ortali = eser.Tema != "modern";
-        var italik = eser.Tema == "zarif";
-
-        // Gruplama
         var bloklar = new List<(string? Baslik, List<Dilek> Dilekler)>();
+
         if (eser.GruplamaTipi == "taraf")
         {
             var es1 = eser.Dilekler.Where(d => d.KaynakEs == "es1").ToList();
@@ -331,122 +339,114 @@ public static class BaskiServisi
 
         kap.Column(sutun =>
         {
-            var bolumSayaci = 0;
+            var bolumSirasi = 0;
 
             foreach (var (baslik, dilekler) in bloklar)
             {
                 if (baslik != null)
                 {
-                    // BOLUM AYRACI GORSELI (varsa): basligin ustunde, bolume nefes verir
-                    if (bolumSayaci < eser.BolumGorselleri.Count)
+                    // Bolum ayraci gorseli - bolume nefes verir
+                    if (bolumSirasi < eser.BolumGorselleri.Count)
                     {
-                        var bg = eser.BolumGorselleri[bolumSayaci];
-                        var (g, y) = Olcule(bg.Genislik, bg.Yukseklik,
-                            YonBul(bg.Genislik, bg.Yukseklik) == Yon.Dikey ? 175f : 135f, 290f);
-                        sutun.Item().PaddingTop(10).ShowEntire().Column(bc =>
+                        var bg = eser.BolumGorselleri[bolumSirasi];
+                        var (g, y) = Olcule(bg.Genislik, bg.Yukseklik, azamiG: 276f, azamiY: 168f);
+                        sutun.Item().PaddingTop(bolumSirasi > 0 ? 16 : 0).ShowEntire().Column(bc =>
                         {
-                            var kap2 = ortali ? bc.Item().AlignCenter() : bc.Item();
-                            kap2.Element(c => Cerceveli(c, bg.Veri, g, y));
+                            bc.Item().AlignCenter().Element(c => Cerceveli(c, bg.Veri, g, y));
                             if (!string.IsNullOrWhiteSpace(bg.Altyazi))
                             {
-                                bc.Item().Height(5);
-                                var ak = ortali ? bc.Item().AlignCenter() : bc.Item();
-                                ak.Text(bg.Altyazi)
+                                bc.Item().Height(6);
+                                bc.Item().AlignCenter().Text(bg.Altyazi)
                                     .FontFamily(GovdeFont).FontSize(7.5f)
                                     .FontColor(Ikincil).Italic();
                             }
                         });
                     }
-                    bolumSayaci++;
+                    bolumSirasi++;
 
-                    sutun.Item().PaddingTop(14).PaddingBottom(4).Element(b =>
+                    sutun.Item().PaddingTop(18).PaddingBottom(16).ShowEntire().Column(bs =>
                     {
-                        var bk = ortali ? b.AlignCenter() : b;
-                        bk.Column(bs =>
-                        {
-                            bs.Item().Text(baslik)
-                                .FontFamily(BaslikFont).FontSize(15).FontColor(Sarap).Italic(italik);
-                            bs.Item().Height(5);
-                            bs.Item().Element(c =>
-                            {
-                                var ck = ortali ? c.AlignCenter() : c;
-                                ck.Width(36).Height(1).Background(Yaldiz);
-                            });
-                        });
+                        bs.Item().AlignCenter().Text(baslik)
+                            .FontFamily(BaslikFont).FontSize(16).FontColor(Sarap)
+                            .Italic(eser.Tema == "zarif");
+                        bs.Item().Height(9);
+                        bs.Item().Element(c => Ayrac(c, eser.Tema, 56));
                     });
-                    sutun.Item().Height(10);
                 }
 
                 foreach (var d in dilekler)
                 {
-                    // DILEK BLOGU - bolunmez birim (ShowEntire: sayfa ortasindan kesilmez).
-                    //
-                    // FOTOGRAFLI dilek yaklasik YARIM SAYFA yukseklik alir; boylece iki
-                    // fotografli dilek bir sayfayi DOGAL olarak doldurur, ucuncusu yeni
-                    // sayfaya akar. Manuel sayfa kirma YOK - dizgi kendi ritmini bulur.
-                    // (Icerik yuksekligi ~487pt; fotografli blok ~230pt.)
-                    sutun.Item().PaddingBottom(d.Foto != null ? 22 : 20).ShowEntire().Column(dc =>
-                    {
-                        if (d.Foto != null)
-                        {
-                            // Oran-duyarli olculeme: dikey fotograf uzar, yatay genisler.
-                            // Kirpma yok - davetlinin kadraji korunur.
-                            var yon = YonBul(d.FotoGenislik, d.FotoYukseklik);
-                            var butce = yon switch
-                            {
-                                Yon.Dikey => 186f,  // dikey: yukseklige yaslanir
-                                Yon.Kare => 168f,
-                                _ => 150f,          // yatay: genisler, daha az yukseklik yer
-                            };
-                            var (fg, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, butce, 300f);
-
-                            var fotoKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                            fotoKap.Element(c => Cerceveli(c, d.Foto, fg, fy));
-                            dc.Item().Height(12);
-                        }
-
-                        var metinKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                        metinKap.Text(d.Mesaj)
-                            .FontFamily(GovdeFont).FontSize(10.5f).LineHeight(1.7f)
-                            .FontColor(MurekkepYumusak).Italic(italik);
-
-                        dc.Item().Height(7);
-
-                        // IMZA: ad + ILISKI (20 yil sonra "bu kimdi?" sorusunu oldurur)
-                        var imzaKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                        imzaKap.Text(d.DavetliAd)
-                            .FontFamily(BaslikFont).FontSize(10).FontColor(Sarap);
-
-                        if (!string.IsNullOrWhiteSpace(d.Iliski))
-                        {
-                            dc.Item().Height(2);
-                            var iliskiKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                            iliskiKap.Text(d.Iliski)
-                                .FontFamily(GovdeFont).FontSize(7.5f).FontColor(Ikincil)
-                                .LetterSpacing(0.06f);
-                        }
-
-                        if (eser.TarihGoster)
-                        {
-                            dc.Item().Height(2);
-                            var tarihKap = ortali ? dc.Item().AlignCenter() : dc.Item();
-                            tarihKap.Text(TarihMetni(d.Birakilma))
-                                .FontFamily(GovdeFont).FontSize(6.8f).FontColor(Yaldiz);
-                        }
-
-                        // Klasik temada dilekler arasi ince ayrac
-                        if (eser.Tema == "klasik")
-                        {
-                            dc.Item().Height(14);
-                            dc.Item().AlignCenter().Width(18).Height(0.6f).Background(Yaldiz);
-                        }
-                    });
+                    // Her dilek BOLUNMEZ (ShowEntire): sayfa ortasindan kesilmez.
+                    sutun.Item().PaddingBottom(16).ShowEntire()
+                        .Element(c => DilekKarti(c, d, eser));
                 }
             }
         });
     }
 
-    // ---------- KAPANIS ----------
+    // DILEK KARTI - kapali birim.
+    // Fotograf, metin ve imza AYNI cercevede durur; okuyan hangi fotografin hangi
+    // dilege ait oldugunu DUSUNMEZ, gorur. Fotografsiz dilek cercevesiz akar -
+    // sayfa gereksiz kutularla dolmaz, tipografi kendi basina tasir.
+    private static void DilekKarti(IContainer kap, Dilek d, EserVerisi eser)
+    {
+        var italik = eser.Tema == "zarif";
+        var fotoVar = d.Foto != null;
+
+        var govde = fotoVar
+            ? kap.Background(KartYuzey).Border(0.6f).BorderColor(KartHat).Padding(13)
+            : kap.PaddingVertical(4);
+
+        govde.Column(kart =>
+        {
+            if (fotoVar)
+            {
+                // BUYUK ve orana sadik. Dikey kare yukseklige, yatay kare genislige
+                // yaslanir; ikisi de sayfada nefes alir, hicbiri deforme olmaz.
+                var yon = YonBul(d.FotoGenislik, d.FotoYukseklik);
+                var (azamiG, azamiY) = yon switch
+                {
+                    Yon.Dikey => (198f, 232f),
+                    Yon.Kare => (216f, 216f),
+                    _ => (268f, 182f),
+                };
+                var (fg, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, azamiG, azamiY);
+
+                kart.Item().AlignCenter().Element(c => Cerceveli(c, d.Foto!, fg, fy, mat: 3.5f));
+                kart.Item().Height(13);
+            }
+
+            kart.Item().AlignCenter().Text(d.Mesaj)
+                .FontFamily(GovdeFont).FontSize(10.5f).LineHeight(1.72f)
+                .FontColor(MurekkepYumusak).Italic(italik);
+
+            kart.Item().Height(10);
+
+            // IMZA BLOGU - ayracla metinden ayrilir; kime ait oldugu NET
+            kart.Item().Element(c => Ayrac(c, eser.Tema, 34));
+            kart.Item().Height(8);
+
+            kart.Item().AlignCenter().Text(d.DavetliAd)
+                .FontFamily(BaslikFont).FontSize(10.5f).FontColor(Sarap);
+
+            if (!string.IsNullOrWhiteSpace(d.Iliski))
+            {
+                kart.Item().Height(3);
+                kart.Item().AlignCenter().Text(d.Iliski)
+                    .FontFamily(GovdeFont).FontSize(7.8f).FontColor(Ikincil)
+                    .LetterSpacing(0.05f);
+            }
+
+            if (eser.TarihGoster)
+            {
+                kart.Item().Height(3);
+                kart.Item().AlignCenter().Text(TarihMetni(d.Birakilma))
+                    .FontFamily(GovdeFont).FontSize(6.8f).FontColor(YaldizSolgun);
+            }
+        });
+    }
+
+    // ---------------- KAPANIS ----------------
     private static void Kapanis(IContainer kap, EserVerisi eser)
     {
         var italik = eser.Tema == "zarif";
@@ -455,30 +455,30 @@ public static class BaskiServisi
         {
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni))
             {
-                sutun.Item().PaddingHorizontal(8).AlignCenter().Text(eser.KapanisMetni)
-                    .FontFamily(GovdeFont).FontSize(11).LineHeight(1.75f)
+                sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.KapanisMetni)
+                    .FontFamily(GovdeFont).FontSize(11).LineHeight(1.8f)
                     .FontColor(MurekkepYumusak).Italic(italik);
-                sutun.Item().Height(30);
+                sutun.Item().Height(28);
             }
 
-            // KAPANIS GORSELI (varsa) - eserin son nefesi
             if (eser.KapanisGorseli != null)
             {
                 var kg = eser.KapanisGorseli;
-                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik,
-                    YonBul(kg.Genislik, kg.Yukseklik) == Yon.Dikey ? 215f : 165f, 290f);
+                var (g, y) = Olcule(kg.Genislik, kg.Yukseklik, azamiG: 276f, azamiY: 208f);
                 sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y));
 
-                if (!string.IsNullOrWhiteSpace(eser.KapanisGorseli.Altyazi))
+                if (!string.IsNullOrWhiteSpace(kg.Altyazi))
                 {
-                    sutun.Item().Height(6);
-                    sutun.Item().AlignCenter().Text(eser.KapanisGorseli.Altyazi)
+                    sutun.Item().Height(7);
+                    sutun.Item().AlignCenter().Text(kg.Altyazi)
                         .FontFamily(GovdeFont).FontSize(7.5f).FontColor(Ikincil).Italic();
                 }
                 sutun.Item().Height(32);
             }
 
-            // Marka kilidi
+            sutun.Item().Element(c => Ayrac(c, eser.Tema, 44));
+            sutun.Item().Height(18);
+
             sutun.Item().AlignCenter().Column(marka =>
             {
                 marka.Item().AlignCenter().Text("Bi Anı Bırak")
@@ -490,7 +490,6 @@ public static class BaskiServisi
         });
     }
 
-    // Tarih metni (Turkce): "12 Temmuz 2026"
     private static string TarihMetni(DateTimeOffset t)
     {
         var kultur = new System.Globalization.CultureInfo("tr-TR");

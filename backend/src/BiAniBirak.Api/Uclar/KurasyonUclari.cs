@@ -82,9 +82,19 @@ public static class KurasyonUclari
         {
             if (g == null) return null;
             var veri = await depo.OkuAsync(g.DepolamaAnahtari);
-            return veri == null
-                ? null
-                : new BaskiServisi.Gorsel(veri, g.Altyazi, g.Genislik, g.Yukseklik);
+            if (veri == null) return null;
+
+            // Eski kayitlarda olcu 0 olabilir (istemci-olcu bug'i oncesi). Bayttan coz -
+            // yanlis olcu, cercevede beyaz bosluk demektir; buna izin verilmez.
+            var gg = g.Genislik;
+            var yy = g.Yukseklik;
+            if (gg <= 0 || yy <= 0)
+            {
+                var olcu = GorselOlcer.Coz(veri);
+                gg = olcu?.Genislik ?? 0;
+                yy = olcu?.Yukseklik ?? 0;
+            }
+            return new BaskiServisi.Gorsel(veri, g.Altyazi, gg, yy);
         }
 
         var kapakG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapak"));
@@ -103,10 +113,22 @@ public static class KurasyonUclari
         foreach (var d in dilekler)
         {
             byte[]? foto = null;
-            if (d.FotoAnahtari != null) foto = await depo.OkuAsync(d.FotoAnahtari);
+            var fg = d.FotoGenislik;
+            var fy = d.FotoYukseklik;
+
+            if (d.FotoAnahtari != null)
+            {
+                foto = await depo.OkuAsync(d.FotoAnahtari);
+                if (foto != null && (fg <= 0 || fy <= 0))
+                {
+                    var olcu = GorselOlcer.Coz(foto);
+                    fg = olcu?.Genislik ?? 0;
+                    fy = olcu?.Yukseklik ?? 0;
+                }
+            }
+
             dilekListe.Add(new BaskiServisi.Dilek(
-                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt,
-                foto, d.FotoGenislik, d.FotoYukseklik));
+                d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt, foto, fg, fy));
         }
 
         BaskiServisi.Hazirla(ortam.ContentRootPath);

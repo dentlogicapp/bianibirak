@@ -203,7 +203,7 @@ public static class KatkiUclari
     // Boylece foto yuklemesi basarisiz olsa bile dilek durur.
     private static async Task<IResult> KatkiFoto(
         string token, Guid katkiId, HttpContext ctx, BiAniBirakDbContext db,
-        DepolamaServisi depo, IFormFile? dosya, int? genislik, int? yukseklik)
+        DepolamaServisi depo, IFormFile? dosya)
     {
         var (link, etkinlik) = await Cozumle(db, token);
         if (link == null || etkinlik == null)
@@ -246,9 +246,12 @@ public static class KatkiUclari
         if (tip == null)
             return Hata(400, "GECERSIZ_GORSEL", "Yalnızca JPEG, PNG veya WebP kabul edilir.");
 
+        // Olcu fotografin kendi baytlarindan - istemci degeri kullanilmaz
+        var olcu = GorselOlcer.Coz(veri);
+
         katki.FotoAnahtari = await depo.KaydetAsync(etkinlik.Id, veri, tip.Uzanti);
-        katki.FotoGenislik = genislik ?? 0;
-        katki.FotoYukseklik = yukseklik ?? 0;
+        katki.FotoGenislik = olcu?.Genislik ?? 0;
+        katki.FotoYukseklik = olcu?.Yukseklik ?? 0;
         katki.UpdatedAt = simdi;
         await db.SaveChangesAsync();
 

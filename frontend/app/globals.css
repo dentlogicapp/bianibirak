@@ -263,32 +263,29 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
   .sayfa-girisi { animation: none; }
 }
 
-/* ---- FOTO SOLENI: Ken Burns ----
-   Fotograf kagit uzerinde durmaz, YASAR: yavasca buyur ve kayar. Iki varyant
-   (duz/ters) art arda gelen karelerin ayni yone kaymasini onler - goz yorulmaz. */
-@keyframes kenburns {
-  0%   { transform: scale(1.06) translate3d(-1.2%, 1%, 0); }
-  100% { transform: scale(1.19) translate3d(1.2%, -1.4%, 0); }
-}
-@keyframes kenburnsTers {
-  0%   { transform: scale(1.18) translate3d(1.4%, -1%, 0); }
-  100% { transform: scale(1.05) translate3d(-1%, 1.3%, 0); }
+/* ---- FILM SERIDI ----
+   Dikissiz dongu: serit tam YARISINA kadar kayar. Dizi iki kez basildigi icin
+   yarim nokta, birinci kopyanin sonu = ikinci kopyanin basi -> kullanici basa
+   donusu GOREMEZ. Zamanlayici yok; ritim mutlak, sicrama imkansiz. */
+@keyframes filmAkis {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
 }
 
-.animasyon-kenburns {
-  animation: kenburns 11s ease-out forwards;
-  will-change: transform;
-}
-.animasyon-kenburns-ters {
-  animation: kenburnsTers 11s ease-out forwards;
+.film-akis {
+  animation-name: filmAkis;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
   will-change: transform;
 }
 
-/* Hareket hassasiyeti olan kullanicilar icin: animasyon durur, gorsellik kalir */
+/* Inceleme daveti: fare uzerindeyken serit yavaslar */
+.film-seridi:hover .film-akis {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animasyon-kenburns,
-  .animasyon-kenburns-ters {
+  .film-akis {
     animation: none;
-    transform: scale(1.04);
   }
 }

@@ -89,7 +89,7 @@ public static class GorselUclari
     // ---------------- YUKLE ----------------
     private static async Task<IResult> Yukle(
         HttpContext ctx, BiAniBirakDbContext db, DepolamaServisi depo, IFormFile? dosya,
-        string? konum, int? genislik, int? yukseklik)
+        string? konum)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
@@ -117,6 +117,11 @@ public static class GorselUclari
         if (tip == null)
             return Hata(400, "GECERSIZ_GORSEL", "Yalnızca JPEG, PNG veya WebP kabul edilir.");
 
+        // OLCU KAYNAKTAN OKUNUR - istemciye guvenilmez. Yanlis olcu = cercevede
+        // beyaz bosluk = coper eser. (Ayrica minimal API form alanlarini query'den
+        // bind eder; istemci degeri zaten backend'e ULASMAZ.)
+        var olcu = GorselOlcer.Coz(veri);
+
         var anahtar = await depo.KaydetAsync(etkinlikId, veri, tip.Uzanti);
 
         var secilenKonum = konum != null && GecerliKonumlar.Contains(konum) ? konum : "galeri";
@@ -129,8 +134,8 @@ public static class GorselUclari
             DepolamaAnahtari = anahtar,
             Konum = secilenKonum,
             Sira = siraSonraki,
-            Genislik = genislik ?? 0,
-            Yukseklik = yukseklik ?? 0,
+            Genislik = olcu?.Genislik ?? 0,
+            Yukseklik = olcu?.Yukseklik ?? 0,
             Bayt = veri.Length,
             CreatedAt = DateTimeOffset.UtcNow,
         };

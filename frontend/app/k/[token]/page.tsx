@@ -5,7 +5,34 @@ import { useParams } from "next/navigation";
 import { api, davetliFotoYukle, type KatkiKarsilama } from "@/lib/api";
 import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
-import { FotoSoleni } from "@/components/site/FotoSoleni";
+import { FilmSeridi } from "@/components/site/FilmSeridi";
+import { iyelikEki } from "@/lib/es";
+
+// ILISKI TIPLERI (Musa karari).
+// Deftere iyelik ekiyle basilir: "Musa'nin Okul Arkadasi".
+// Detay alani opsiyoneldir; doldurulursa deftere O yazilir ve dilek zenginlesir:
+// "Musa'nin Okul Arkadasi - Universiteden sinif arkadasi" yerine dogrudan
+// "Universiteden sinif arkadasi" gibi kendi cumlesi.
+const ILISKI_TIPLERI = [
+  {
+    kod: "calisma",
+    etiket: "Çalışma Arkadaşı",
+    detaySorusu: "çalışma arkadaşlığını",
+    ornek: "Örn: Aynı ekipte üç yıl birlikte çalıştık",
+  },
+  {
+    kod: "okul",
+    etiket: "Okul Arkadaşı",
+    detaySorusu: "okul arkadaşlığını",
+    ornek: "Örn: Üniversiteden sınıf arkadaşı",
+  },
+  {
+    kod: "cocukluk",
+    etiket: "Çocukluk Arkadaşı",
+    detaySorusu: "çocukluk arkadaşlığını",
+    ornek: "Örn: Aynı sokakta büyüdük",
+  },
+] as const;
 
 // Public davetli katki sayfasi (login YOK; surtunme sifir - Belge 01).
 // Karsilama -> form (ad/email/telefon/mesaj + KVKK riza) -> teyit.
@@ -145,20 +172,13 @@ function KatkiFormu({
   const karsilama =
     veri.karsilama_metni ||
     "Bu özel günümüzde bize bir anı bırakır mısın?";
-  // Davetli hangi esin linkinde? Yonlendirme icin (yanlis link uyarisi).
+  // Davetli hangi esin linkinden geldi? Iliski metni buna gore kurulur.
   const buEs = veri.kaynak_es === "es1" ? veri.es1_ad : veri.es2_ad;
-  const digerEs = veri.kaynak_es === "es1" ? veri.es2_ad : veri.es1_ad;
 
-  // Iliski secenekleri: davetli HANGI esin linkinden geldiyse ona gore.
-  // Deftere "Ayse Yildiz - Musa'nin universite arkadasi" olarak basilir.
-  const iliskiSecenekleri = [
-    `${buEs} tarafından akraba`,
-    `${buEs} ile çalışma arkadaşı`,
-    `${buEs} ile okul arkadaşı`,
-    `${buEs} ile çocukluk arkadaşı`,
-    "Aile dostu",
-    "Komşu",
-  ];
+  // ILISKI: acilir menu. Deftere "Musa'nin Okul Arkadasi" olarak basilir.
+  // Ilk uc secim detay alani acar - "Universiteden sinif arkadasi" gibi.
+  const esIyelik = iyelikEki(buEs); // "Musa'nın" / "Ayşegül'ün"
+  const secilenTip = ILISKI_TIPLERI.find((t) => t.kod === iliski) ?? null;
 
   async function gonder(e: React.FormEvent) {
     e.preventDefault();
@@ -170,9 +190,20 @@ function KatkiFormu({
     if (ad.trim().length < 2) return setHata("Adını yazar mısın?");
     if (!email.includes("@")) return setHata("Geçerli bir e-posta gerekli.");
     if (telefon.trim().length < 7) return setHata("Geçerli bir telefon gerekli.");
-    const secilenIliski = iliski === "diger" ? iliskiSerbest.trim() : iliski;
+    // Deftere basilacak metin:
+    //  - Detay yazildiysa O kullanilir (davetlinin kendi cumlesi daha degerli)
+    //  - Yazilmadiysa iyelikli tip: "Musa'nin Okul Arkadasi"
+    //  - Diger secildiyse serbest metin
+    const detay = iliskiSerbest.trim();
+    let secilenIliski = "";
+    if (iliski === "diger") {
+      secilenIliski = detay;
+    } else if (secilenTip) {
+      secilenIliski = detay.length >= 2 ? detay : `${esIyelik} ${secilenTip.etiket}`;
+    }
+
     if (secilenIliski.length < 2)
-      return setHata("Çifte yakınlığını seçer misin? Bu, seni yıllar sonra hatırlamalarını sağlar.");
+      return setHata(`${buEs} ile yakınlığını seçer misin? Bu, seni yıllar sonra hatırlamalarını sağlar.`);
     if (mesaj.trim().length < 2) return setHata("Bir mesaj yazmalısın.");
 
     setYukleniyor(true);
@@ -242,7 +273,7 @@ function KatkiFormu({
         <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
           {/* CIFT GORSELLERI: davetli cift'i gorur -> duygusal bag -> daha icten dilek.
               TUM fotograflar dongude; sabit sergi degil, nefes alan bir vitrin. */}
-          <FotoSoleni fotograflar={veri.gorseller} baslik={ciftAdi} />
+          <FilmSeridi fotograflar={veri.gorseller} baslik={ciftAdi} />
 
           <div className="p-8 text-center">
           <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
@@ -264,23 +295,12 @@ function KatkiFormu({
             />
           )}
           </div>
-        </div>
 
-        {/* Yonlendirme - hangi esin yakini + yanlis link uyarisi (kisa, carpici) */}
-        <div className="mt-4 rounded-2xl border border-sarap/30 bg-sarap/5 px-5 py-4">
-          <p className="text-center font-govde text-sm font-medium text-sarap">
-            {buEs} tarafının yakınısın
-          </p>
-          <p className="metin-yasli mt-1.5 font-govde text-xs text-ikincil">
-            {digerEs} tarafındansan, kendi bağlantına geçerek anını orada bırak.
-          </p>
-          <p className="mt-2.5 text-center font-govde text-xs font-medium text-murekkep">
-            Dileğini {digerEs} tarafına geçtikten sonra bırak!
-          </p>
-        </div>
+          {/* TEK BLOK: karsilama ile form arasinda kopukluk yok - ayni kagit uzerinde
+              devam eden bir davet gibi okunur. */}
+          <div className="mx-8 h-px bg-ayrac" />
 
-        {/* Form */}
-        <form onSubmit={gonder} className="mt-5 rounded-3xl border border-ayrac bg-yuzey p-8">
+          <form onSubmit={gonder} className="p-8 pt-7">
           <label className="mb-4 block">
             <span className="mb-1 block font-govde text-xs text-ikincil">Adın</span>
             <input
@@ -316,50 +336,80 @@ function KatkiFormu({
             </label>
           </div>
 
-          {/* ILISKI - deftere basilir: "Ayse Yildiz - Gelinin universite arkadasi".
-              Cift 20 yil sonra "bu kimdi?" demesin. */}
+          {/* ILISKI - acilir menu (Musa karari).
+              Deftere "Musa'nin Okul Arkadasi" olarak basilir; ilk uc secim
+              detay alani acar ("Universiteden sinif arkadasi"). */}
           <div className="mt-4">
-            <span className="mb-1.5 block font-govde text-xs text-ikincil">
-              Çifte yakınlığın
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {iliskiSecenekleri.map((sec) => (
-                <button
-                  key={sec}
-                  type="button"
-                  onClick={() => setIliski(sec)}
-                  className={`rounded-full border px-3 py-1.5 font-govde text-xs transition-colors ${
-                    iliski === sec
-                      ? "border-sarap bg-sarap text-parsomen"
-                      : "border-ayrac bg-parsomen text-ikincil hover:border-sarap"
-                  }`}
-                >
-                  {sec}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setIliski("diger")}
-                className={`rounded-full border px-3 py-1.5 font-govde text-xs transition-colors ${
-                  iliski === "diger"
-                    ? "border-sarap bg-sarap text-parsomen"
-                    : "border-ayrac bg-parsomen text-ikincil hover:border-sarap"
-                }`}
+            <label className="mb-1 block font-govde text-xs text-ikincil">
+              {buEs} ile yakınlığın
+            </label>
+            <div className="relative">
+              <select
+                value={iliski}
+                onChange={(e) => {
+                  setIliski(e.target.value);
+                  setIliskiSerbest("");
+                }}
+                className="w-full appearance-none rounded-xl border border-ayrac bg-parsomen px-4 py-3 pr-10 font-govde text-sm text-murekkep outline-none focus:border-sarap"
               >
-                Diğer
-              </button>
+                <option value="">Seç...</option>
+                {ILISKI_TIPLERI.map((t) => (
+                  <option key={t.kod} value={t.kod}>
+                    {t.etiket}
+                  </option>
+                ))}
+                <option value="diger">
+                  Diğer (yakınlığını kendin tanımla)
+                </option>
+              </select>
+              <svg
+                viewBox="0 0 24 24"
+                className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ikincil"
+                aria-hidden
+              >
+                <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
             </div>
 
+            {/* Secim yapildi -> deftere ne yazilacagini GOSTER (surpriz olmasin) */}
+            {secilenTip && (
+              <p className="mt-2 rounded-lg bg-sarap/5 px-3 py-2 font-govde text-xs text-sarap">
+                Defterde yazacak:{" "}
+                <span className="font-medium">
+                  {esIyelik} {secilenTip.etiket}
+                </span>
+              </p>
+            )}
+
+            {/* Ilk uc secim -> detaylandirma alani (opsiyonel, zenginlestirir) */}
+            {secilenTip && (
+              <div className="mt-2.5">
+                <label className="mb-1 block font-govde text-[0.7rem] text-ikincil">
+                  {buEs} ile {secilenTip.detaySorusu} detaylandırabilir misin?{" "}
+                  <span className="text-ikincil/70">(isteğe bağlı)</span>
+                </label>
+                <input
+                  value={iliskiSerbest}
+                  onChange={(e) => setIliskiSerbest(e.target.value)}
+                  maxLength={60}
+                  className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-2.5 font-govde text-sm text-murekkep outline-none placeholder:text-ikincil/45 focus:border-sarap"
+                  placeholder={secilenTip.ornek}
+                />
+              </div>
+            )}
+
+            {/* Diger -> tamamen serbest */}
             {iliski === "diger" && (
               <input
                 value={iliskiSerbest}
                 onChange={(e) => setIliskiSerbest(e.target.value)}
                 maxLength={60}
                 autoFocus
-                className="mt-2 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
+                className="mt-2.5 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none placeholder:text-ikincil/45 focus:border-sarap"
                 placeholder={`Örn: ${buEs} ile aynı mahallede büyüdük`}
               />
             )}
+
             <p className="mt-1.5 font-govde text-[0.7rem] text-ikincil">
               Defterde adının altında yazacak - seni yıllar sonra da hatırlasınlar.
             </p>
@@ -454,7 +504,8 @@ function KatkiFormu({
           >
             {yukleniyor ? "Gönderiliyor..." : "Dileğimi bırak"}
           </button>
-        </form>
+          </form>
+        </div>
 
         <p className="mt-6 text-center font-govde text-[0.7rem] text-ikincil">
           Bir Anı Bırak, Senden Bize Kalan
