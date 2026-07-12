@@ -322,11 +322,15 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
 /* Kare cercevesi: yaldiz hat. Tailwind ring KULLANILMAZ - CSS degiskenli
    renklerde opacity modifier (ring-yaldiz/25) gecersiz olur ve Tailwind
    varsayilan MAVI ring'e duser. Bu, koyu fotograflarda gorsel hata gibi durur. */
+/* Kareler BITISIK durur (gercek 35mm serit gibi); aralarinda yalniz ince bir
+   ayirici hat vardir. Onceki surumde gap + padding vardi ve fotograflar arasinda
+   buyuk bosluklar olusuyordu. */
 .film-kare {
-  box-shadow:
-    0 0 0 1px var(--film-cerceve),
-    0 2px 14px rgba(0, 0, 0, 0.35);
+  border-right: 2px solid color-mix(in srgb, var(--film) 60%, black);
   background-color: color-mix(in srgb, var(--film) 70%, black);
+}
+.film-kare:last-child {
+  border-right: 0;
 }
 
 .film-perforasyon {

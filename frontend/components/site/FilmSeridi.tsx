@@ -40,7 +40,7 @@ export function FilmSeridi({ fotograflar, baslik }: { fotograflar: Foto[]; basli
     return (
       <div className="relative bg-film">
         <Perforasyon />
-        <div className="flex h-52 items-center justify-center px-4 py-2.5 sm:h-60">
+        <div className="flex h-52 items-center justify-center sm:h-60">
           <Kare foto={kareler[0]} baslik={baslik} />
         </div>
         <Perforasyon />
@@ -58,7 +58,7 @@ export function FilmSeridi({ fotograflar, baslik }: { fotograflar: Foto[]; basli
 
       <div className="relative h-52 overflow-hidden sm:h-60">
         <div
-          className="film-akis flex h-full w-max items-center gap-3 px-4 py-2.5"
+          className="film-akis flex h-full w-max items-stretch"
           style={{ animationDuration: `${sure}s` }}
         >
           {seri.map((f, i) => (
@@ -82,14 +82,23 @@ export function FilmSeridi({ fotograflar, baslik }: { fotograflar: Foto[]; basli
 // - cerceve: sicak yaldiz hat (onceki surumde Tailwind ring varsayilanina dusup
 //   MAVI ciziyordu - CSS degiskenli renklerde opacity modifier calismaz)
 function Kare({ foto, baslik }: { foto: Foto; baslik: string }) {
-  const oran =
+  const hamOran =
     foto.genislik > 0 && foto.yukseklik > 0
       ? foto.genislik / foto.yukseklik
       : VARSAYILAN_ORAN;
 
+  // YATAY/DIKEY DENGESI:
+  // Gercek bir film seridinde her kare AYNI yuksekliktedir; genislik oranla degisir.
+  // Ama dikey fotograf cok dar, panorama cok genis kare uretir - serit dengesiz olur.
+  // Bu yuzden orani MAKUL bir araliga sikistiririz: kare hep serit yuksekligini
+  // TAM doldurur (bosluk YOK), asiri dar/genis kare olusmaz.
+  const oran = Math.min(Math.max(hamOran, 0.72), 1.62);
+
+  // Oran sikistirildiysa fotograf kutuya "cover" ile oturur (cok hafif kirpma,
+  // merkezden). Sikistirilmadiysa "cover" zaten birebir oturur - kayip sifir.
   return (
     <div
-      className="film-kare relative h-full shrink-0 overflow-hidden rounded-[3px]"
+      className="film-kare relative h-full shrink-0"
       style={{ aspectRatio: `${oran}` }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -97,7 +106,7 @@ function Kare({ foto, baslik }: { foto: Foto; baslik: string }) {
         src={foto.url}
         alt={baslik}
         loading="eager"
-        className="h-full w-full object-contain"
+        className="h-full w-full object-cover"
         draggable={false}
       />
     </div>

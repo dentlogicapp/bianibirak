@@ -131,12 +131,28 @@ public static class KatkiUclari
         var iliski = (istek.DavetliIliski ?? "").Trim();
         var mesaj = (istek.Mesaj ?? "").Trim();
 
-        if (ad.Length < 2)
-            return Hata(400, "DOGRULAMA_HATASI", "Ad Soyad gereklidir.");
-        if (!email.Contains('@') || !email.Contains('.'))
-            return Hata(400, "DOGRULAMA_HATASI", "Geçerli bir e-posta gereklidir.");
-        if (telefon.Length < 7)
-            return Hata(400, "DOGRULAMA_HATASI", "Geçerli bir telefon gereklidir.");
+        // AD: en az iki kelime, rakam/sembol yok (isim deftere BASILACAK)
+        if (ad.Length < 3 || !ad.Contains(' '))
+            return Hata(400, "DOGRULAMA_HATASI", "Adını ve soyadını yazmalısın.");
+        if (ad.Any(char.IsDigit))
+            return Hata(400, "DOGRULAMA_HATASI", "Adında rakam olamaz.");
+        if (ad.Any(c => !char.IsLetter(c) && c != ' ' && c != '\'' && c != '-'))
+            return Hata(400, "DOGRULAMA_HATASI", "Adında yalnızca harf kullanabilirsin.");
+        if (ad.Length > 60)
+            return Hata(400, "DOGRULAMA_HATASI", "Ad çok uzun.");
+
+        // E-POSTA: OPSIYONEL (Musa karari). Yazildiysa gecerli olmali.
+        if (email.Length > 0 && (!email.Contains('@') || !email.Contains('.')))
+            return Hata(400, "DOGRULAMA_HATASI", "Geçerli bir e-posta yaz ya da boş bırak.");
+
+        // TELEFON: Turkiye cep, 05XX + 11 hane. Cift davetliye ulasabilmeli.
+        var telRakam = new string(telefon.Where(char.IsDigit).ToArray());
+        if (telRakam.Length == 12 && telRakam.StartsWith("90")) telRakam = telRakam[2..];
+        if (telRakam.Length == 10 && telRakam.StartsWith("5")) telRakam = "0" + telRakam;
+        if (!telRakam.StartsWith("05") || telRakam.Length != 11)
+            return Hata(400, "DOGRULAMA_HATASI",
+                "Telefon 05 ile başlamalı ve 11 haneli olmalı.");
+        telefon = telRakam;
         // ILISKI zorunlu: cift 20 yil sonra "bu Ayse kimdi?" dememeli.
         if (iliski.Length < 2)
             return Hata(400, "DOGRULAMA_HATASI", "Çifte yakınlığını belirtmelisin.");

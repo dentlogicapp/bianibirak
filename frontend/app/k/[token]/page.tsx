@@ -7,7 +7,22 @@ import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { FilmSeridi } from "@/components/site/FilmSeridi";
 import { iyelikEki } from "@/lib/es";
-import { yazimDenetle, bulguyuUygula, tumunuUygula, type Bulgu } from "@/lib/yazim";
+import {
+  yazimDenetle,
+  bulguyuUygula,
+  tumunuUygula,
+  duzeltilebilir,
+  sozlukYukle,
+  type Bulgu,
+} from "@/lib/yazim";
+import {
+  adDogrula,
+  adBicimle,
+  telefonDogrula,
+  telefonBicimle,
+  telefonNormalize,
+  epostaDogrula,
+} from "@/lib/dogrulama";
 
 // ILISKI TIPLERI (Musa karari).
 // Deftere iyelik ekiyle basilir: "Musa'nin Okul Arkadasi".
@@ -108,19 +123,9 @@ export default function KatkiSayfasi() {
     );
   }
 
-  // Teyit ekrani
+  // TESEKKUR + SATIS MOTORU
   if (gonderildi) {
-    return (
-      <EkranKabuk>
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sarap/10">
-          <span className="font-display text-2xl text-sarap">✓</span>
-        </div>
-        <p className="mt-5 font-display text-xl text-murekkep">Dileğin iletildi</p>
-        <p className="mt-3 font-govde text-sm text-ikincil">
-          {ciftAdi} çiftine bıraktığın anı için teşekkürler. Dileğin onlara ulaştı.
-        </p>
-      </EkranKabuk>
-    );
+    return <TesekkurEkrani ciftAdi={ciftAdi} tur={veri.tur} />;
   }
 
   // Katki formu
@@ -162,15 +167,33 @@ function KatkiFormu({
   const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
   const [riza, setRiza] = useState(false);
   const [denetimUyarisi, setDenetimUyarisi] = useState(false);
+  const [sozluk, setSozluk] = useState<Set<string> | null>(null);
+  const [onizleme, setOnizleme] = useState(false);
+
+  // Sozluk LAZY yuklenir: davetli mesaj alanina dokundugunda arka planda gelir.
+  // Sayfa acilisi etkilenmez; sonrasi tamamen yerel, sifir gecikme.
+  useEffect(() => {
+    let iptal = false;
+    void sozlukYukle().then((s) => {
+      if (!iptal) setSozluk(s);
+    });
+    return () => {
+      iptal = true;
+    };
+  }, []);
 
   // YAZIM DENETIMI - anlik, tarayicida. Sunucuya gitmez; davetli gecikme hissetmez.
   // Bu metin BASILACAK; kagida gecen hata sonsuza kadar orada kalir.
-  const bulgular = useMemo<Bulgu[]>(() => yazimDenetle(mesaj), [mesaj]);
-  const yazimBulgulari = bulgular.filter((b) => b.tur !== "uygunsuz");
+  const bulgular = useMemo<Bulgu[]>(
+    () => yazimDenetle(mesaj, sozluk),
+    [mesaj, sozluk]
+  );
+  const duzeltmeler = duzeltilebilir(bulgular);
+  const bilinmeyenler = bulgular.filter((b) => b.tur === "bilinmeyen");
   const uygunsuzBulgular = bulgular.filter((b) => b.tur === "uygunsuz");
 
-  function duzeltmeUygula(b: Bulgu) {
-    setMesaj((m) => bulguyuUygula(m, b));
+  function duzeltmeUygula(b: Bulgu, secilen?: string) {
+    setMesaj((m) => bulguyuUygula(m, b, secilen));
     setDenetimUyarisi(false);
   }
 
@@ -193,63 +216,73 @@ function KatkiFormu({
   const esIyelik = iyelikEki(buEs); // "Musa'nın" / "Ayşegül'ün"
   const secilenTip = ILISKI_TIPLERI.find((t) => t.kod === iliski) ?? null;
 
-  async function gonder(e: React.FormEvent) {
+  // Deftere basilacak iliski metni:
+  //  - Detay yazildiysa O kullanilir (davetlinin kendi cumlesi daha degerli)
+  //  - Yazilmadiysa iyelikli tip: "Musa'nin Okul Arkadasi"
+  const iliskiMetni = (() => {
+    const detay = iliskiSerbest.trim();
+    if (iliski === "diger") return detay;
+    if (secilenTip) return detay.length >= 2 ? detay : `${esIyelik} ${secilenTip.etiket}`;
+    return "";
+  })();
+
+  // Form -> ONIZLEME kapisi. Gercek gonderim onizlemede onaylaninca olur.
+  function onizlemeyeGec(e: React.FormEvent) {
     e.preventDefault();
     setHata("");
+
     if (!riza) {
       setHata("Devam etmek için aydınlatma metnini onaylaman gerekir.");
       return;
     }
-    if (ad.trim().length < 2) return setHata("Adını yazar mısın?");
-    if (!email.includes("@")) return setHata("Geçerli bir e-posta gerekli.");
-    if (telefon.trim().length < 7) return setHata("Geçerli bir telefon gerekli.");
-    // Deftere basilacak metin:
-    //  - Detay yazildiysa O kullanilir (davetlinin kendi cumlesi daha degerli)
-    //  - Yazilmadiysa iyelikli tip: "Musa'nin Okul Arkadasi"
-    //  - Diger secildiyse serbest metin
-    const detay = iliskiSerbest.trim();
-    let secilenIliski = "";
-    if (iliski === "diger") {
-      secilenIliski = detay;
-    } else if (secilenTip) {
-      secilenIliski = detay.length >= 2 ? detay : `${esIyelik} ${secilenTip.etiket}`;
-    }
 
-    if (secilenIliski.length < 2)
-      return setHata(`${buEs} ile yakınlığını seçer misin? Bu, seni yıllar sonra hatırlamalarını sağlar.`);
+    const adHatasi = adDogrula(ad);
+    if (adHatasi) return setHata(adHatasi);
+
+    const telHatasi = telefonDogrula(telefon);
+    if (telHatasi) return setHata(telHatasi);
+
+    const epostaHatasi = epostaDogrula(email);
+    if (epostaHatasi) return setHata(epostaHatasi);
+
+    if (!iliski) return setHata(`${buEs} ile yakınlığını seçer misin?`);
+    if (iliski === "diger" && iliskiSerbest.trim().length < 2)
+      return setHata("Yakınlığını kendi cümlenle yazar mısın?");
+
     if (mesaj.trim().length < 2) return setHata("Bir mesaj yazmalısın.");
 
-    // DENETIM KAPISI: bulgu varsa BIR KEZ uyar. Davetli yine de gondermek isterse
-    // yolu acik - bogmayiz, hatirlatiriz. (Ikinci tiklamada gonderim gecer.)
+    // DENETIM KAPISI: bulgu varsa BIR KEZ uyar. Davetli yine de devam edebilir.
     if (bulgular.length > 0 && !denetimUyarisi) {
       setDenetimUyarisi(true);
       return;
     }
 
+    setOnizleme(true);
+  }
+
+  // Onizlemede "Onayla" -> GERCEK gonderim
+  async function gonder() {
+    setHata("");
     setYukleniyor(true);
+
     const cevap = await api.katkiBirak(token, {
-      davetliAd: ad.trim(),
+      davetliAd: adBicimle(ad),
       davetliEmail: email.trim(),
-      davetliTelefon: telefon.trim(),
-      davetliIliski: secilenIliski,
+      davetliTelefon: telefonNormalize(telefon),
+      davetliIliski: iliskiMetni,
       mesaj: mesaj.trim(),
     });
 
     if (!cevap.ok) {
       setYukleniyor(false);
+      setOnizleme(false);
       setHata(cevap.mesaj);
       return;
     }
 
-    // Fotograf 2. adimda gider: dilek ZATEN kaydedildi, foto basarisiz olsa bile kaybolmaz.
+    // Fotograf 2. adimda: dilek ZATEN kaydedildi, foto basarisiz olsa da kaybolmaz.
     if (foto) {
-      const f = await davetliFotoYukle(token, cevap.veri.katki_id, foto.dosya);
-      if (!f.ok) {
-        // Dilek gitti; yalniz foto gitmedi - davetliyi bosuna kaygilandirma
-        setYukleniyor(false);
-        onGonderildi();
-        return;
-      }
+      await davetliFotoYukle(token, cevap.veri.katki_id, foto.dosya);
     }
 
     setYukleniyor(false);
@@ -269,6 +302,24 @@ function KatkiFormu({
     } catch (h) {
       setHata(h instanceof Error ? h.message : "Fotoğraf işlenemedi.");
     }
+  }
+
+  // ONIZLEME EKRANI - davetli dilegini KAGITTA nasil gorunecegiyle gorur.
+  // Bir sey gonderdikten sonra "keske soyle yazsaydim" dememeli; simdi gorsun.
+  if (onizleme) {
+    return (
+      <DilekOnizleme
+        ad={adBicimle(ad)}
+        iliski={iliskiMetni}
+        mesaj={mesaj.trim()}
+        fotoUrl={foto?.onizleme ?? null}
+        ciftAdi={ciftAdi}
+        yukleniyor={yukleniyor}
+        hata={hata}
+        onOnayla={gonder}
+        onDuzenle={() => setOnizleme(false)}
+      />
+    );
   }
 
   return (
@@ -324,12 +375,13 @@ function KatkiFormu({
               devam eden bir davet gibi okunur. */}
           <div className="mx-8 h-px bg-ayrac" />
 
-          <form onSubmit={gonder} className="p-8 pt-7">
+          <form onSubmit={onizlemeyeGec} className="p-8 pt-7">
           <label className="mb-4 block">
             <span className="mb-1 block font-govde text-xs text-ikincil">Adın</span>
             <input
               value={ad}
               onChange={(e) => setAd(e.target.value)}
+              onBlur={(e) => setAd(adBicimle(e.target.value))}
               className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
               placeholder="Adın Soyadın"
             />
@@ -337,7 +389,9 @@ function KatkiFormu({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-1 block font-govde text-xs text-ikincil">E-posta</span>
+              <span className="mb-1 block font-govde text-xs text-ikincil">
+                E-posta <span className="text-ikincil/60">(isteğe bağlı)</span>
+              </span>
               <input
                 type="email"
                 inputMode="email"
@@ -351,11 +405,12 @@ function KatkiFormu({
               <span className="mb-1 block font-govde text-xs text-ikincil">Telefon</span>
               <input
                 type="tel"
-                inputMode="tel"
+                inputMode="numeric"
                 value={telefon}
-                onChange={(e) => setTelefon(e.target.value)}
+                onChange={(e) => setTelefon(telefonBicimle(e.target.value))}
+                maxLength={14}
                 className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
-                placeholder="05xx xxx xx xx"
+                placeholder="0532 123 45 67"
               />
             </label>
           </div>
@@ -449,64 +504,92 @@ function KatkiFormu({
               }}
               rows={5}
               className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
-              placeholder="Dileğini, anını ya da tavsiyeni buraya yaz..."
+              placeholder="Dilek, hatıra ya da içinden geleni buraya yaz..."
             />
           </label>
 
-          {/* YAZIM DENETIMI - anlik oneriler. Dayatmaz, ONERIR. */}
+          {/* YAZIM DENETIMI - anlik. Dayatmaz, ONERIR. */}
           {bulgular.length > 0 && (
-            <div className="mt-2.5 rounded-xl border border-yaldiz/40 bg-yaldiz/5 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 font-govde text-[0.7rem] font-medium text-murekkep">
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-yaldiz" aria-hidden>
-                    <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" fill="none" />
+            <div className="mt-3 overflow-hidden rounded-xl border border-yaldiz/35 bg-parsomen">
+              <div className="flex items-center justify-between gap-2 border-b border-yaldiz/20 bg-yaldiz/8 px-3.5 py-2">
+                <span className="flex min-w-0 items-center gap-2 font-govde text-[0.7rem] font-medium uppercase tracking-etiket text-yaldiz">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" aria-hidden>
+                    <path d="M4 6.5h16M4 12h11M4 17.5h7" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                    <path d="m17.5 15.5 1.6 1.6 3-3.2" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
                   </svg>
-                  <span className="truncate">
-                    {yazimBulgulari.length > 0
-                      ? `${yazimBulgulari.length} yazım önerisi`
-                      : "Dikkat edilecek ifade"}
-                  </span>
+                  <span className="truncate">Yazım denetimi</span>
                 </span>
 
-                {yazimBulgulari.length > 1 && (
+                {duzeltmeler.length > 1 && (
                   <button
                     type="button"
                     onClick={tumDuzeltmeleriUygula}
-                    className="shrink-0 rounded-full bg-sarap px-3 py-1 font-govde text-[0.7rem] font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+                    className="shrink-0 rounded-full bg-sarap px-3 py-1 font-govde text-[0.68rem] font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
                   >
-                    Tümünü düzelt
+                    Tümünü düzelt ({duzeltmeler.length})
                   </button>
                 )}
               </div>
 
-              <ul className="mt-2 space-y-1.5">
-                {yazimBulgulari.slice(0, 5).map((b, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate font-govde text-xs">
-                      <span className="text-ikincil line-through">{b.hatali.trim() || "␣␣"}</span>
-                      <span className="mx-1.5 text-ikincil/60">→</span>
-                      <span className="font-medium text-murekkep">{b.dogru.trim() || "␣"}</span>
+              <ul className="divide-y divide-ayrac/60">
+                {/* Kesin duzeltmeler */}
+                {duzeltmeler.slice(0, 4).map((b, i) => (
+                  <li key={`d${i}`} className="flex items-center justify-between gap-3 px-3.5 py-2">
+                    <span className="min-w-0 flex-1 truncate font-govde text-xs">
+                      <span className="text-ikincil line-through decoration-sarap/40">
+                        {b.hatali.trim()}
+                      </span>
+                      <span className="mx-1.5 text-ikincil/50">→</span>
+                      <span className="font-medium text-murekkep">{b.dogru.trim()}</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => duzeltmeUygula(b)}
-                      className="shrink-0 rounded-full border border-sarap px-2.5 py-0.5 font-govde text-[0.65rem] text-sarap transition-colors hover:bg-sarap hover:text-parsomen"
+                      className="shrink-0 rounded-full border border-sarap/60 px-2.5 py-0.5 font-govde text-[0.65rem] text-sarap transition-colors hover:bg-sarap hover:text-parsomen"
                     >
                       Düzelt
                     </button>
                   </li>
                 ))}
+
+                {/* Bilinmeyen kelimeler - oneri sunulur, karar davetlinin */}
+                {bilinmeyenler.slice(0, 3).map((b, i) => (
+                  <li key={`b${i}`} className="px-3.5 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 truncate font-govde text-xs font-medium text-murekkep underline decoration-sarap decoration-wavy underline-offset-2">
+                        {b.hatali}
+                      </span>
+                      <span className="shrink-0 font-govde text-[0.65rem] text-ikincil">
+                        tanımadığım bir kelime
+                      </span>
+                    </div>
+
+                    {b.oneriler && b.oneriler.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {b.oneriler.map((o) => (
+                          <button
+                            key={o}
+                            type="button"
+                            onClick={() => duzeltmeUygula(b, o)}
+                            className="rounded-full border border-ayrac bg-yuzey px-2.5 py-0.5 font-govde text-[0.68rem] text-murekkep transition-colors hover:border-sarap hover:text-sarap"
+                          >
+                            {o}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
               </ul>
 
-              {yazimBulgulari.length > 5 && (
-                <p className="mt-1.5 font-govde text-[0.65rem] text-ikincil">
-                  ve {yazimBulgulari.length - 5} öneri daha
+              {(duzeltmeler.length > 4 || bilinmeyenler.length > 3) && (
+                <p className="border-t border-ayrac/60 px-3.5 py-1.5 font-govde text-[0.65rem] text-ikincil">
+                  ve {duzeltmeler.length - Math.min(4, duzeltmeler.length) + bilinmeyenler.length - Math.min(3, bilinmeyenler.length)} öneri daha
                 </p>
               )}
 
-              {/* Uygunsuz ifade - duzeltilmez, DUSUNDURULUR */}
               {uygunsuzBulgular.length > 0 && (
-                <p className="mt-2 border-t border-yaldiz/25 pt-2 font-govde text-[0.7rem] text-sarap">
+                <p className="border-t border-sarap/25 bg-sarap/5 px-3.5 py-2 font-govde text-[0.7rem] text-sarap">
                   Bu mesaj deftere basılacak ve yıllarca okunacak - ifadeni bir kez daha
                   gözden geçirmek ister misin?
                 </p>
@@ -593,34 +676,82 @@ function KatkiFormu({
             {yukleniyor ? "Gönderiliyor..." : "Dileğimi bırak"}
           </button>
 
-          {/* DENETIM UYARISI - kirmizi, ama cikis yolu acik */}
+          {/* DENETIM UYARISI - kararli, olcülu, markanin dilinde.
+              Kirmizi "hata" degil; SORUMLULUK hatirlatmasi. Basili bir esere
+              gidiyoruz - ton buna yakisir. */}
           {denetimUyarisi && (
-            <div className="mt-3 rounded-xl border border-red-400/60 bg-red-50 p-3.5 dark:bg-red-950/20">
-              <p className="font-govde text-xs font-medium text-red-700 dark:text-red-400">
-                {yazimBulgulari.length > 0
-                  ? `${yazimBulgulari.length} yazım önerisi var - bunlar deftere basılacak.`
-                  : "Mesajında dikkat çeken bir ifade var."}
-              </p>
-              <p className="metin-yasli mt-1 font-govde text-[0.7rem] text-red-700/80 dark:text-red-400/80">
-                Yukarıdaki düzeltmeleri uygulamak ister misin? Bu metin yıllarca okunacak.
-              </p>
+            <div className="mt-4 overflow-hidden rounded-2xl border border-sarap/45 bg-yuzey shadow-[0_8px_28px_rgba(110,36,56,0.10)]">
+              {/* Basli seridi */}
+              <div className="flex items-center gap-2.5 border-b border-sarap/25 bg-sarap px-4 py-2.5">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-parsomen" aria-hidden>
+                  <path d="M12 8.5v4.2" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" />
+                  <circle cx="12" cy="16.4" r="0.95" fill="currentColor" />
+                  <path d="M10.3 3.9 2.6 17.4A1.9 1.9 0 0 0 4.3 20.3h15.4a1.9 1.9 0 0 0 1.7-2.9L13.7 3.9a1.95 1.95 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" fill="none" />
+                </svg>
+                <p className="font-govde text-xs font-medium uppercase tracking-etiket text-parsomen">
+                  Bu metin kağıda basılacak
+                </p>
+              </div>
 
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {yazimBulgulari.length > 0 && (
+              <div className="px-5 py-4">
+                <p className="metin-yasli font-govde text-[0.82rem] leading-relaxed text-murekkep">
+                  Mesajında{" "}
+                  <span className="font-medium text-sarap">
+                    {duzeltmeler.length + bilinmeyenler.length} nokta
+                  </span>{" "}
+                  dikkatimizi çekti. Bu satırlar bir defterde ciltlenecek ve yıllar sonra
+                  yeniden okunacak - şimdi düzeltmek, sonra pişman olmaktan iyidir.
+                </p>
+
+                {/* Bulgu ozeti */}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {duzeltmeler.slice(0, 3).map((b, i) => (
+                    <span
+                      key={`u${i}`}
+                      className="rounded-full bg-parsomen px-2.5 py-1 font-govde text-[0.68rem] text-ikincil"
+                    >
+                      <span className="line-through decoration-sarap/50">{b.hatali.trim()}</span>
+                      <span className="mx-1 text-ikincil/50">→</span>
+                      <span className="font-medium text-murekkep">{b.dogru.trim()}</span>
+                    </span>
+                  ))}
+                  {bilinmeyenler.slice(0, 2).map((b, i) => (
+                    <span
+                      key={`v${i}`}
+                      className="rounded-full bg-parsomen px-2.5 py-1 font-govde text-[0.68rem] text-murekkep underline decoration-sarap decoration-wavy underline-offset-2"
+                    >
+                      {b.hatali}
+                    </span>
+                  ))}
+                  {duzeltmeler.length + bilinmeyenler.length > 5 && (
+                    <span className="rounded-full bg-parsomen px-2.5 py-1 font-govde text-[0.68rem] text-ikincil">
+                      +{duzeltmeler.length + bilinmeyenler.length - 5}
+                    </span>
+                  )}
+                </div>
+
+                {/* Eylemler - hiyerarsi net: ONERILEN once, cikis yolu ikincil */}
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  {duzeltmeler.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={tumDuzeltmeleriUygula}
+                      className="flex-1 rounded-full bg-sarap px-5 py-2.5 font-govde text-[0.82rem] font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+                    >
+                      Düzeltmeleri uygula
+                    </button>
+                  )}
                   <button
-                    type="button"
-                    onClick={tumDuzeltmeleriUygula}
-                    className="rounded-full bg-sarap px-4 py-1.5 font-govde text-xs font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+                    type="submit"
+                    className="flex-1 rounded-full border border-ikincil/45 bg-transparent px-5 py-2.5 font-govde text-[0.82rem] text-ikincil transition-colors hover:border-murekkep hover:text-murekkep"
                   >
-                    Düzeltmeleri uygula
+                    Yine de devam et
                   </button>
-                )}
-                <button
-                  type="submit"
-                  className="rounded-full border border-ikincil/40 px-4 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-ikincil"
-                >
-                  Yine de dileğimi bırak
-                </button>
+                </div>
+
+                <p className="mt-2.5 text-center font-govde text-[0.68rem] text-ikincil">
+                  Devam edersen dileğini önizleyip son kez göreceksin.
+                </p>
               </div>
             </div>
           )}
@@ -701,4 +832,298 @@ function hesapla(hedefIso: string) {
     dk: Math.floor((mutlak % 3600000) / 60000),
     sn: Math.floor((mutlak % 60000) / 1000),
   };
+}
+
+// ---------------- DILEK ONIZLEME ----------------
+// Davetli, dileginin DEFTERDE nasil gorunecegini AYNEN gorur.
+// Bu ekran PDF'teki dilek kartinin birebir esidir: kagit dokusu, muze cercevesi,
+// yaldiz ayrac, Fraunces imza. "Ne gorursen o basilir" - surpriz yok.
+function DilekOnizleme({
+  ad,
+  iliski,
+  mesaj,
+  fotoUrl,
+  ciftAdi,
+  yukleniyor,
+  hata,
+  onOnayla,
+  onDuzenle,
+}: {
+  ad: string;
+  iliski: string;
+  mesaj: string;
+  fotoUrl: string | null;
+  ciftAdi: string;
+  yukleniyor: boolean;
+  hata: string;
+  onOnayla: () => void;
+  onDuzenle: () => void;
+}) {
+  const bugun = new Date().toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <main className="flex min-h-screen flex-col items-center bg-parsomen px-6 py-12">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex justify-center">
+          <MarkaKilidi varyant="tam" boyut="kucuk" />
+        </div>
+
+        <div className="rounded-3xl border border-ayrac bg-yuzey p-7 sm:p-8">
+          <p className="text-center font-govde text-[0.7rem] uppercase tracking-etiket text-yaldiz">
+            Defterde böyle görünecek
+          </p>
+          <h2 className="mt-2 text-center font-display text-xl text-murekkep">
+            Dileğini son bir kez gör
+          </h2>
+          <p className="metin-yasli mx-auto mt-2 max-w-xs text-center font-govde text-xs leading-relaxed text-ikincil">
+            {ciftAdi} bu sayfayı yıllar sonra açacak. Beğendiysen gönder; değilse
+            düzenlemeye dön.
+          </p>
+
+          {/* KAGIT - PDF'teki dilek kartinin birebir esi */}
+          <div className="mt-6 rounded-lg bg-[#fdf9f0] p-6 shadow-[0_6px_24px_rgba(0,0,0,0.13)]">
+            <div className="border border-[#e8dcc4] bg-[#fffdf8] p-4 text-center">
+              {fotoUrl && (
+                <div className="mx-auto mb-3.5 w-fit border border-[#a8823c] bg-white p-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={fotoUrl}
+                    alt=""
+                    className="max-h-44 w-auto max-w-full object-contain"
+                  />
+                </div>
+              )}
+
+              <p className="font-govde text-[0.84rem] leading-[1.72] text-[#3a2f28]">
+                {mesaj}
+              </p>
+
+              {/* Yaldiz ayrac - imzayi metinden ayirir (PDF ile ayni) */}
+              <div className="mx-auto my-3 flex w-fit items-center gap-1.5" aria-hidden>
+                <span className="h-px w-5 bg-[#a8823c]" />
+                <span className="h-[3px] w-[3px] rotate-45 bg-[#a8823c]" />
+                <span className="h-px w-5 bg-[#a8823c]" />
+              </div>
+
+              <p className="font-display text-[0.82rem] text-[#6e2438]">{ad}</p>
+              {iliski && (
+                <p className="mt-0.5 font-govde text-[0.62rem] text-[#6c5f50]">{iliski}</p>
+              )}
+              <p className="mt-0.5 font-govde text-[0.58rem] text-[#c9a96a]">{bugun}</p>
+            </div>
+          </div>
+
+          {hata && (
+            <p className="mt-4 rounded-lg bg-sarap/10 px-3 py-2 text-center font-govde text-xs text-sarap">
+              {hata}
+            </p>
+          )}
+
+          <div className="mt-6 flex flex-col gap-2.5">
+            <button
+              onClick={onOnayla}
+              disabled={yukleniyor}
+              className="w-full rounded-full bg-sarap px-6 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-60"
+            >
+              {yukleniyor ? "Gönderiliyor..." : "Onayla, dileğimi gönder"}
+            </button>
+            <button
+              onClick={onDuzenle}
+              disabled={yukleniyor}
+              className="w-full rounded-full border border-ayrac px-6 py-3 font-govde text-sm text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-60"
+            >
+              Dileğimi düzenle
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-6 text-center font-govde text-[0.7rem] text-ikincil">
+          Bir Anı Bırak, Senden Bize Kalan
+        </p>
+      </div>
+    </main>
+  );
+}
+
+// ---------------- TESEKKUR + SATIS MOTORU ----------------
+//
+// STRATEJI: bu ekran, urunun EN DEGERLI reklam alanidir.
+//
+// Davetli su an: (1) bir dilek yazdi, (2) duygusal olarak acik, (3) urunun ne
+// yaptigini BIZZAT yasadi. Dunyanin hicbir reklami bu kadar nitelikli bir ani
+// yakalayamaz. Bir dugune giden herkes, baska dugunlere de gider - ve bir kismi
+// kendi dugununu planliyor.
+//
+// Bu yuzden burada uc kapi acilir:
+//  1. KENDI DEFTERINI OLUSTUR - "ucretsiz basla, begenirsen bastir"
+//  2. HEDIYE ET - sevdiginin ozel gunu icin defter hediyesi (viral carpan)
+//  3. NASIL CALISIR / ORNEK ESERLER - guveni kurar, merakı besler
+//
+// Ton: satis degil DAVET. Davetli az once bir hatira birakti; simdi ayni seyi
+// kendi icin isteyebilecegini FARK ETMELI.
+function TesekkurEkrani({ ciftAdi, tur }: { ciftAdi: string; tur: string }) {
+  const turAdi =
+    tur === "nisan" ? "nişanında" : tur === "nikah" ? "nikâhında" : "düğününde";
+
+  return (
+    <main className="min-h-screen bg-parsomen px-6 py-12">
+      <div className="mx-auto w-full max-w-md">
+        <div className="mb-6 flex justify-center">
+          <MarkaKilidi varyant="tam" boyut="kucuk" />
+        </div>
+
+        {/* 1) TESEKKUR - once duygu tamamlanir */}
+        <div className="rounded-3xl border border-ayrac bg-yuzey p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-yaldiz/50 bg-yaldiz/10">
+            <svg viewBox="0 0 24 24" className="h-6 w-6 text-yaldiz" aria-hidden>
+              <path d="m5 12.5 4.2 4.2L19 7" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </div>
+
+          <h1 className="mt-5 font-display text-2xl leading-snug text-murekkep">
+            Anın deftere düştü
+          </h1>
+          <p className="metin-yasli mx-auto mt-3 max-w-xs font-govde text-sm leading-relaxed text-ikincil">
+            {ciftAdi} onayladıktan sonra dileğin defterlerine eklenecek. Yıllar sonra
+            bu sayfayı açtıklarında seni de hatırlayacaklar.
+          </p>
+        </div>
+
+        {/* 2) DONUSUM - "sen de yapabilirsin" */}
+        <div className="mt-4 overflow-hidden rounded-3xl border border-yaldiz/40 bg-gradient-to-b from-yaldiz/8 to-transparent">
+          <div className="p-7 text-center">
+            <p className="font-govde text-[0.68rem] uppercase tracking-etiket text-yaldiz">
+              Peki ya senin özel günün?
+            </p>
+            <h2 className="mt-3 font-display text-xl leading-snug text-murekkep">
+              Sen de sevdiklerinden
+              <br />
+              bir miras topla
+            </h2>
+            <p className="metin-yasli mx-auto mt-3 max-w-xs font-govde text-sm leading-relaxed text-ikincil">
+              Az önce yaptığın şey, bir çiftin en değerli hatırasına dönüşüyor.
+              Aynısını kendi {turAdi} yapabilirsin.
+            </p>
+
+            <div className="mt-5 rounded-2xl border border-ayrac bg-yuzey px-4 py-3">
+              <p className="font-display text-base text-sarap">
+                Toplamak ücretsiz.
+              </p>
+              <p className="mt-0.5 font-govde text-xs text-ikincil">
+                Miras, bir kereye mahsus.
+              </p>
+            </div>
+
+            <a
+              href="/?kaynak=davetli"
+              className="mt-5 block w-full rounded-full bg-sarap px-6 py-3.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+            >
+              Ücretsiz defterimi oluştur
+            </a>
+            <p className="mt-2 font-govde text-[0.68rem] text-ikincil">
+              Kayıt 2 dakika · Kredi kartı istemez
+            </p>
+          </div>
+        </div>
+
+        {/* 3) HEDIYE - viral carpan */}
+        <a
+          href="/hediye?kaynak=davetli"
+          className="mt-4 flex items-center gap-4 rounded-3xl border border-ayrac bg-yuzey p-5 transition-colors hover:border-sarap"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sarap/10 text-sarap">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+              <path d="M4 11h16v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+              <path d="M3 7.5h18V11H3V7.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+              <path d="M12 7.5V21" stroke="currentColor" strokeWidth={1.6} />
+              <path d="M12 7.5S10.8 3 8.5 3a2.2 2.2 0 0 0 0 4.5H12Zm0 0S13.2 3 15.5 3a2.2 2.2 0 0 1 0 4.5H12Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-base text-murekkep">
+              Bir yakınına hediye et
+            </span>
+            <span className="metin-yasli block font-govde text-xs leading-relaxed text-ikincil">
+              Evlenen bir dostuna, yeni doğan bebeğe, mezun olan kardeşine - hatıra
+              defteri hediyesi.
+            </span>
+          </span>
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+            <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </svg>
+        </a>
+
+        {/* 4) GUVEN + MERAK - nasil calisir, ornek eserler */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <a
+            href="/nasil-calisir?kaynak=davetli"
+            className="rounded-2xl border border-ayrac bg-yuzey p-4 text-center transition-colors hover:border-sarap"
+          >
+            <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-yaldiz/10 text-yaldiz">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+                <circle cx="12" cy="16.6" r="0.9" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="mt-2 block font-govde text-xs font-medium text-murekkep">
+              Nasıl çalışır?
+            </span>
+          </a>
+
+          <a
+            href="/ornekler?kaynak=davetli"
+            className="rounded-2xl border border-ayrac bg-yuzey p-4 text-center transition-colors hover:border-sarap"
+          >
+            <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-yaldiz/10 text-yaldiz">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="M8 8.5h6M8 12h6M8 15.5h3.5" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="mt-2 block font-govde text-xs font-medium text-murekkep">
+              Örnek defterler
+            </span>
+          </a>
+        </div>
+
+        {/* 5) UYGULAMA - kalici temas noktasi */}
+        <div className="mt-4 rounded-2xl border border-ayrac bg-yuzey p-5">
+          <p className="text-center font-govde text-xs text-ikincil">
+            Defterini cebinden yönet
+          </p>
+          <div className="mt-3 flex justify-center gap-2.5">
+            <a
+              href="/?kur=pwa"
+              className="flex items-center gap-1.5 rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-murekkep transition-colors hover:border-sarap"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                <rect x="7" y="2.5" width="10" height="19" rx="2.2" stroke="currentColor" strokeWidth={1.5} fill="none" />
+                <path d="M11 18.5h2" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+              </svg>
+              Uygulamayı yükle
+            </a>
+            <a
+              href="/"
+              className="flex items-center gap-1.5 rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-murekkep transition-colors hover:border-sarap"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.5} fill="none" />
+                <path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18" stroke="currentColor" strokeWidth={1.3} fill="none" />
+              </svg>
+              Web sitesi
+            </a>
+          </div>
+        </div>
+
+        <p className="mt-7 text-center font-display text-sm italic text-ikincil">
+          Bir Anı Bırak, Senden Bize Kalan
+        </p>
+      </div>
+    </main>
+  );
 }
