@@ -1,7 +1,7 @@
 // BiAniBirak - PWA service worker (Planlama Defteri deseni uyarlamasi).
 // Ilke: API (/api) ASLA onbellege alinmaz (her zaman canli); sayfa network-first
 // (en guncel surum); degismez statik varliklar (hash'li JS/CSS/ikon) cache-first.
-const CACHE = "bianibirak-pwa-v1";
+const CACHE = "bianibirak-pwa-v2";
 
 self.addEventListener("install", (event) => {
   // Yeni surum beklemeden devreye girsin (guncellemeler aninda yansisin)
@@ -24,6 +24,16 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return; // sadece okuma istekleri
 
   const url = new URL(request.url);
+
+  // 0) YALNIZ http/https - blob: ve data: URL'lere ASLA dokunma.
+  //
+  //    KRITIK: new URL("blob:https://site/uuid").origin, sayfanin origin'i ile
+  //    ESLESIR. Yani asagidaki origin kontrolunden gecer, service worker blob'u
+  //    agdan cekmeye calisir ve PATLAR. Sonuc: tarayicida uretilen fotograf
+  //    onizlemeleri (URL.createObjectURL) hic gorunmez.
+  //
+  //    Bu URL'ler zaten bellekte; ag katmaninin isi degil.
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
 
   // 1) API cagrilari -> HIC dokunma, her zaman canli (kritik: veri onbelleklenmez)
   if (url.pathname.startsWith("/api")) return;

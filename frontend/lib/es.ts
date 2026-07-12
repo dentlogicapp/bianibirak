@@ -72,12 +72,30 @@ export function iliskiMetniKur(esAd: string, serbestMetin: string): string {
   const ad = (esAd ?? "").trim();
   if (ad.length === 0) return metin;
 
-  // Es adi metinde geciyor mu? (Musa / Musa'nin / Musa ile ...)
-  const kucukMetin = metin.toLocaleLowerCase("tr-TR");
-  const kucukAd = ad.toLocaleLowerCase("tr-TR");
-  if (kucukMetin.includes(kucukAd)) return metin;
+  const iyelikli = iyelikEki(ad); // "Musa'nın"
 
-  // Ilk kelimeyi kucult - ama ozel ad ise dokunma
+  // 1) Metin ZATEN iyelikli adi iceriyor mu? ("Musa'nın okul arkadaşı")
+  //    -> Davetli dogru yazmis, dokunma.
+  if (icerirMi(metin, iyelikli)) return metin;
+
+  // 2) Vasita hali var mi? ("Musa ile aynı mahallede büyüdük")
+  //    -> Bu da dogru bir Turkce kurulum, dokunma.
+  if (icerirMi(metin, `${ad} ile`)) return metin;
+
+  // 3) Es adi CIPLAK geciyor mu? ("Musa okul arkadaşı")
+  //    -> Ad dogru ama IYELIK EKI eksik. Adi iyelikli haliyle DEGISTIRIRIZ:
+  //       "Musa okul arkadaşı" -> "Musa'nın okul arkadaşı"
+  //    Deftere ek almadan girmesi, defterin dil butunlugunu bozar.
+  const ciplak = new RegExp(`(^|[^\\p{L}])(${kacir(ad)})(?=$|[^\\p{L}'\u2019])`, "iu");
+  const e = ciplak.exec(metin);
+  if (e) {
+    const bas = e.index + e[1].length;
+    return metin.slice(0, bas) + iyelikli + metin.slice(bas + e[2].length);
+  }
+
+  // 4) Es adi hic gecmiyor -> basa iyelikli ad eklenir.
+  //    Ilk kelime kucuk harfe duser (Turkce tamlamada dogru olan bu), ama OZEL AD
+  //    ise buyuk kalir: kesme isareti tasiyan kelimeler ("Ankara'dan") ozel addir.
   const parcalar = metin.split(" ");
   const ilk = parcalar[0];
   const ozelAd = ilk.includes("'") || ilk.includes("\u2019");
@@ -86,5 +104,15 @@ export function iliskiMetniKur(esAd: string, serbestMetin: string): string {
     parcalar[0] = ilk.charAt(0).toLocaleLowerCase("tr-TR") + ilk.slice(1);
   }
 
-  return `${iyelikEki(ad)} ${parcalar.join(" ")}`;
+  return `${iyelikli} ${parcalar.join(" ")}`;
+}
+
+// Kelime siniriyla arar: "Musa" ararken "Musafir" eslesmesin.
+function icerirMi(metin: string, aranan: string): boolean {
+  const desen = new RegExp(`(^|[^\\p{L}])${kacir(aranan)}(?=$|[^\\p{L}])`, "iu");
+  return desen.test(metin);
+}
+
+function kacir(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
