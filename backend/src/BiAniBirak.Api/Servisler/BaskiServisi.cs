@@ -128,7 +128,28 @@ public static class BaskiServisi
             .Background("#FFFFFF")
             .Border(0.7f).BorderColor(Yaldiz)
             .Padding(mat)
-            .Image(veri).FitArea();
+            // ---- UseOriginalImage: CIFTE SIKISTIRMAYI ONLER ----
+            //
+            // QuestPDF varsayilan olarak her gorseli hedef DPI'ya gore YENIDEN
+            // BOYUTLANDIRIR ve JPEG'e YENIDEN SIKISTIRIR (ImageRasterDpi=288,
+            // ImageCompressionQuality=High).
+            //
+            // Bizim fotograflarimiz depoya girmeden ONCE zaten sikistiriliyor
+            // (tarayicida 1600px / q88 JPEG). QuestPDF'in ikinci kez sikistirmasi
+            // NESIL KAYBI uretir: sikistirilmisi yeniden sikistirmak, her seferinde
+            // biraz daha bozar. Sonuc: baski PDF'inde yazilar kusursuz (onlar VEKTOR),
+            // ama fotograflar yumusak ve artefaktli.
+            //
+            // UseOriginalImage, yeniden boyutlandirmayi ve sikistirmayi TAMAMEN
+            // atlatir - kaynak veri oldugu gibi gomulur. Ikinci sikistirma HIC olmaz.
+            //
+            // ONIZLEMEYI BOZMAZ: onizleme sayfayi 96 DPI'da rasterize eder; gomulu
+            // gorsel tam kalite olsa bile sayfa 96 DPI'ya duser. Paywall yerinde kalir.
+            //
+            // Depolama yuku YOK: fotograflar zaten diskte, PDF anlik uretilip
+            // gonderiliyor - saklanmiyor. Artan tek sey indirilen dosyanin boyutu;
+            // matbaaya giden bir eser icin bu kusur degil, GEREKLILIKTIR.
+            .Image(veri).FitArea().UseOriginalImage();
     }
 
     // ---------------- BELGE ----------------
@@ -182,8 +203,31 @@ public static class BaskiServisi
             }
         });
 
-        return belge;
+        // ---- BELGE AYARLARI - BASKI STANDARDI ----
+        //
+        // QuestPDF varsayilanlari: ImageRasterDpi = 288, ImageCompressionQuality = High.
+        //
+        // Iki sorun vardi:
+        //   1. 288 DPI, matbaanin istedigi 300 DPI'nin ALTINDA.
+        //   2. "High" bile bir JPEG sikistirmasidir - zaten sikistirilmis kaynagi
+        //      yeniden sikistirir (nesil kaybi).
+        //
+        // Fotograflar icin asil cozum UseOriginalImage (bkz. Cerceveli). Bu ayarlar
+        // ONUN KAPSAMINA GIRMEYEN her sey icin ikinci savunma hatti: dinamik uretilen
+        // ogeler, ileride eklenecek gorseller, kutuphanenin ic olceklemeleri.
+        //
+        // Onizlemeyi ETKILEMEZ: GenerateImages, ImageRasterDpi'yi kendi RasterDpi'siyla
+        // (96) EZER - QuestPDF'in DocumentGenerator'i bunu acikca yapar. Yani onizleme
+        // 96 DPI kalir, paywall yerinde durur.
+        return belge.WithSettings(new DocumentSettings
+        {
+            ImageRasterDpi = BaskiDpi,
+            ImageCompressionQuality = ImageCompressionQuality.Best,
+        });
     }
+
+    // Matbaa standardi. 288 (QuestPDF varsayilani) bunun altindadir.
+    private const int BaskiDpi = 300;
 
     private static void SayfaKur(PageDescriptor sayfa, EserVerisi eser, bool altbilgi)
     {
