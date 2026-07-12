@@ -13,8 +13,11 @@ import {
   tumunuUygula,
   duzeltilebilir,
   sozlukYukle,
+  daveti,
   type Bulgu,
+  type Sozluk,
 } from "@/lib/yazim";
+import { DenetimliAlan } from "@/components/site/DenetimliAlan";
 import {
   adDogrula,
   adBicimle,
@@ -167,7 +170,7 @@ function KatkiFormu({
   const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
   const [riza, setRiza] = useState(false);
   const [denetimUyarisi, setDenetimUyarisi] = useState(false);
-  const [sozluk, setSozluk] = useState<Set<string> | null>(null);
+  const [sozluk, setSozluk] = useState<Sozluk | null>(null);
   const [onizleme, setOnizleme] = useState(false);
 
   // Sozluk LAZY yuklenir: davetli mesaj alanina dokundugunda arka planda gelir.
@@ -189,6 +192,10 @@ function KatkiFormu({
     [mesaj, sozluk]
   );
   const duzeltmeler = duzeltilebilir(bulgular);
+
+  // KURASYON ASISTANI - dilegin DERINLIGINE bakar (yazim degil, DEGER).
+  // Bir defterin kalitesi dizgiden degil, icerikten gelir.
+  const asistan = useMemo(() => daveti(mesaj), [mesaj]);
   const bilinmeyenler = bulgular.filter((b) => b.tur === "bilinmeyen");
   const uygunsuzBulgular = bulgular.filter((b) => b.tur === "uygunsuz");
 
@@ -494,19 +501,79 @@ function KatkiFormu({
             </p>
           </div>
 
-          <label className="mt-4 block">
+          <div className="mt-4">
             <span className="mb-1 block font-govde text-xs text-ikincil">Mesajın</span>
-            <textarea
-              value={mesaj}
-              onChange={(e) => {
-                setMesaj(e.target.value);
+
+            {/* WORD TARZI DENETIMLI ALAN: hatali kelimeler METNIN ICINDE dalgali
+                cizgiyle isaretlenir; ustune tiklayinca oneriler acilir. */}
+            <DenetimliAlan
+              deger={mesaj}
+              onDegisim={(y) => {
+                setMesaj(y);
                 setDenetimUyarisi(false);
               }}
-              rows={5}
-              className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
-              placeholder="Dilek, hatıra ya da içinden geleni buraya yaz..."
+              bulgular={bulgular}
+              onDuzelt={(b, secilen) => duzeltmeUygula(b, secilen)}
+              yerTutucu="Dilek, hatıra ya da içinden geleni buraya yaz..."
+              satir={5}
             />
-          </label>
+          </div>
+
+          {/* KURASYON ASISTANI - yazim degil, DEGER katmani.
+              Davetliyi zorlamaz; bir kapi daha oldugunu hatirlatir. */}
+          {asistan && (
+            <div
+              className={`mt-2.5 rounded-xl border px-3.5 py-3 ${
+                asistan.seviye === "harika"
+                  ? "border-yaldiz/45 bg-yaldiz/8"
+                  : "border-ayrac bg-yuzey"
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                    asistan.seviye === "harika"
+                      ? "bg-yaldiz/25 text-yaldiz"
+                      : "bg-sarap/10 text-sarap"
+                  }`}
+                >
+                  {asistan.seviye === "harika" ? (
+                    <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden>
+                      <path d="m5 12.5 4.2 4.2L19 7" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden>
+                      <path d="M12 4.5c-3.6 0-6.5 2.7-6.5 6 0 2 1 3.6 2.6 4.7v1.6c0 .6.5 1.2 1.2 1.2h5.4c.7 0 1.2-.6 1.2-1.2v-1.6c1.6-1.1 2.6-2.7 2.6-4.7 0-3.3-2.9-6-6.5-6Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none" />
+                      <path d="M10 20.5h4" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" />
+                    </svg>
+                  )}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-govde text-[0.78rem] font-medium text-murekkep">
+                    {asistan.baslik}
+                  </p>
+                  <p className="metin-yasli mt-1 font-govde text-[0.72rem] leading-relaxed text-ikincil">
+                    {asistan.metin}
+                  </p>
+
+                  {asistan.ipuclari.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {asistan.ipuclari.map((ip) => (
+                        <li
+                          key={ip}
+                          className="flex items-center gap-1.5 font-govde text-[0.7rem] text-ikincil"
+                        >
+                          <span className="h-1 w-1 shrink-0 rounded-full bg-yaldiz" aria-hidden />
+                          {ip}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* YAZIM DENETIMI - anlik. Dayatmaz, ONERIR. */}
           {bulgular.length > 0 && (

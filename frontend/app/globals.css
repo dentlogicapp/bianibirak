@@ -360,3 +360,30 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
     animation: none;
   }
 }
+
+/* ---- DENETIM ISARETLERI (Word tarzi) ----
+   Hata METNIN ICINDE isaretlenir; kullanici nerede hata yaptigini aramaz, gorur.
+   Cizgi text-decoration ile cizilir - arka katman metni seffaf oldugu icin
+   yalniz CIZGI gorunur, harfler ustteki gercek textarea'dan gelir. */
+.isaret-yazim {
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #c0392b;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.isaret-uygunsuz {
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--sarap);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  background-color: color-mix(in srgb, var(--sarap) 9%, transparent);
+  border-radius: 2px;
+}
+
+/* Koyu temada kirmizi cok karanlik kalmasin */
+.koyu .isaret-yazim {
+  text-decoration-color: #e57373;
+}

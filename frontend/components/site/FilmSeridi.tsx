@@ -87,15 +87,24 @@ function Kare({ foto, baslik }: { foto: Foto; baslik: string }) {
       ? foto.genislik / foto.yukseklik
       : VARSAYILAN_ORAN;
 
-  // YATAY/DIKEY DENGESI:
-  // Gercek bir film seridinde her kare AYNI yuksekliktedir; genislik oranla degisir.
-  // Ama dikey fotograf cok dar, panorama cok genis kare uretir - serit dengesiz olur.
-  // Bu yuzden orani MAKUL bir araliga sikistiririz: kare hep serit yuksekligini
-  // TAM doldurur (bosluk YOK), asiri dar/genis kare olusmaz.
-  const oran = Math.min(Math.max(hamOran, 0.72), 1.62);
+  // YATAY/DIKEY DENGESI - KIRPMA SIFIR.
+  //
+  // ONCEKI HATA: oran 0.72-1.62 araligina sikistiriliyordu. Modern telefon dikey
+  // fotografi 9:16'dir (oran 0.5625) ve bu alt sinira carpip 0.72'ye ZORLANIYORDU:
+  // kutu fotograftan genis kaliyor, object-cover fotografi buyutup merkezden
+  // kirpiyor -> yakin cekim portrelerde KAFA KESILIYORDU. (Yatay ve uzak-dikey
+  // fotograflar sinirin ustunde kaldigi icin sorunsuz gorunuyordu.)
+  //
+  // COZUM: kutu, fotografin GERCEK oranini alir. Kutu orani = fotograf orani
+  // oldugunda object-cover'in kirpacak hicbir sey kalmaz - kayip MATEMATIKSEL
+  // OLARAK sifir. Dikey kare dar olur; olsun. Gercek bir film seridinde de
+  // farkli formatlar yan yana durur - kirpilmis bir yuz, dar bir kareden bin kat
+  // kotudur.
+  //
+  // Tek sinir ustte: asiri panorama (oran > 2.4) seridi bozar. O nadir durumda
+  // merkez kirpma yapilir; panoramada bu zararsizdir (yuz merkezdedir).
+  const oran = Math.min(hamOran, 2.4);
 
-  // Oran sikistirildiysa fotograf kutuya "cover" ile oturur (cok hafif kirpma,
-  // merkezden). Sikistirilmadiysa "cover" zaten birebir oturur - kayip sifir.
   return (
     <div
       className="film-kare relative h-full shrink-0"
@@ -107,6 +116,9 @@ function Kare({ foto, baslik }: { foto: Foto; baslik: string }) {
         alt={baslik}
         loading="eager"
         className="h-full w-full object-cover"
+        // Kirpma gerekirse (yalniz asiri panoramada) UST kisim korunur:
+        // portrelerde yuz ust yaridadir.
+        style={{ objectPosition: "center 32%" }}
         draggable={false}
       />
     </div>

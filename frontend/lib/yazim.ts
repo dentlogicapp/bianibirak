@@ -31,14 +31,59 @@ export type Bulgu = {
 };
 
 // ---------------- SOZLUK (lazy) ----------------
-let _sozluk: Set<string> | null = null;
-let _yukleniyor: Promise<Set<string>> | null = null;
+//
+// Uc yapi tutulur:
+//   tum      : gercek kelimeler + turetimler. KELIME GECERLI MI sorusunu yanitlar.
+//   gercek   : yalniz sozluk kelimeleri. ONERI havuzu budur - turetilmis kokler
+//              ("mutlulug" gibi) davetliye ONERILMEZ, onlar yalniz ic esleme icin.
+//   asciiHaritasi : "dugun" -> ["düğün"]. Turkce'de EN YAYGIN hata sapkasiz
+//              yazimdir; harf harf mesafe hesabiyla "dugun"dan "düğün"e ulasmak
+//              3 duzenleme gerektirir ve tavani asar. ASCII katlamayla mesafe SIFIR
+//              olur - hata aninda ve KESIN olarak bulunur. Word'un fonetik
+//              eslemesinin yaptigi is budur.
+export type Sozluk = {
+  tum: Set<string>;
+  gercek: Set<string>;
+  // TAM eslesme icin: yalniz gercek kelimeler ("dugun" -> "düğün")
+  asciiGercek: Map<string, string[]>;
+  // KOK eslesme icin: turetimler dahil. Unsuz yumusamasi ve unlu dusmesi
+  // olmus kokler burada ("mutlulug" -> "mutluluğ", "omr" -> "ömr"); bunlar
+  // tek baslarina kelime DEGILDIR ama cekimli kelimenin kokudur:
+  //   "mutlulugunuz" -> kok "mutluluğ" + "unuz" -> "mutluluğunuz"
+  asciiTum: Map<string, string[]>;
+};
+
+let _sozluk: Sozluk | null = null;
+let _yukleniyor: Promise<Sozluk> | null = null;
 
 export function sozlukHazirMi(): boolean {
   return _sozluk !== null;
 }
 
-export async function sozlukYukle(): Promise<Set<string>> {
+// Turkce harfleri ASCII karsiligina katlar: "düğün" -> "dugun"
+export function asciiKatla(k: string): string {
+  return k
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c");
+}
+
+function onekCoz(bolum: string, hedef: Set<string>) {
+  let onceki = "";
+  for (const satir of bolum.split("\n")) {
+    if (!satir) continue;
+    const ortak = satir.charCodeAt(0) - 48;
+    const kelime = onceki.slice(0, ortak) + satir.slice(1);
+    hedef.add(kelime);
+    onceki = kelime;
+  }
+}
+
+export async function sozlukYukle(): Promise<Sozluk> {
   if (_sozluk) return _sozluk;
   if (_yukleniyor) return _yukleniyor;
 
@@ -46,19 +91,33 @@ export async function sozlukYukle(): Promise<Set<string>> {
     const yanit = await fetch("/sozluk/tr.txt");
     const metin = await yanit.text();
 
-    // Onek sikistirmasi cozulur: her satirin ilk karakteri, onceki kelimeyle
-    // ortak onek uzunlugudur (dosya boylece yariya iner).
-    const kume = new Set<string>();
-    let onceki = "";
-    for (const satir of metin.split("\n")) {
-      if (!satir) continue;
-      const ortak = satir.charCodeAt(0) - 48;
-      const kelime = onceki.slice(0, ortak) + satir.slice(1);
-      kume.add(kelime);
-      onceki = kelime;
-    }
-    _sozluk = kume;
-    return kume;
+    const [gercekBolum, turetimBolum] = metin.split("\n@@@\n");
+
+    const gercek = new Set<string>();
+    onekCoz(gercekBolum, gercek);
+
+    const tum = new Set(gercek);
+    if (turetimBolum) onekCoz(turetimBolum, tum);
+
+    const haritaKur = (kaynak: Set<string>) => {
+      const harita = new Map<string, string[]>();
+      for (const k of kaynak) {
+        const a = asciiKatla(k);
+        if (a === k) continue; // Turkce harf yok - haritaya gerek yok
+        const liste = harita.get(a);
+        if (liste) liste.push(k);
+        else harita.set(a, [k]);
+      }
+      return harita;
+    };
+
+    _sozluk = {
+      tum,
+      gercek,
+      asciiGercek: haritaKur(gercek),
+      asciiTum: haritaKur(tum),
+    };
+    return _sozluk;
   })();
 
   return _yukleniyor;
@@ -96,15 +155,94 @@ function ekZinciri(kalan: string, derinlik = 0, sonEk: string | null = null): bo
   return false;
 }
 
-function kelimeGecerli(kelime: string, sozluk: Set<string>): boolean {
+function kelimeGecerli(kelime: string, sz: Sozluk): boolean {
   const k = kelime.toLocaleLowerCase("tr-TR");
   if (k.length <= 1) return true;
-  if (sozluk.has(k)) return true;
+  if (sz.tum.has(k)) return true;
 
   for (let kesim = k.length - 1; kesim >= 2; kesim--) {
-    if (sozluk.has(k.slice(0, kesim)) && ekZinciri(k.slice(kesim))) return true;
+    if (sz.tum.has(k.slice(0, kesim)) && ekZinciri(k.slice(kesim))) return true;
   }
   return false;
+}
+
+// SAPKASIZ YAZIM COZUCU - "dugun" -> "düğün", "cocuklariniza" -> "çocuklarınıza"
+//
+// Turkce klavye kullanmayan ya da acele eden herkesin yaptigi hata. Harf-harf
+// mesafeyle bulunmasi zordur ("dugun" -> "düğün" UC duzenleme), ASCII katlamayla
+// KESIN bulunur.
+//
+// Ama kok yetmez: "cocuklariniza" cozulunce ekler de ASCII kalir ("çocuklariniza").
+// Ekleri UNLU UYUMUNA gore yeniden uretiriz: kok kalin unluluyse kalin ek
+// ("çocuk" + "lar" + "ınız" + "a"), inceyse ince ek ("düğün" + "ünüz" + "de").
+const KALIN = "aıou";
+const INCE = "eiöü";
+
+function sonUnlu(k: string): string {
+  for (let i = k.length - 1; i >= 0; i--) {
+    if (KALIN.includes(k[i]) || INCE.includes(k[i])) return k[i];
+  }
+  return "";
+}
+
+function unluUyumlu(govde: string, ek: string): boolean {
+  const g = sonUnlu(govde);
+  const e = sonUnlu(ek);
+  if (!g || !e) return true; // unlusuz ek ("n", "s", "y") her zaman uyar
+  return (KALIN.includes(g) && KALIN.includes(e)) || (INCE.includes(g) && INCE.includes(e));
+}
+
+// ASCII ek zincirini gercek Turkce eklere cevirir (unlu uyumuna sadik)
+function ekleriTurkcelestir(kok: string, asciiEkler: string): string | null {
+  let sonuc = kok;
+  let kalan = asciiEkler;
+  let derinlik = 0;
+  let sonEk: string | null = null;
+
+  while (kalan.length > 0) {
+    if (derinlik >= AZAMI_EK) return null;
+
+    let bulundu = false;
+    for (const ek of EKLER) {
+      const ekAscii = asciiKatla(ek);
+      if (!kalan.startsWith(ekAscii)) continue;
+      if (ek === sonEk) continue;
+      if (!unluUyumlu(sonuc, ek)) continue;
+
+      sonuc += ek;
+      kalan = kalan.slice(ekAscii.length);
+      sonEk = ek;
+      derinlik++;
+      bulundu = true;
+      break;
+    }
+    if (!bulundu) return null;
+  }
+  return sonuc;
+}
+
+function sapkasizCoz(kelime: string, sz: Sozluk): string | null {
+  const k = kelime.toLocaleLowerCase("tr-TR");
+  const a = asciiKatla(k);
+
+  // Tam eslesme GERCEK kelimelerde aranir ("dugun" -> "düğün").
+  // Turetimlerde aranmaz: "mutlulug" tek basina kelime degildir, oneri olamaz.
+  const tam = sz.asciiGercek.get(a);
+  if (tam && tam.length > 0) return tam[0];
+
+  // Cekimli hal: kok TURETIMLERDE de aranir (unsuz yumusamasi/unlu dusmesi),
+  // ekler unlu uyumuyla yeniden uretilir.
+  //   "mutlulugunuz" -> kok "mutluluğ" + "unuz" -> "mutluluğunuz"
+  //   "omrunuze"     -> kok "ömr"      + "ünüz" + "e" -> "ömrünüze"
+  for (let kesim = a.length - 1; kesim >= 2; kesim--) {
+    const adaylar = sz.asciiTum.get(a.slice(0, kesim));
+    if (!adaylar || adaylar.length === 0) continue;
+
+    const tamKelime = ekleriTurkcelestir(adaylar[0], a.slice(kesim));
+    if (tamKelime) return tamKelime;
+  }
+
+  return null;
 }
 
 // ---------------- ONERI (Damerau-Levenshtein) ----------------
@@ -142,23 +280,102 @@ function mesafe(a: string, b: string, tavan: number): number {
   return onceki[n];
 }
 
-function oneriBul(kelime: string, sozluk: Set<string>, azami = 3): string[] {
+// TURKCE Q KLAVYE komsulugu - "zaman" yerine "zsman" yazmak, "a" yerine "s"ye
+// basmaktir. Komsu harf hatasi, uzak harf hatasindan COK daha olasidir; oneriyi
+// buna gore siralarsak Word'un yaptigi isi yapariz.
+const KOMSU: Record<string, string> = {
+  q: "wa", w: "qes", e: "wrd", r: "etf", t: "ryg", y: "tuh", u: "yij", i: "uok",
+  o: "ipl", p: "oğ", ğ: "püp", ü: "ğ",
+  a: "qsz", s: "awdx", d: "serfc", f: "drtgv", g: "ftyhb", h: "gyujn", j: "huikm",
+  k: "jiol", l: "koşp", ş: "lİ", i̇: "ş",
+  z: "asx", x: "zsdc", c: "xdfv", v: "cfgb", b: "vghn", n: "bhjm", m: "njö",
+  ö: "mç", ç: "ö.",
+  ı: "uo", ş2: "", ü2: "",
+};
+
+function komsuMu(a: string, b: string): boolean {
+  return (KOMSU[a] ?? "").includes(b) || (KOMSU[b] ?? "").includes(a);
+}
+
+// Turkce'de sik karisan harf ciftleri - sapkasiz yazim en yaygin hatadir
+const BENZER: [string, string][] = [
+  ["i", "ı"], ["o", "ö"], ["u", "ü"], ["c", "ç"], ["s", "ş"], ["g", "ğ"],
+];
+
+function benzerMi(a: string, b: string): boolean {
+  return BENZER.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+}
+
+// Oneri PUANI: dusuk = iyi.
+// Edit mesafesi temeldir; ustune "hata TURU" cezasi eklenir. Boylece ayni
+// mesafedeki adaylar arasinda EN OLASI hata one cikar:
+//   "zman" -> "zaman" (harf dusmus)      : cok olasi
+//   "zman" -> "iman"  (baska harf)       : az olasi
+function oneriPuani(hatali: string, aday: string, mesafeDegeri: number): number {
+  let puan = mesafeDegeri * 10;
+
+  // Ayni harfle basliyorsa cok daha olasi (insan ilk harfi nadiren sasirir)
+  if (hatali[0] !== aday[0]) {
+    puan += benzerMi(hatali[0], aday[0]) ? 2 : 6;
+  }
+
+  // Uzunluk yakinligi
+  puan += Math.abs(hatali.length - aday.length);
+
+  // Ayni harflerden mi olusuyor? ("zmaan"/"zaman" - yalniz sira farkli)
+  const harfle = (x: string) => x.split("").sort().join("");
+  if (harfle(hatali) === harfle(aday)) puan -= 6;
+
+  // Hatali kelime, adayin harflerinin ALT KUMESI mi? (harf dusurme - en sik hata)
+  let i = 0;
+  for (const c of aday) {
+    if (i < hatali.length && hatali[i] === c) i++;
+  }
+  if (i === hatali.length) puan -= 5;
+
+  // Klavye komsulugu: tek harf farkliysa ve komsuysa cok olasi
+  if (hatali.length === aday.length) {
+    let fark = 0;
+    let komsuFark = 0;
+    for (let j = 0; j < hatali.length; j++) {
+      if (hatali[j] !== aday[j]) {
+        fark++;
+        if (komsuMu(hatali[j], aday[j]) || benzerMi(hatali[j], aday[j])) komsuFark++;
+      }
+    }
+    if (fark > 0 && fark === komsuFark) puan -= 4;
+  }
+
+  return puan;
+}
+
+function oneriBul(kelime: string, sz: Sozluk, azami = 4): string[] {
   const k = kelime.toLocaleLowerCase("tr-TR");
   const tavan = k.length <= 4 ? 1 : 2;
 
-  const adaylar: { kelime: string; d: number }[] = [];
+  const adaylar: { kelime: string; puan: number }[] = [];
 
-  for (const aday of sozluk) {
-    // Hizli eleme (86k kelimeyi tek tek olcmek pahali olurdu)
+  // ONERI HAVUZU: yalniz GERCEK sozluk kelimeleri. Turetilmis kokler
+  // ("mutlulug", "kalb") ic esleme icindir; davetliye ONERILMEZ.
+  for (const aday of sz.gercek) {
     if (Math.abs(aday.length - k.length) > tavan) continue;
-    if (aday[0] !== k[0] && aday[1] !== k[0] && aday[0] !== k[1]) continue;
+
+    // Hizli eleme: ilk iki harften biri tutmali (86k kelimeyi tek tek olcmek pahali)
+    if (
+      aday[0] !== k[0] &&
+      aday[1] !== k[0] &&
+      aday[0] !== k[1] &&
+      !benzerMi(aday[0], k[0])
+    ) {
+      continue;
+    }
 
     const d = mesafe(k, aday, tavan);
-    if (d <= tavan) adaylar.push({ kelime: aday, d });
+    if (d <= tavan) adaylar.push({ kelime: aday, puan: oneriPuani(k, aday, d) });
   }
 
   return adaylar
-    .sort((a, b) => a.d - b.d || a.kelime.length - b.kelime.length)
+    .sort((a, b) => a.puan - b.puan || a.kelime.length - b.kelime.length)
     .slice(0, azami)
     .map((a) => a.kelime);
 }
@@ -200,7 +417,7 @@ const UYGUNSUZ = [
 ];
 
 // ---------------- ANA DENETIM ----------------
-export function yazimDenetle(metin: string, sozluk: Set<string> | null): Bulgu[] {
+export function yazimDenetle(metin: string, sz: Sozluk | null): Bulgu[] {
   const bulgular: Bulgu[] = [];
   if (!metin || metin.trim().length < 2) return bulgular;
 
@@ -223,7 +440,7 @@ export function yazimDenetle(metin: string, sozluk: Set<string> | null): Bulgu[]
   }
 
   // 2) SOZLUK DENETIMI - eksik/uydurma kelimeler ("zman", "blmym", "mutlulk")
-  if (sozluk) {
+  if (sz) {
     const kelimeDeseni = /\p{L}[\p{L}'’]*/gu;
     let k: RegExpExecArray | null;
 
@@ -247,7 +464,22 @@ export function yazimDenetle(metin: string, sozluk: Set<string> | null): Bulgu[]
         continue;
       }
 
-      if (kelimeGecerli(govde, sozluk)) continue;
+      if (kelimeGecerli(govde, sz)) continue;
+
+      // SAPKASIZ YAZIM once denenir: kesin bir duzeltmedir, "bilinmeyen kelime"
+      // belirsizligine dusurmeye gerek yok. ("dugun" -> "düğün")
+      const sapkali = sapkasizCoz(govde, sz);
+      if (sapkali && sapkali !== govde.toLocaleLowerCase("tr-TR")) {
+        bulgular.push({
+          tur: "yazim",
+          baslangic: bas,
+          bitis: bit,
+          hatali: ham,
+          dogru: buyukKoru(ham, sapkali),
+          aciklama: "Türkçe karakter eksik",
+        });
+        continue;
+      }
 
       bulgular.push({
         tur: "bilinmeyen",
@@ -255,7 +487,7 @@ export function yazimDenetle(metin: string, sozluk: Set<string> | null): Bulgu[]
         bitis: bit,
         hatali: ham,
         dogru: "",
-        oneriler: oneriBul(govde, sozluk),
+        oneriler: oneriBul(govde, sz),
         aciklama: "Bu kelimeyi tanımıyorum",
       });
     }
@@ -406,4 +638,96 @@ function buyukKoru(kaynak: string, dogru: string): string {
     return dogru.charAt(0).toLocaleUpperCase("tr-TR") + dogru.slice(1);
   }
   return dogru;
+}
+
+// ---------------- KURASYON ASISTANI ----------------
+//
+// STRATEJI: bir defterin degeri, dizginin kalitesinden DEGIL, iceriginin
+// kalitesinden gelir. Kusursuz dizilmis "Mutluluklar dilerim" satirlari, bos bir
+// defterdir. Rakipler sablon satabilir; IYI TOPLAMAYI satamaz.
+//
+// Bu yuzden davetliyi ZORLAMADAN derinlestirmeye davet ederiz. Ton: elestiri
+// degil, DAVET. "Yetersiz" demeyiz; "bir kapi daha var" deriz.
+//
+// Kritik denge: davetli bogulursa hic yazmaz. Bu yuzden asistan yalniz ONERIR,
+// asla ENGELLEMEZ - gonderim her zaman aciktir.
+
+export type Davet = {
+  seviye: "kisa" | "kalip" | "iyi" | "harika";
+  baslik: string;
+  metin: string;
+  ipuclari: string[];
+};
+
+// Herkesin yazdigi kaliplar. Kotu degiller - ama YALNIZ bunlar varsa, defter
+// kirk kez ayni cumleyi tasir ve hicbiri hatirlanmaz.
+const KALIPLAR = [
+  "mutluluklar", "tebrikler", "hayırlı olsun", "uğurlu olsun", "allah",
+  "mutlu olun", "bir yastıkta", "nice yıllara", "tebrik ederim", "kutlarım",
+  "başınız", "darısı",
+];
+
+export function daveti(mesaj: string): Davet | null {
+  const m = mesaj.trim();
+  if (m.length === 0) return null;
+
+  const kelimeSayisi = m.split(/\s+/).filter((k) => k.length > 0).length;
+  const kucuk = m.toLocaleLowerCase("tr-TR");
+
+  // Cok kisa - henuz bir sey soylenmemis
+  if (kelimeSayisi < 6) {
+    return {
+      seviye: "kisa",
+      baslik: "Bir cümle daha?",
+      metin:
+        "Bu satır deftere girecek ve yıllar sonra okunacak. Onlarla bir anını hatırlıyor musun? Tek bir cümle bile bu sayfayı unutulmaz yapar.",
+      ipuclari: [
+        "Onları ilk nerede tanıdın?",
+        "Birlikte güldüğünüz bir an",
+        "Onlara ne dilersin?",
+      ],
+    };
+  }
+
+  // Kalip cumle - iyi niyetli ama herkesin yazdigi
+  const kalipMi = KALIPLAR.some((k) => kucuk.includes(k));
+  const kisiselIz = /\b(hatırl|ilk|birlikte|beraber|o gün|seninle|sizinle|bana|bize|zaman|yıl|okul|çocuk|tanı)/i.test(
+    kucuk
+  );
+
+  if (kalipMi && !kisiselIz && kelimeSayisi < 20) {
+    return {
+      seviye: "kalip",
+      baslik: "Sadece sana ait bir şey ekle",
+      metin:
+        "Güzel bir dilek. Ama defterde bunun gibi onlarca satır olacak. Seni ayıran şey, senin hatıran - bir anı, bir söz, bir görüntü.",
+      ipuclari: [
+        "Aklına gelen ilk anıyı yaz",
+        "Onlarda en sevdiğin şey",
+        "Yıllar sonra hatırlamalarını istediğin an",
+      ],
+    };
+  }
+
+  // Kisisel iz var ve yeterince uzun - bu iyi bir dilek
+  if (kisiselIz && kelimeSayisi >= 15) {
+    return {
+      seviye: "harika",
+      baslik: "İşte bu deftere değer",
+      metin:
+        "Kendinden bir şey bıraktın. Bu satırlar yıllar sonra okunduğunda seni hatırlatacak.",
+      ipuclari: [],
+    };
+  }
+
+  if (kelimeSayisi >= 12) {
+    return {
+      seviye: "iyi",
+      baslik: "Güzel oluyor",
+      metin: "İstersen bir anı ekleyerek bunu daha da kişisel yapabilirsin.",
+      ipuclari: [],
+    };
+  }
+
+  return null;
 }
