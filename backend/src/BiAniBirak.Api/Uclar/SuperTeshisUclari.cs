@@ -34,6 +34,10 @@ public static class SuperTeshisUclari
         // "gecikmis imha var" alarmini yonetici ANINDA temizleyebilmeli, bir sonraki
         // turu beklememeli. Ayrica test edilebilirligin tek yolu.
         app.MapPost("/api/super/imha/calistir", ImhaCalistir).RequireAuthorization();
+
+        // ONAY KAYITLARI - hukuki kanit arsivi. Kullanici "onaylamadim" derse,
+        // yonetici bu ekrandan hash + zaman + IP gosterir.
+        app.MapGet("/api/super/onaylar", Onaylar).RequireAuthorization();
     }
 
     // ---------------- ORTAK ----------------
@@ -382,6 +386,78 @@ public static class SuperTeshisUclari
                 yeni_dilek = await db.Katkilar.AsNoTracking()
                     .CountAsync(k => !k.SilindiMi && k.CreatedAt >= esik30),
             },
+        });
+    }
+
+    // ---------------- ONAY KAYITLARI (hukuki kanit arsivi) ----------------
+    //
+    // "Ben boyle bir sey kabul etmedim" diyen kullaniciya verilecek yanit BURADA durur:
+    // hangi metni, hangi surumde, hangi hash ile, ne zaman, hangi IP'den onayladi.
+    //
+    // Kayitlar APPEND-ONLY: hicbir zaman silinmez, guncellenmez. Kullanici hesabini
+    // silse bile durur (KVKK m.5/2-e - hakkin tesisi ve korunmasi).
+    private static async Task<IResult> Onaylar(
+        HttpContext ctx, BiAniBirakDbContext db, string? ara)
+    {
+        var (ok, _) = await SuperAdminMi(ctx, db);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var sorgu = db.KullanimOnaylari.AsNoTracking()
+            .GroupJoin(db.Kullanicilar.AsNoTracking(),
+                o => o.KullaniciId, k => (Guid?)k.Id,
+                (o, ks) => new { Onay = o, Kullanicilar = ks })
+            .SelectMany(x => x.Kullanicilar.DefaultIfEmpty(),
+                (x, k) => new { x.Onay, Kullanici = k });
+
+        if (!string.IsNullOrWhiteSpace(ara))
+        {
+            var a = ara.Trim().ToLower();
+            sorgu = sorgu.Where(x =>
+                (x.Kullanici != null && (x.Kullanici.Email.ToLower().Contains(a)
+                                         || x.Kullanici.Ad.ToLower().Contains(a)))
+                || x.Onay.MetinHash.ToLower().Contains(a));
+        }
+
+        var kayitlar = await sorgu
+            .OrderByDescending(x => x.Onay.CreatedAt)
+            .Take(200)
+            .Select(x => new
+            {
+                id = x.Onay.Id,
+                // Kullanici silinmis olabilir - kayit yine de durur. Bu KASITLIDIR.
+                kullanici_id = x.Onay.KullaniciId,
+                ad = x.Kullanici != null ? x.Kullanici.Ad : null,
+                email = x.Kullanici != null ? x.Kullanici.Email : null,
+                silinmis = x.Kullanici == null || x.Kullanici.DeletedAt != null,
+                metin_anahtar = x.Onay.MetinAnahtar,
+                metin_surum = x.Onay.MetinSurum,
+                metin_hash = x.Onay.MetinHash,
+                ip = x.Onay.IpAdresi,
+                tarayici = x.Onay.TarayiciBilgisi,
+                created_at = x.Onay.CreatedAt,
+            })
+            .ToListAsync();
+
+        // GECERLI metinlerin hash'leri: bir onay kaydinin hash'i bugunku metinle
+        // ESLESMIYORSA, o kullanici ESKI bir surumu onaylamistir. Yonetici bunu
+        // gormeli - "hangi metni onayladi" sorusunun yanitidir.
+        var guncelMetinler = await db.SistemMetinleri.AsNoTracking()
+            .Where(m => OnayServisi.ZorunluMetinler.Contains(m.Anahtar))
+            .Select(m => new
+            {
+                anahtar = m.Anahtar,
+                baslik = m.Baslik,
+                surum = m.Surum,
+                hash = m.Hash,
+                yururluk = m.YururlukTarihi,
+            })
+            .ToListAsync();
+
+        return Results.Json(new
+        {
+            kayitlar,
+            guncel_metinler = guncelMetinler,
+            toplam = await db.KullanimOnaylari.CountAsync(),
         });
     }
 

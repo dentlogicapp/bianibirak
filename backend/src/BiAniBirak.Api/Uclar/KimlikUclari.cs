@@ -17,6 +17,13 @@ public static class KimlikUclari
     public static void KimlikUclariniEkle(this WebApplication app)
     {
         app.MapPost("/api/kayit", Kayit);
+
+        // YASAL METINLER - HERKESE ACIK (kayit oncesi okunmali).
+        //
+        // Kritik: bu uc, onay kaydinda hash'i saklanan metnin TA KENDISINI dondurur.
+        // Sayfa metni hardcoded olsaydi, kullanicinin OKUDUGU ile ONAYLADIGI metin
+        // ayrisirdi - ve "siz bunu kabul ettiniz" iddiamiz cururdu.
+        app.MapGet("/api/metin/{anahtar}", YasalMetin);
         app.MapPost("/api/giris", Giris);
         app.MapPost("/api/cikis", Cikis);
         app.MapGet("/api/ben", Ben).RequireAuthorization();
@@ -29,8 +36,30 @@ public static class KimlikUclari
     private static object KullaniciYaniti(Kullanici k)
         => new { id = k.Id, ad = k.Ad, email = k.Email, cinsiyet = k.Cinsiyet, super_admin = k.SuperAdmin };
 
+    // Yasal metni DB'den dondurur - onay kaydindaki hash'in kaynagi ile AYNI metin.
+    // Hash de dondurulur: seffaflik. Kullanici isterse kendi onayiyla karsilastirabilir.
+    private static async Task<IResult> YasalMetin(string anahtar, BiAniBirakDbContext db)
+    {
+        var metin = await db.SistemMetinleri.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Anahtar == anahtar);
+
+        if (metin == null)
+            return Hata(404, "METIN_BULUNAMADI", "Metin bulunamadı.");
+
+        return Results.Json(new
+        {
+            anahtar = metin.Anahtar,
+            baslik = metin.Baslik,
+            icerik = metin.Icerik,
+            surum = metin.Surum,
+            hash = metin.Hash,
+            yururluk_tarihi = metin.YururlukTarihi,
+            guncelleme = metin.UpdatedAt,
+        });
+    }
+
     private static async Task<IResult> Kayit(
-        KayitIstek istek, BiAniBirakDbContext db, SifreServisi sifreServisi,
+        KayitIstek istek, HttpContext ctx, BiAniBirakDbContext db, SifreServisi sifreServisi,
         JwtServisi jwtServisi, HttpResponse yanit)
     {
         var email = (istek.Email ?? "").Trim().ToLowerInvariant();
@@ -43,6 +72,32 @@ public static class KimlikUclari
 
         if (await db.Kullanicilar.AnyAsync(k => k.Email == email && k.DeletedAt == null))
             return Hata(409, "EMAIL_KULLANIMDA", "Bu e-posta zaten kayitli.");
+
+        // ---- ZORUNLU ONAY (hukuki kanit) ----
+        //
+        // Onaysiz kayit YOKTUR. Ortuk riza ("kabul etmis sayilirsiniz", varsayilan
+        // isaretli kutucuk) KVKK m.3/1-a uyarinca GECERSIZDIR: acik riza,
+        // bilgilendirmeye dayanan ve OZGUR IRADEYLE aciklanan olmalidir.
+        //
+        // Sunucu tarafinda dogrulanir: istemci kutucugu atlatsa bile kayit olmaz.
+        var gelenOnaylar = (istek.Onaylar ?? Array.Empty<string>())
+            .Select(o => (o ?? "").Trim())
+            .ToHashSet(StringComparer.Ordinal);
+
+        var eksik = OnayServisi.ZorunluMetinler
+            .Where(z => !gelenOnaylar.Contains(z))
+            .ToList();
+
+        if (eksik.Count > 0)
+            return Hata(400, "ONAY_ZORUNLU",
+                "Kayıt için KVKK Aydınlatma Metni ve Kullanım Koşulları'nı onaylamanız gerekir.");
+
+        // Onaylanan metinlerin O ANKI hali - hash'leriyle birlikte. Metin sonradan
+        // degisse bile, kullanicinin GORDUGU metin bu hash ile ispatlanir.
+        var metinler = await OnayServisi.ZorunluMetinleriGetirAsync(db);
+        if (metinler.Count < OnayServisi.ZorunluMetinler.Length)
+            return Hata(500, "METIN_EKSIK",
+                "Yasal metinler yüklenemedi. Lütfen daha sonra tekrar deneyin.");
 
         var simdi = DateTimeOffset.UtcNow;
         var kullanici = new Kullanici
@@ -58,7 +113,27 @@ public static class KimlikUclari
         db.Kullanicilar.Add(kullanici);
         db.DenetimGunlukleri.Add(Denetim("KAYIT", kullanici.Id, kullanici.Id,
             new { email = kullanici.Email }, simdi));
-        await db.SaveChangesAsync(); // tek SaveChanges = atomik transaction
+
+        // ONAY KANITI - kullanici ile AYNI transaction'da. Ayri yazsaydik, kullanici
+        // olusup onay kaydi patlayabilirdi: onaysiz kullanici = hukuki bosluk.
+        foreach (var m in metinler)
+        {
+            db.KullanimOnaylari.Add(new KullanimOnayi
+            {
+                Id = Guid.NewGuid(),
+                KullaniciId = kullanici.Id,
+                MetinAnahtar = m.Anahtar,
+                MetinSurum = string.IsNullOrEmpty(m.Surum)
+                    ? OnayServisi.SurumUret(m.YururlukTarihi) : m.Surum,
+                MetinHash = string.IsNullOrEmpty(m.Hash)
+                    ? OnayServisi.HashUret(m.Icerik) : m.Hash,
+                IpAdresi = OnayServisi.IpAl(ctx),
+                TarayiciBilgisi = OnayServisi.TarayiciAl(ctx),
+                CreatedAt = simdi,
+            });
+        }
+
+        await db.SaveChangesAsync(); // tek SaveChanges = atomik (kullanici + onaylar + audit)
 
         CerezYardimcisi.Yaz(yanit, jwtServisi.Uret(kullanici), jwtServisi.GecerlilikGun);
         return Results.Json(KullaniciYaniti(kullanici));

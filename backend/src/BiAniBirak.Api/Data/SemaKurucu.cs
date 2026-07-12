@@ -340,6 +340,26 @@ public static class SemaKurucu
             'KVKK_METIN_GUNCELLENDI', 'KVKK_TALEP_ISLENDI'
           );
 
+        -- HUKUKI KANIT: metin surum + hash (onaylanan metnin o gunku hali ispatlanabilsin)
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Surum" text NOT NULL DEFAULT '';
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Hash" text NOT NULL DEFAULT '';
+
+        -- KULLANIM ONAYLARI - APPEND-ONLY hukuki kanit.
+        -- Kullanici hesabini silse bile bu kayit KALIR (KVKK m.5/2-e: hakkin tesisi/
+        -- korunmasi). PII icermez: kimlik UUID, hash, zaman, IP.
+        CREATE TABLE IF NOT EXISTS kullanim_onaylari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NULL,
+            "MetinAnahtar" text NOT NULL,
+            "MetinSurum" text NOT NULL,
+            "MetinHash" text NOT NULL,
+            "IpAdresi" text NULL,
+            "TarayiciBilgisi" text NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_kullanim_onaylari_kullanici
+            ON kullanim_onaylari ("KullaniciId");
+
         -- IMHA TAKVIMI (Belge 08): kapanis + SaklamaGun sonrasi tam imha.
         -- Idempotent - her restart calisir, sonuc degismez.
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaUyari14Gonderildi" boolean NOT NULL DEFAULT false;

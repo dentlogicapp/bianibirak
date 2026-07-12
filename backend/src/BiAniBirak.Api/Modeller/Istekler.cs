@@ -1,7 +1,11 @@
 namespace BiAniBirak.Api.Modeller;
 
 // Istek govdeleri (JSON). Minimal ve sade.
-public record KayitIstek(string Ad, string Email, string Sifre);
+// Onaylar: kullanicinin kabul ettigi metin anahtarlari ("kvkk_aydinlatma",
+// "kullanim_kosullari"). ZorunluMetinler'in TAMAMI gelmelidir; eksikse kayit reddedilir.
+// Ortuk riza (varsayilan isaretli kutucuk, "kabul etmis sayilirsiniz") KVKK'da
+// GECERSIZDIR - bu yuzden istemci acikca gondermek zorundadir.
+public record KayitIstek(string Ad, string Email, string Sifre, string[]? Onaylar = null);
 public record GirisIstek(string Email, string Sifre);
 public record ProfilGuncelleIstek(string Ad, string? Cinsiyet);
 

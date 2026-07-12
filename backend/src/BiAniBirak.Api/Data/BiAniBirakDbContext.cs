@@ -28,6 +28,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
     public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
+    public DbSet<KullanimOnayi> KullanimOnaylari => Set<KullanimOnayi>();
     public DbSet<Kurasyon> Kurasyonlar => Set<Kurasyon>();
     public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
@@ -312,6 +313,24 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             e.HasIndex(x => x.Anahtar).IsUnique();
+            e.Property(x => x.Surum).HasColumnName("Surum").HasDefaultValue("");
+            e.Property(x => x.Hash).HasColumnName("Hash").HasDefaultValue("");
+        });
+
+        // ---- kullanim_onaylari (HUKUKI KANIT - append-only, ASLA silinmez) ----
+        model.Entity<KullanimOnayi>(e =>
+        {
+            e.ToTable("kullanim_onaylari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.MetinAnahtar).HasColumnName("MetinAnahtar").IsRequired();
+            e.Property(x => x.MetinSurum).HasColumnName("MetinSurum").IsRequired();
+            e.Property(x => x.MetinHash).HasColumnName("MetinHash").IsRequired();
+            e.Property(x => x.IpAdresi).HasColumnName("IpAdresi");
+            e.Property(x => x.TarayiciBilgisi).HasColumnName("TarayiciBilgisi");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.KullaniciId);
         });
 
         // ---- kvkk_talepleri (ilgili kisi haklari) ----

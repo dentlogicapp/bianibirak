@@ -36,6 +36,10 @@ builder.Services.AddSingleton<PushGonderici>();
 // IMHA GOREVI - kapanis + SaklamaGun sonrasi tam imha (Belge 08).
 // Saatlik calisir, idempotent. KVKK taahhudumuzun kodla karsiligi.
 builder.Services.AddHostedService<ImhaGorevi>();
+
+// HATIRLATMA GOREVI - indirme takvimi (+2, +10, +15, +20, +25, +30, son hafta her gun).
+// Kimse mirasini "hatirlatilmadi" diye kaybetmesin.
+builder.Services.AddHostedService<HatirlatmaGorevi>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
 
@@ -86,7 +90,13 @@ if (!string.IsNullOrWhiteSpace(postgresBaglanti))
     using var kapsam = app.Services.CreateScope();
     var db = kapsam.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
     SemaKurucu.Uygula(db);
-    app.Logger.LogInformation("Idempotent sema uygulandi (kullanicilar, denetim_gunlukleri, etkinlikler, etkinlik_uyelikleri, uye_davetleri).");
+
+    // YASAL METINLER - idempotent seed. Bos bir veritabaninda kimse kaydolamazdi:
+    // onaylanacak metin yoktu. Metin VARSA dokunulmaz (super panelden yapilan
+    // duzenleme restart'ta ezilmez).
+    await YasalMetinler.SeedAsync(db);
+
+    app.Logger.LogInformation("Idempotent sema uygulandi + yasal metinler hazir.");
 }
 
 app.UseAuthentication();

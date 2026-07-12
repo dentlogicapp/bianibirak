@@ -20,6 +20,17 @@ public class SistemMetni
     // Yururluk tarihi (metin surumleme; kullaniciya "son guncelleme" olarak gosterilir)
     public DateTimeOffset YururlukTarihi { get; set; }
 
+    // SURUM + HASH - hukuki kanitin temeli.
+    //
+    // Kullanici bir metni onayladiginda, o metnin HASH'i onay kaydina yazilir. Metni
+    // sonradan degistirsek bile, kullanicinin onayladigi hash ESKI metni isaret eder.
+    // "Siz bunu onayladiniz" demek icin, o gunku metnin ne oldugunu ISPAT edebilmeliyiz.
+    //
+    // Surum: yururluk tarihinden turetilen insan-okunur damga ("2026-07-12").
+    // Hash  : icerigin SHA-256'si (hex). Bir harf degisse hash tamamen degisir.
+    public string Surum { get; set; } = string.Empty;
+    public string Hash { get; set; } = string.Empty;
+
     public Guid? GuncelleyenKullaniciId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

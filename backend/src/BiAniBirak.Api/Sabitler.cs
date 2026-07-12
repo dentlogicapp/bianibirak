@@ -4,14 +4,35 @@ namespace BiAniBirak.Api;
 // Not: tenant-ozel degerler etkinlik_ayarlari'ndan gelir; bunlar yalniz ILK varsayilan.
 public static class Sabitler
 {
-    // Kapanis penceresi varsayilani (gun) - Karar 4 / Belge 05.
-    public const int VarsayilanKapanisPencereGun = 30;
+    // ================== YASAM DONGUSU - TEK KANON ==================
+    //
+    // ONCEKI MODELIN HATASI: kapanis penceresi cifte birakilmisti (30-365 gun) ve imha
+    // "kapanis + 37" idi. Sonuc: her defterin takvimi FARKLI, hicbir cift ne zaman ne
+    // olacagini bilmiyor, destek "sizin defterinizde su tarih" demek zorunda kaliyordu.
+    // Ustelik frontend ile backend AYRI hesap yapiyordu - cizelge yalan soyluyordu.
+    //
+    // YENI MODEL - KURULUM ZAMANINDAN BAGIMSIZ, HER DEFTERDE AYNI:
+    //
+    //   Acilis      : defter kurulur kurulmaz (davetli girisleri hemen baslar)
+    //   Ozel gun    : EtkinlikTarihi (cift belirler - tek degisken budur)
+    //   Toplama sonu: Ozel gun + 30 gun  -> yeni dilek YAZILAMAZ
+    //   Son indirme : Ozel gun + 37 gun  -> bu ana kadar eser indirilmeli
+    //   IMHA        : Ozel gun + 37 gun  -> her sey yok edilir, geri donusu YOK
+    //
+    // Kurasyon (defter duzenleme) BASTAN SONA aciktir: kurulumdan imhaya kadar cift
+    // defterini duzenleyebilir. Kapanan sey yalniz DAVETLI GIRISIDIR.
+    //
+    // Bu sadelik bir urun karari: "37 gun" tek bir cumleyle anlatilabilir, her defterde
+    // ayni, herkes ayni sozu duyar. Degisken sure, guveni degil karisikligi buyutur.
 
-    // Kapanis penceresi minimum (gun) - Belge 05 fiyat politikasi: min 30, uzeri orantili ucret.
-    public const int MinKapanisPencereGun = 30;
+    // Ozel gunden sonra davetli girislerinin acik kaldigi sure.
+    public const int ToplamaGun = 30;
 
-    // Kapanis penceresi maksimum (gun).
-    public const int MaxKapanisPencereGun = 365;
+    // Toplama kapandiktan sonra eserin indirilebilecegi son sure.
+    public const int IndirmeGun = 7;
+
+    // Ozel gunden IMHA'ya kadar toplam sure. 30 + 7 = 37.
+    public const int ToplamGun = ToplamaGun + IndirmeGun;
 
     // ---- TUR-BAZLI VARSAYILAN ICERIK BLOKLARI ----
     // Cift, zorunlu alanlar (isimler/tur/tarih) disinda HICBIR SEYE DOKUNMASA BILE
@@ -133,9 +154,19 @@ public static class Sabitler
             KapanisMetni: kapanis);
     }
 
-    // SAKLAMA & IMHA (Musa karari): kapanistan sonra 37 gun. Aksiyon yoksa TAM IMHA.
-    // Davetli ekraninda ve KVKK metninde acikca gosterilir - guven rozeti.
-    public const int SaklamaGun = 37;
+    // SAKLAMA (kapanis SONRASI): toplama kapandiktan sonra eser bu kadar gun durur,
+    // sonra TAM IMHA. IndirmeGun ile aynidir - iki isim, tek gercek.
+    //
+    // Onceki surumde bu deger 37 idi ve "kapanis + 37" olarak sayiliyordu; yani imha
+    // ozel gunden 67 gun sonraya dusuyordu. Cizelgede yazan 37 ile kodun yaptigi 67
+    // birbirini TUTMUYORDU. Simdi tek kanon: ozel gun + 37.
+    public const int SaklamaGun = IndirmeGun;
+
+    // Bildirim saatleri (Turkiye saati, UTC+3). Sabah ve aksam - insanin telefonuna
+    // baktigi saatler.
+    public const int BildirimSabahSaat = 10;
+    public const int BildirimAksamSaat = 19;
+    public const int TurkiyeSaatFarki = 3;
 
     // Editoryel temalar (PDF + onizleme ortak sozlugu)
     public static readonly string[] Temalar = { "klasik", "modern", "zarif" };

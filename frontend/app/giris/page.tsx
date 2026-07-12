@@ -28,6 +28,15 @@ function GirisIcerik() {
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
+  // ZORUNLU ONAY - varsayilan olarak ISARETSIZ.
+  //
+  // Onceki surumde "kayit olarak kabul etmis olursun" yaziyordu: bu ORTUK RIZA'dir
+  // ve KVKK m.3/1-a uyarinca GECERSIZDIR (acik riza, ozgur iradeyle aciklanan olmali).
+  // Varsayilan isaretli kutucuk da ayni sebeple gecersizdir - kullanici HAREKET
+  // ETMELIDIR.
+  const [onayKvkk, setOnayKvkk] = useState(false);
+  const [onayKosullar, setOnayKosullar] = useState(false);
+
   async function gonder(e: React.FormEvent) {
     e.preventDefault();
     setHata("");
@@ -35,9 +44,19 @@ function GirisIcerik() {
       setHata("Şifreler eşleşmiyor.");
       return;
     }
+    if (kayitMi && (!onayKvkk || !onayKosullar)) {
+      setHata("Devam etmek için her iki metni de onaylamanız gerekir.");
+      return;
+    }
     setYukleniyor(true);
     const cevap = kayitMi
-      ? await api.kayit({ ad, email, sifre })
+      ? await api.kayit({
+          ad,
+          email,
+          sifre,
+          // Sunucu bunlari YENIDEN dogrular: istemci kutucugu atlatsa bile kayit olmaz.
+          onaylar: ["kvkk_aydinlatma", "kullanim_kosullari"],
+        })
       : await api.giris({ email, sifre });
     if (!cevap.ok) {
       setYukleniyor(false);
@@ -135,15 +154,54 @@ function GirisIcerik() {
           {yukleniyor ? "Lütfen bekleyin..." : kayitMi ? "Kayıt ol" : "Giriş yap"}
         </button>
 
-        {/* Kayıtta ince onam metni (checkbox DEĞİL - kanuni bilgilendirme) */}
+        {/* ZORUNLU ONAY - kutucuklar isaretlenmeden kayit olmaz.
+            Onceki surumde "kayit olarak kabul etmis olursun" yaziyordu: ortuk riza,
+            KVKK'da gecersiz. Onay kaydi (metin hash'i + zaman + IP) kalici saklanir. */}
         {kayitMi && (
-          <p className="mt-4 text-center font-govde text-[0.7rem] leading-relaxed text-ikincil">
-            Kayıt olarak{" "}
-            <Link href="/kvkk" className="font-medium text-sarap hover:underline">
-              KVKK Aydınlatma Metni
-            </Link>
-            &apos;ni kabul etmiş olursun.
-          </p>
+          <div className="mt-4 space-y-2.5 rounded-2xl border border-ayrac bg-parsomen p-4">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={onayKvkk}
+                onChange={(e) => setOnayKvkk(e.target.checked)}
+                className="mt-0.5 shrink-0 accent-[color:var(--sarap)]"
+              />
+              <span className="font-govde text-[0.72rem] leading-relaxed text-ikincil">
+                <Link
+                  href="/kvkk"
+                  target="_blank"
+                  className="font-medium text-sarap hover:underline"
+                >
+                  KVKK Aydınlatma Metni
+                </Link>
+                &apos;ni okudum, kişisel verilerimin işlenmesini kabul ediyorum.
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={onayKosullar}
+                onChange={(e) => setOnayKosullar(e.target.checked)}
+                className="mt-0.5 shrink-0 accent-[color:var(--sarap)]"
+              />
+              <span className="font-govde text-[0.72rem] leading-relaxed text-ikincil">
+                <Link
+                  href="/kosullar"
+                  target="_blank"
+                  className="font-medium text-sarap hover:underline"
+                >
+                  Kullanım Koşulları
+                </Link>
+                &apos;nı okudum ve kabul ediyorum. Defterimin{" "}
+                <span className="font-medium text-murekkep">
+                  özel günümden 37 gün sonra kalıcı olarak silineceğini
+                </span>{" "}
+                ve eserimi bu süre içinde indirmenin benim sorumluluğumda olduğunu
+                anlıyorum.
+              </span>
+            </label>
+          </div>
         )}
 
         <p className="mt-5 text-center font-govde text-xs text-ikincil">

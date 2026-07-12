@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { ZamanCizelgesi } from "@/components/site/ZamanCizelgesi";
 
 type Link2 = { es: string; token: string; aktif: boolean };
 
@@ -67,7 +68,7 @@ export default function PaylasimSayfasi() {
         ve onun onay bekleyen dileklerine düşer. Karışıklık olmaması için yalnız kendi bağlantını görürsün.
       </p>
 
-      <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />
+      <ZamanCizelgesi etkinlik={etkinlik} />
 
       <div className="mt-6 grid min-w-0 gap-5">
         {linkler.map((l) => (
@@ -79,47 +80,6 @@ export default function PaylasimSayfasi() {
         ))}
       </div>
     </AppShell>
-  );
-}
-
-// ---- Zaman cizelgesi ----
-function ZamanCizelgesi({ etkinlik, pencereGun }: { etkinlik: Etkinlik; pencereGun: number }) {
-  const acilis = new Date(etkinlik.acilis_tarihi);
-  const ozelGun = new Date(etkinlik.etkinlik_tarihi);
-  const kapanis = new Date(etkinlik.kapanis_tarihi);
-  const kisisel = new Date(kapanis.getTime() + 7 * 24 * 3600 * 1000);
-  const silme = new Date(kisisel.getTime() + 10 * 24 * 3600 * 1000);
-
-  const adimlar = [
-    { t: acilis, e: "Davetli girişleri başlar", v: "Bağlantı/QR ile dilekler toplanmaya başlar." },
-    { t: ozelGun, e: "Özel gün", v: "Etkinliğiniz gerçekleşir." },
-    { t: kapanis, e: "Anı girişi sonlanır", v: `Toplama penceresi (${pencereGun} gün) kapanır.` },
-    { t: kisisel, e: "Kişiselleştirme", v: "Anı defteri üzerinde düzenleme yapabilirsiniz." },
-    { t: silme, e: "İndirme ve silme", v: "Veri indirilir; 10 gün sonra kalıcı silinir." },
-  ];
-
-  return (
-    <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-      <h2 className="font-display text-lg text-murekkep">Süreç zaman çizelgesi</h2>
-      <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-        Seçtiğiniz tarihe göre canlı önizleme.
-      </p>
-      <ol className="mt-6 space-y-4">
-        {adimlar.map((a, i) => (
-          <li key={i} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <span className="h-3 w-3 rounded-full bg-sarap" />
-              {i < adimlar.length - 1 && <span className="mt-1 h-full w-px flex-1 bg-ayrac" />}
-            </div>
-            <div className="pb-2">
-              <p className="font-govde text-sm font-medium text-murekkep">{a.e}</p>
-              <p className="font-govde text-xs text-yaldiz">{tarihSaatMetni(a.t.toISOString())}</p>
-              <p className="mt-0.5 font-govde text-xs text-ikincil">{a.v}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
   );
 }
 

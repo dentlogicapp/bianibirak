@@ -45,6 +45,16 @@ export type Etkinlik = {
   etkinlik_tarihi: string; // yyyy-MM-dd
   acilis_tarihi: string; // ISO-8601
   kapanis_tarihi: string; // ISO-8601
+
+  // TEK KANON: imha tarihi ve sureler BACKEND'DEN gelir. Frontend hesaplamaz.
+  // (Onceki surumde frontend "kapanis + 7 + 10" uyduruyordu ve cizelge YALAN
+  // tarih gosteriyordu.)
+  imha_tarihi: string; // ISO-8601
+  toplama_gun: number; // 30
+  indirme_gun: number; // 7
+  toplam_gun: number; // 37
+  imha_edildi: boolean;
+
   durum: string;
   rol: string | null;
 };
@@ -342,7 +352,7 @@ export type DenetimKaydi = {
 };
 
 export const api = {
-  kayit: (v: { ad: string; email: string; sifre: string }) =>
+  kayit: (v: { ad: string; email: string; sifre: string; onaylar: string[] }) =>
     istek<Kullanici>("/api/kayit", {
       method: "POST",
       body: JSON.stringify({ Ad: v.ad, Email: v.email, Sifre: v.sifre }),

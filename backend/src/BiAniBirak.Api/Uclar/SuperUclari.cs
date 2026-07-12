@@ -749,6 +749,14 @@ public static class SuperUclari
             metin.UpdatedAt = simdi;
         }
 
+        // HASH + SURUM TAZELENIR - kanit zincirinin can damari.
+        //
+        // Bu cagri unutulsaydi: metin degisir ama hash eski kalirdi. O anda sistem,
+        // kullanicinin GORMEDIGI bir metni "onayladiniz" diye gosterirdi - ve bu,
+        // mahkemede aleyhimize donen bir sahtelik olurdu. Eski onaylar eski hash'i
+        // tasir; yeni onaylar yenisini. Ikisi karismaz.
+        OnayServisi.MetniDamgala(metin);
+
         await db.SaveChangesAsync();
         await Denetim(db, null, kullanici.Id, "KVKK_METNI_GUNCELLENDI", "sistem_metinleri",
             metin.Id, new { anahtar });

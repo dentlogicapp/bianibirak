@@ -74,12 +74,28 @@ public static class EtkinlikUclari
             etkinlik_tarihi = e.EtkinlikTarihi,
             acilis_tarihi = e.AcilisTarihi,
             kapanis_tarihi = e.KapanisTarihi,
+
+            // IMHA TARIHI BACKEND'DEN GELIR - TEK KANON.
+            //
+            // Onceki surumde frontend bunu KENDI hesapliyordu ("kapanis + 7 + 10")
+            // ve backend baska soyluyordu ("kapanis + 37"). Cizelge kullaniciya
+            // YALAN tarih gosteriyordu. Bir zaman urununde bu, ozurle gecistirilecek
+            // bir hata degil - urunun temel vaadinin cokusudur.
+            //
+            // Artik hesap TEK yerde: burada. Frontend yalniz GOSTERIR.
+            imha_tarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
+            toplama_gun = Sabitler.ToplamaGun,
+            indirme_gun = Sabitler.IndirmeGun,
+            toplam_gun = Sabitler.ToplamGun,
+            imha_edildi = e.ImhaEdildi,
+
             durum = e.Durum,
             rol,
         };
 
     private static async Task<IResult> EtkinlikOlustur(
-        EtkinlikOlusturIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+        EtkinlikOlusturIstek istek, HttpContext ctx, BiAniBirakDbContext db,
+        PushGonderici push)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
@@ -116,7 +132,7 @@ public static class EtkinlikUclari
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var k))
             kapanis = k;
         else
-            kapanis = etkinlikTarihi.AddDays(Sabitler.VarsayilanKapanisPencereGun);
+            kapanis = etkinlikTarihi.AddDays(Sabitler.ToplamaGun);
 
         if (kapanis <= acilis)
             return Hata(400, "DOGRULAMA_HATASI", "Kapanis tarihi acilistan sonra olmalidir.");
@@ -175,7 +191,7 @@ public static class EtkinlikUclari
             EtkinlikId = etkinlik.Id,
             KarsilamaMetni = varsayilan.KarsilamaMetni,
             PromptMetni = varsayilan.PromptMetni,
-            KapanisPencereGun = Sabitler.VarsayilanKapanisPencereGun,
+            KapanisPencereGun = Sabitler.ToplamaGun,
             SayacAktif = true,
             SayacAktifCumle = varsayilan.SayacAktifCumle,
             SayacBittiCumle = varsayilan.SayacBittiCumle,
@@ -199,6 +215,11 @@ public static class EtkinlikUclari
             CreatedAt = simdi,
         });
         await db.SaveChangesAsync(); // tek SaveChanges = atomik (etkinlik+uyelik+2 link+ayar+audit)
+
+        // HOSGELDIN - sureci BASTA anlat. Sonradan "bilmiyordum" diyen bir cift,
+        // bizim iletisim basarisizligimizdir.
+        await HosgeldinBildirimi.GonderAsync(
+            db, push, kullaniciId, etkinlik.Id, $"{es1} & {es2}", tur);
 
         return Results.Json(EtkinlikYaniti(etkinlik, "es1"));
     }
@@ -265,11 +286,15 @@ public static class EtkinlikUclari
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var yeniTarih))
                 return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi/saati gereklidir.");
             etkinlik.EtkinlikTarihi = yeniTarih;
-            // kapanis penceresi ayardan; tarih degisince kapanisi tutarli tut
-            var ayar = await db.EtkinlikAyarlari.AsNoTracking()
-                .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlikId);
-            var gun = ayar?.KapanisPencereGun ?? Sabitler.VarsayilanKapanisPencereGun;
-            etkinlik.KapanisTarihi = yeniTarih.AddDays(gun);
+
+            // TEK KANON: kapanis HER ZAMAN ozel gun + ToplamaGun. Ayardan okunmaz.
+            // Onceki surumde her defterin penceresi farkli olabiliyordu; kimse ne zaman
+            // ne olacagini bilmiyordu. Simdi tek cumle herkese ayni sozu veriyor.
+            // Tarih degisirse imha takvimi de kayar - uyari bayraklari sifirlanir,
+            // yoksa yeni takvim icin uyari GONDERILMEZ ve cift habersiz kalir.
+            etkinlik.KapanisTarihi = yeniTarih.AddDays(Sabitler.ToplamaGun);
+            etkinlik.ImhaUyari14Gonderildi = false;
+            etkinlik.ImhaUyari3Gonderildi = false;
         }
         etkinlik.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -442,14 +467,16 @@ public static class EtkinlikUclari
         if (istek.SayacAktif.HasValue) ayar.SayacAktif = istek.SayacAktif.Value;
         if (istek.SayacAktifCumle != null) ayar.SayacAktifCumle = istek.SayacAktifCumle.Trim();
         if (istek.SayacBittiCumle != null) ayar.SayacBittiCumle = istek.SayacBittiCumle.Trim();
-        if (istek.KapanisPencereGun.HasValue)
-        {
-            var gun = istek.KapanisPencereGun.Value;
-            if (gun < Sabitler.MinKapanisPencereGun || gun > Sabitler.MaxKapanisPencereGun)
-                return Hata(400, "DOGRULAMA_HATASI",
-                    $"Kapanis penceresi en az {Sabitler.MinKapanisPencereGun} gun olmalidir (en fazla {Sabitler.MaxKapanisPencereGun}).");
-            ayar.KapanisPencereGun = gun;
-        }
+        // KAPANIS PENCERESI ARTIK DEGISTIRILEMEZ.
+        //
+        // Her defterde ayni: ozel gun + 30 gun toplama + 7 gun indirme = 37. Degisken
+        // sure, cifte esneklik degil BELIRSIZLIK veriyordu: kimse ne zaman ne olacagini
+        // bilmiyor, destek her seferinde "sizin defterinizde su tarih" demek zorunda
+        // kaliyordu. Tek kural, herkese ayni soz.
+        //
+        // Gelen istekte bu alan varsa SESSIZCE YOK SAYILIR (eski istemciler kirilmasin);
+        // ayar kolonu tarihsel olarak duruyor ama hicbir hesapta OKUNMUYOR.
+        ayar.KapanisPencereGun = Sabitler.ToplamaGun;
         ayar.UpdatedAt = DateTimeOffset.UtcNow;
 
         db.DenetimGunlukleri.Add(new DenetimGunlugu

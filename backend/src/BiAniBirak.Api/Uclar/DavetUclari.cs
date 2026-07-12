@@ -218,6 +218,17 @@ public static class DavetUclari
                 url: "/panel/etkinlik", etkinlikId: davet.EtkinlikId);
         }
 
+        // YENI ESE HOSGELDIN: sureci o da bilmeli. Ikinci es de ayni sorumlulugu
+        // tasir - ondan bilgi saklamak, onu magdur etmektir.
+        var etkinlikKaydi = await db.Etkinlikler.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == davet.EtkinlikId);
+        if (etkinlikKaydi != null)
+        {
+            await HosgeldinBildirimi.GonderAsync(
+                db, push, kullaniciId, etkinlikKaydi.Id,
+                $"{etkinlikKaydi.Es1Ad} & {etkinlikKaydi.Es2Ad}", etkinlikKaydi.Tur);
+        }
+
         // Aktif etkinlik olarak ayarla + JWT yenile (kullanici dogrudan deftere dussun)
         var kul = await db.Kullanicilar.AsNoTracking()
             .FirstOrDefaultAsync(k => k.Id == kullaniciId);
