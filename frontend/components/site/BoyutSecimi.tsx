@@ -19,26 +19,55 @@ import { createPortal } from "react-dom";
 
 export type Boyut = "a5" | "a4" | "a3";
 
-const BOYUTLAR: { kod: Boyut; ad: string; olcu: string; aciklama: string }[] = [
+// FOTOGRAF COZUNURLUGU - her boyutta ACIKCA gosterilir.
+//
+// Kaynak fotograflar 1600 piksel (davetli telefonundan yukluyor, sunucuya inmeden
+// once sikistiriliyor). Sayfa buyudukce ayni fotograf daha genis bir alana yayilir
+// ve SEYRELIR:
+//
+//   A5 -> 430 DPI  (fazlasiyla yeterli)
+//   A4 -> 303 DPI  (baski standardinin tam ustunde)
+//   A3 -> 214 DPI  (standardin ALTINDA - yazilar kusursuz kalir, fotograflar yumusar)
+//
+// Bu sayilari GIZLEMIYORUZ. Cift ne aldigini bilmeli; "fotograflariniz bozulmasin"
+// deyip, onerdigimiz boyutta bozulmasina goz yumamayiz.
+//
+// A4 ONERILEN: hem yeterince buyuk (album olcusu, fotograflar nefes alir), hem tam
+// baski standardi. Sektor de burada - Blurb ve Shutterfly'in ana urunleri 8x10 /
+// 8x11 inc, yani A4 civari.
+const BOYUTLAR: {
+  kod: Boyut;
+  ad: string;
+  olcu: string;
+  aciklama: string;
+  dpi: number;
+  onerilen?: boolean;
+}[] = [
   {
     kod: "a5",
     ad: "A5",
     olcu: "148 × 210 mm",
-    aciklama: "Klasik kitap ölçüsü. Elde tutması rahat, rafta durur.",
+    aciklama: "Roman ölçüsü. Elde tutması rahat, küçük ve mahrem.",
+    dpi: 430,
   },
   {
     kod: "a4",
     ad: "A4",
     olcu: "210 × 297 mm",
-    aciklama: "Albüm ölçüsü. Fotoğraflar daha büyük görünür.",
+    aciklama: "Albüm ölçüsü. Fotoğraflar nefes alır, yazı rahat okunur.",
+    dpi: 303,
+    onerilen: true,
   },
   {
     kod: "a3",
     ad: "A3",
     olcu: "297 × 420 mm",
-    aciklama: "Anıt ölçüsü. Masaya açılan, gösterişli bir eser.",
+    aciklama: "Anıt ölçüsü. Gösterişli ama fotoğraflar seyrelir.",
+    dpi: 214,
   },
 ];
+
+const BASKI_STANDARDI = 300;
 
 export function BoyutSecimi({
   acik,
@@ -51,7 +80,9 @@ export function BoyutSecimi({
   onSec: (boyut: Boyut) => void;
   uretiliyor: boolean;
 }) {
-  const [secili, setSecili] = useState<Boyut>("a5");
+  // Varsayilan = ONERILEN. Rozeti A4'e verip varsayilani A5 birakmak, kullaniciya
+  // "onerdigimizi kendimiz secmiyoruz" demektir.
+  const [secili, setSecili] = useState<Boyut>("a4");
 
   useEffect(() => {
     if (!acik) return;
@@ -127,7 +158,7 @@ export function BoyutSecimi({
                     <span className="font-govde text-xs tabular-nums text-ikincil">
                       {b.olcu}
                     </span>
-                    {b.kod === "a5" && (
+                    {b.onerilen && (
                       <span className="rounded-full bg-yaldiz/15 px-2 py-0.5 font-govde text-[0.55rem] uppercase tracking-etiket text-yaldiz">
                         Önerilen
                       </span>
@@ -135,6 +166,26 @@ export function BoyutSecimi({
                   </span>
                   <span className="mt-0.5 block font-govde text-xs text-ikincil">
                     {b.aciklama}
+                  </span>
+
+                  {/* DURUST COZUNURLUK: cift ne aldigini gormeli. */}
+                  <span className="mt-1 flex items-center gap-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        b.dpi >= BASKI_STANDARDI ? "bg-yaldiz" : "bg-sarap"
+                      }`}
+                      aria-hidden
+                    />
+                    <span
+                      className={`font-govde text-[0.62rem] tabular-nums ${
+                        b.dpi >= BASKI_STANDARDI ? "text-ikincil" : "text-sarap"
+                      }`}
+                    >
+                      Fotoğraflar {b.dpi} DPI
+                      {b.dpi >= BASKI_STANDARDI
+                        ? " · baskı standardının üstünde"
+                        : " · standardın altında, yumuşar"}
+                    </span>
                   </span>
                 </span>
 
