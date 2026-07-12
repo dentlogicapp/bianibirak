@@ -269,10 +269,17 @@ export async function davetliFotoYukle(
 // ustelik silmeye bile gerek yok, dosya ZATEN elde.
 //
 // Onizleme icin onizlemeSayfalari() var: PDF degil, 96 DPI goruntu.
-export async function defteriIndir(): Promise<{ ok: true } | { ok: false; mesaj: string }> {
+// BOYUT: cift, basimi hangi olcude yaptiracaksa o boyut secilir (a5 | a4 | a3).
+//
+// Belge DOGRUDAN o olcude uretilir. Yazicidan buyutmeye birakmak da mumkundur
+// (ISO 216 - A serisinin orani ayni, duzen bozulmaz), ama o zaman fotograflar
+// seyrelir: A3'e buyutmede 300 DPI -> ~215 DPI. Dogru boyutta uretilirse kalite korunur.
+export async function defteriIndir(
+  boyut: "a5" | "a4" | "a3" = "a5"
+): Promise<{ ok: true } | { ok: false; mesaj: string }> {
   try {
     const yanit = await fetch(
-      "/api/etkinlik/aktif/kurasyon/defter.pdf",
+      `/api/etkinlik/aktif/kurasyon/defter.pdf?boyut=${boyut}`,
       { credentials: "include" }
     );
     if (!yanit.ok) {

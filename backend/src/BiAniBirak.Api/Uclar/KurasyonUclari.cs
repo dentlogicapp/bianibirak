@@ -49,7 +49,7 @@ public static class KurasyonUclari
     // kalir. Paywall'in cizgisi tam olarak burasidir.
     private static async Task<IResult> DefterPdf(
         HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
-        DepolamaServisi depo)
+        DepolamaServisi depo, string? boyut = null)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
@@ -65,8 +65,13 @@ public static class KurasyonUclari
         // PDF uretimi TEK yerde: DefterDerleyici. Super panel "Defter Rontgeni" de
         // ayni servisi cagirir - iki kopya olsaydi kacinilmaz olarak ayrisir ve
         // yonetici, cift'in gordugunden BASKA bir PDF gorurdu.
+        // BOYUT: cift, basimi hangi olcude yaptiracaksa o boyut secilir. Belge
+        // dogrudan o olcude uretilir - yazicidan buyutmeye birakilirsa fotograflar
+        // seyrelir (A3'e buyutmede 300 DPI -> ~215 DPI).
+        var sayfaBoyutu = BaskiServisi.BoyutCoz(boyut);
+
         var (derleme, derlemeHatasi) = await DefterDerleyici.DerleAsync(
-            etkinlikId, db, depo, ortam.ContentRootPath);
+            etkinlikId, db, depo, ortam.ContentRootPath, sayfaBoyutu);
 
         if (derlemeHatasi != null)
             return Hata(
@@ -94,6 +99,7 @@ public static class KurasyonUclari
                 gruplama = kurasyon.GruplamaTipi,
                 kapak = kurasyon.KapakBaslik,
                 tarih = kurasyon.TarihGoster,
+                boyut = sayfaBoyutu.Kod,
             }),
             DilekSayisi = derleme.DilekSayisi,
             OlusturanKullaniciId = kullaniciId,
@@ -103,10 +109,12 @@ public static class KurasyonUclari
         // Hatirlatma gorevi bu kayda bakar: "indirdi mi?" sorusunun yaniti.
         await Denetim(db, etkinlikId, kullaniciId,
             "ESER_INDIRILDI", kurasyon.Id,
-            new { dilek_sayisi = derleme.DilekSayisi, tema = kurasyon.Tema });
+            new { dilek_sayisi = derleme.DilekSayisi, tema = kurasyon.Tema, boyut = sayfaBoyutu.Kod });
         await db.SaveChangesAsync();
 
-        var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri") + ".pdf";
+        // Dosya adinda boyut: cift birden fazla boy indirirse karistirmasin.
+        var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri")
+                       + $"-{sayfaBoyutu.Kod}.pdf";
 
         return Results.File(pdf, "application/pdf", dosyaAdi);
     }

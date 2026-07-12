@@ -154,8 +154,8 @@ public static class BaskiServisi
 
     // ---------------- BELGE ----------------
     // ODEME SONRASI: baskiya hazir PDF (300 DPI, tam kalite).
-    public static byte[] DefterUret(EserVerisi eser)
-        => DefterBelgesi(eser).GeneratePdf();
+    public static byte[] DefterUret(EserVerisi eser, SayfaBoyutu? boyut = null)
+        => DefterBelgesi(eser, boyut).GeneratePdf();
 
     // BELGE - hem PDF'e hem GORUNTUYE donusturulebilen ara form.
     //
@@ -168,37 +168,42 @@ public static class BaskiServisi
     // Fark yalniz cozunurluktedir: ekranda kusursuz, kagitta bulanik.
     //
     // Gormek bedava, BASMAK ucretli.
-    public static IDocument DefterBelgesi(EserVerisi eser)
+    public static IDocument DefterBelgesi(EserVerisi eser, SayfaBoyutu? boyut = null)
     {
+        var bo = boyut ?? BoyutA5;
+
         var belge = Document.Create(kapsayici =>
         {
+            // SCALE: icerigi olcek katsayisiyla orantili buyutur. QuestPDF, Scale
+            // kapsayicisindaki HER SEYI olcekler - metin, gorsel, padding, cerceve.
+            // A5'te 1.0, A4'te 1.419, A3'te 2.007. Tasarim birebir korunur.
             kapsayici.Page(sayfa =>
             {
-                SayfaKur(sayfa, eser, altbilgi: false);
-                sayfa.Content().Element(k => Kapak(k, eser));
+                SayfaKur(sayfa, eser, altbilgi: false, bo);
+                sayfa.Content().Scale(bo.Olcek).Element(k => Kapak(k, eser));
             });
 
             if (!string.IsNullOrWhiteSpace(eser.IthafMetni) || eser.IthafGorseli != null)
             {
                 kapsayici.Page(sayfa =>
                 {
-                    SayfaKur(sayfa, eser, altbilgi: false);
-                    sayfa.Content().Element(k => Ithaf(k, eser));
+                    SayfaKur(sayfa, eser, altbilgi: false, bo);
+                    sayfa.Content().Scale(bo.Olcek).Element(k => Ithaf(k, eser));
                 });
             }
 
             kapsayici.Page(sayfa =>
             {
-                SayfaKur(sayfa, eser, altbilgi: true);
-                sayfa.Content().Element(k => Dilekler(k, eser));
+                SayfaKur(sayfa, eser, altbilgi: true, bo);
+                sayfa.Content().Scale(bo.Olcek).Element(k => Dilekler(k, eser));
             });
 
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.KapanisGorseli != null)
             {
                 kapsayici.Page(sayfa =>
                 {
-                    SayfaKur(sayfa, eser, altbilgi: false);
-                    sayfa.Content().Element(k => Kapanis(k, eser));
+                    SayfaKur(sayfa, eser, altbilgi: false, bo);
+                    sayfa.Content().Scale(bo.Olcek).Element(k => Kapanis(k, eser));
                 });
             }
         });
@@ -229,21 +234,59 @@ public static class BaskiServisi
     // Matbaa standardi. 288 (QuestPDF varsayilani) bunun altindadir.
     private const int BaskiDpi = 300;
 
-    private static void SayfaKur(PageDescriptor sayfa, EserVerisi eser, bool altbilgi)
+    // ---------------- SAYFA BOYUTU ----------------
+    //
+    // ISO 216'nin armagani: A3, A4, A5, A6 - hepsi AYNI en-boy oranina sahiptir
+    // (1:kok2). Bu yuzden A5 tasarimi buyuk boya TASINDIGINDA hicbir sey bozulmaz:
+    // kirpma olmaz, oran kaymaz, cilt payi orantisini korur.
+    //
+    // Tek gereken bir OLCEK KATSAYISI. QuestPDF'in Scale() elementi, icindeki her
+    // seyi orantili buyutur: metin, gorsel, kenar bosluklari, cerceveler, yaldiz
+    // hatlar. Yani onlarca sabiti tek tek degistirmeye gerek YOK - tasarim BIREBIR
+    // korunur, yalniz buyur.
+    //
+    // Katsayi = hedef genislik / A5 genisligi (148mm).
+    public sealed record SayfaBoyutu(string Kod, string Ad, PageSize Sayfa, float Olcek);
+
+    public static readonly SayfaBoyutu BoyutA5 =
+        new("a5", "A5", PageSizes.A5, 1.0f);          // 148x210mm - kitap olcusu, varsayilan
+    public static readonly SayfaBoyutu BoyutA4 =
+        new("a4", "A4", PageSizes.A4, 210f / 148f);   // 210x297mm - 1.419x
+    public static readonly SayfaBoyutu BoyutA3 =
+        new("a3", "A3", PageSizes.A3, 297f / 148f);   // 297x420mm - 2.007x
+
+    public static SayfaBoyutu BoyutCoz(string? kod) => (kod ?? "").ToLowerInvariant() switch
     {
-        sayfa.Size(PageSizes.A5);
-        sayfa.MarginTop(18, Unit.Millimetre);
-        sayfa.MarginBottom(16, Unit.Millimetre);
-        sayfa.MarginLeft(20, Unit.Millimetre);   // cilt payi
-        sayfa.MarginRight(15, Unit.Millimetre);
+        "a4" => BoyutA4,
+        "a3" => BoyutA3,
+        _ => BoyutA5,
+    };
+
+    private static void SayfaKur(
+        PageDescriptor sayfa, EserVerisi eser, bool altbilgi, SayfaBoyutu bo)
+    {
+        sayfa.Size(bo.Sayfa);
+
+        // KENAR BOSLUKLARI DA OLCEKLENIR - Scale yalniz icerigi buyutur, margin'e
+        // dokunmaz. Olceklemezsek: A3'te icerik 2 kat buyur ama kenar bosluklari A5
+        // olcusunde kalir - sayfa tasar, cilt payi erir, kitap kesilirken yazi gider.
+        //
+        // Orantili buyutuldugunde icerik alani da tam 2 kat olur; duzen BIREBIR ayni
+        // gorunur, yalniz daha buyuk kagitta.
+        sayfa.MarginTop(18 * bo.Olcek, Unit.Millimetre);
+        sayfa.MarginBottom(16 * bo.Olcek, Unit.Millimetre);
+        sayfa.MarginLeft(20 * bo.Olcek, Unit.Millimetre);   // cilt payi
+        sayfa.MarginRight(15 * bo.Olcek, Unit.Millimetre);
         sayfa.PageColor(Kagit);
         sayfa.DefaultTextStyle(x =>
             x.FontFamily(GovdeFont).FontSize(10).FontColor(MurekkepYumusak));
 
         if (altbilgi)
         {
-            // Sayfa numarasi: yaldiz hatlar arasinda - kitap hissi
-            sayfa.Footer().PaddingTop(10).AlignCenter().Row(satir =>
+            // Sayfa numarasi: yaldiz hatlar arasinda - kitap hissi.
+            // Altbilgi de OLCEKLENIR: yoksa A3'te sayfa numarasi ve yaldiz hatlar
+            // A5 olcusunde kalir - koca sayfanin altinda minicik, orantisiz durur.
+            sayfa.Footer().Scale(bo.Olcek).PaddingTop(10).AlignCenter().Row(satir =>
             {
                 satir.AutoItem().PaddingTop(5).Width(16).Height(0.5f).Background(YaldizSolgun);
                 satir.AutoItem().PaddingHorizontal(9).Text(t =>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api, defteriIndir, type Katki, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { DefterOnizleme } from "@/components/site/DefterOnizleme";
+import { BoyutSecimi, type Boyut } from "@/components/site/BoyutSecimi";
 import { DefterKarti } from "@/components/site/DefterKarti";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DilekInceleme } from "@/components/site/DilekInceleme";
@@ -88,6 +89,10 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   const [inceleme, setInceleme] = useState<KurasyonOgesi | null>(null);
   const [tamamlaniyor, setTamamlaniyor] = useState(false);
   const [uretiliyor, setUretiliyor] = useState<"onizleme" | "baski" | null>(null);
+
+  // BOYUT SECIMI: indirmeden once sorulur. Sonradan telafisi olmayan bir karar -
+  // yanlis boyutta indirilen defter matbaada buyutulunce fotograflar seyrelir.
+  const [boyutAcik, setBoyutAcik] = useState(false);
   const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
 
   const degisti =
@@ -151,14 +156,15 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     }
   }
 
-  async function defterUret() {
+  async function defterUret(boyut: Boyut) {
     setUretiliyor("baski");
-    const c = await defteriIndir();
+    const c = await defteriIndir(boyut);
     setUretiliyor(null);
     if (!c.ok) {
       toast.error(c.mesaj);
       return;
     }
+    setBoyutAcik(false);
     toast.success("Baskıya hazır defterin indirildi.");
   }
 
@@ -531,7 +537,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
               dikkati uzerine cekmeli. Yanip sonme YOK (ucuz durur, gozu yorar);
               yavas gecen parilti + nefes alan halka VAR - devlerin yontemi. */}
           <button
-            onClick={() => defterUret()}
+            onClick={() => setBoyutAcik(true)}
             disabled={uretiliyor !== null || dahilOgeler.length === 0}
             className="premium-vurgu flex w-full max-w-md min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
           >
@@ -575,15 +581,25 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
               </svg>
             </span>
             <span className="metin-yasli min-w-0 font-govde text-xs leading-relaxed text-ikincil">
-              Basım öncesinde kağıt boyutunu (A3, A4, A5 vb.), baskı kalitesini (DPI
-              ayarı) ve ölçeklendirme ayarlarını (kağıda sığdır, yazdırılabilir alana
-              sığdır, özel vb.) yapmayı unutma!{" "}
+              İndirirken{" "}
+              <span className="font-medium text-murekkep">basacağın kâğıt boyutunu</span>{" "}
+              (A5, A4, A3) seçeceksin — defter doğrudan o ölçüde üretilir. Yazdırırken
+              ölçeklendirmeyi <span className="font-medium text-murekkep">"gerçek boyut"</span>{" "}
+              bırak ve baskı kalitesini en yükseğe al.{" "}
               <span className="font-medium text-murekkep">
                 Hiçbir şey bozulmaz, düzenlemelerin aynı kalır.
               </span>
             </span>
           </p>
         </div>
+
+        {/* BOYUT SECIMI - indirmeden onceki son karar */}
+        <BoyutSecimi
+          acik={boyutAcik}
+          onKapat={() => setBoyutAcik(false)}
+          onSec={(b) => void defterUret(b)}
+          uretiliyor={uretiliyor === "baski"}
+        />
 
         {/* Muhurleme */}
         {!tamamlandi && (

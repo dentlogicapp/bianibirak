@@ -45,16 +45,24 @@ public static class DefterDerleyici
         return (BaskiServisi.DefterBelgesi(eser!.Eser), null);
     }
 
+    // BOYUT: cift, basimi hangi olcude yaptiracaksa O boyutu secmeli.
+    //
+    // Neden onemli: A5 belgeyi yazicidan A3'e buyuterek basmak MUMKUNDUR (ISO orani
+    // ayni), ama fotograflar o buyutmede seyrelir - 300 DPI'dan ~215 DPI'ya duser.
+    // Belgeyi DOGRUDAN A3 uretirsek, fotograf o olcude yerlestirilir ve kalite korunur.
+    //
+    // Yazilar her iki halde de kusursuz (vektor). Fark yalniz fotograflarda hissedilir.
     public static async Task<(Sonuc? sonuc, Hata? hata)> DerleAsync(
         Guid etkinlikId,
         BiAniBirakDbContext db,
         DepolamaServisi depo,
-        string icerikKoku)
+        string icerikKoku,
+        BaskiServisi.SayfaBoyutu? boyut = null)
     {
         var (veri, hata) = await EserAsync(etkinlikId, db, depo, icerikKoku);
         if (hata != null) return (null, hata);
 
-        var pdf = BaskiServisi.DefterUret(veri!.Eser);
+        var pdf = BaskiServisi.DefterUret(veri!.Eser, boyut);
         return (new Sonuc(pdf, veri.Kurasyon, veri.DilekSayisi), null);
     }
 
