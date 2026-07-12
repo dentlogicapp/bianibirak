@@ -262,12 +262,17 @@ export async function davetliFotoYukle(
   }
 }
 
-// Baskiya hazir defteri indir (PDF - blob, JSON degil).
-// onizleme=true -> filigranli surum (satin alma oncesi).
-export async function defteriIndir(onizleme = false): Promise<{ ok: true } | { ok: false; mesaj: string }> {
+// BASKIYA HAZIR DEFTER - 300 DPI, tam kalite.
+//
+// "onizleme" parametresi KALDIRILDI. Eski surumde filigranli PDF indiriliyordu; bu,
+// urunu bedava dagitmakti - filigran bir goruntu modeliyle saniyeler icinde silinir,
+// ustelik silmeye bile gerek yok, dosya ZATEN elde.
+//
+// Onizleme icin onizlemeSayfalari() var: PDF degil, 96 DPI goruntu.
+export async function defteriIndir(): Promise<{ ok: true } | { ok: false; mesaj: string }> {
   try {
     const yanit = await fetch(
-      `/api/etkinlik/aktif/kurasyon/defter.pdf${onizleme ? "?onizleme=true" : ""}`,
+      "/api/etkinlik/aktif/kurasyon/defter.pdf",
       { credentials: "include" }
     );
     if (!yanit.ok) {
@@ -530,6 +535,13 @@ export const api = {
   superDefterDetay: (id: string) =>
     istek<SuperDefterDetay>(`/api/super/defter/${id}/detay`),
   superOlcum: () => istek<SuperOlcum>("/api/super/olcum"),
+
+  // --- KVKK Yonetimi ---
+  superMetinler: () => istek<MetinKatalog[]>("/api/super/metinler"),
+  superMetinSurumler: (anahtar: string) =>
+    istek<MetinSurum[]>(`/api/super/metin/${encodeURIComponent(anahtar)}/surumler`),
+  superOnaylar: (ara?: string) =>
+    istek<OnayArsivi>(`/api/super/onaylar${ara ? `?ara=${encodeURIComponent(ara)}` : ""}`),
   superImhaCalistir: () =>
     istek<{ ok: boolean; imha_edilen: number }>("/api/super/imha/calistir", {
       method: "POST",
@@ -701,6 +713,120 @@ export const api = {
     ),
 };
 
+// ---------------- ONIZLEME (goruntu, PDF degil) ----------------
+
+export type OnizlemeBilgi = {
+  sayfa_sayisi: number;
+  onizleme_dpi: number;
+  baski_dpi: number;
+};
+
+export function onizlemeBilgi() {
+  return istek<OnizlemeBilgi>("/api/etkinlik/aktif/kurasyon/onizleme");
+}
+
+// Sayfa GORUNTUSU (PNG). Dosya degil - tarayicida goruntu olarak akar.
+// "Farkli kaydet" derse elinde 96 DPI bir PNG olur: ekranda guzel, kagitta bulanik.
+export function onizlemeSayfaUrl(sayfa: number): string {
+  return `/api/etkinlik/aktif/kurasyon/onizleme/${sayfa}.png`;
+}
+
+// ---------------- KVKK YONETIMI (Planlama deseni, cok metinli) ----------------
+
+export type MetinKatalog = {
+  id: string;
+  anahtar: string;
+  baslik: string;
+  icerik: string;
+  kapsam: string; // "es" | "davetli"
+  zorunlu: boolean;
+  sira: number;
+  deprecated: boolean;
+  surum: string;
+  hash: string;
+  yururluk_tarihi: string;
+  guncelleme: string;
+  surum_sayisi: number;
+  onay_sayisi: number;
+};
+
+export type MetinSurum = {
+  id: string;
+  surum: string;
+  hash: string;
+  baslik: string;
+  icerik: string;
+  yururluk_tarihi: string;
+  created_at: string;
+};
+
+export type OnayKaydi = {
+  id: string;
+  kullanici_id: string | null;
+  ad: string | null;
+  email: string | null;
+  silinmis: boolean;
+  metin_anahtar: string;
+  metin_surum: string;
+  metin_hash: string;
+  ip: string | null;
+  tarayici: string | null;
+  created_at: string;
+};
+
+export type OnayArsivi = {
+  kayitlar: OnayKaydi[];
+  guncel_metinler: {
+    anahtar: string;
+    baslik: string;
+    surum: string;
+    hash: string;
+    yururluk: string;
+  }[];
+  toplam: number;
+};
+
+// Kanit belgesi - avukata/mahkemeye sunulabilir tek PDF.
+export async function kanitIndir(onayId: string): Promise<{ ok: boolean; mesaj: string }> {
+  try {
+    const y = await fetch(`/api/super/onay/${onayId}/kanit.pdf`, { credentials: "include" });
+    if (!y.ok) return { ok: false, mesaj: "Kanıt belgesi üretilemedi." };
+    const blob = await y.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `onay-kaniti-${onayId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true, mesaj: "Kanıt belgesi indirildi." };
+  } catch {
+    return { ok: false, mesaj: "Kanıt belgesi üretilemedi." };
+  }
+}
+
+// Onam kayitlari - toplu CSV (denetim/avukat icin).
+export async function onamCsvIndir(kapsam?: string): Promise<{ ok: boolean; mesaj: string }> {
+  try {
+    const q = kapsam ? `?kapsam=${kapsam}` : "";
+    const y = await fetch(`/api/super/onaylar/belge.csv${q}`, { credentials: "include" });
+    if (!y.ok) return { ok: false, mesaj: "Belge üretilemedi." };
+    const blob = await y.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "onam-kayitlari.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return { ok: true, mesaj: "Onam kayıtları indirildi." };
+  } catch {
+    return { ok: false, mesaj: "Belge üretilemedi." };
+  }
+}
+
 // ---------------- SUPER PANEL TESHIS (Tur S) ----------------
 
 export type SuperDefterDetay = {
@@ -762,7 +888,6 @@ export type SuperDefterDetay = {
 
   ciktilar: {
     tip: string;
-    filigranli: boolean;
     dilek_sayisi: number;
     created_at: string;
   }[];

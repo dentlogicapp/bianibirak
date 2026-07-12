@@ -9,13 +9,13 @@ import {
   type SuperDefter,
   type SuperKullanici,
   type AkisKaydi,
-  type KvkkMetin,
   type KvkkTalep,
   type CopKutusu,
 } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
+import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
@@ -105,7 +105,7 @@ export default function SuperPanelSayfasi() {
         {sekme === "olcum" && <OlcumSekmesi />}
         {sekme === "kullanicilar" && <KullanicilarSekmesi />}
         {sekme === "cop" && <CopSekmesi />}
-        {sekme === "kvkk" && <KvkkSekmesi />}
+        {sekme === "kvkk" && <KvkkYonetimi />}
         {sekme === "akis" && <AkisSekmesi />}
       </div>
     </AppShell>
@@ -688,166 +688,6 @@ function CopSekmesi() {
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-// ---------------- KVKK ----------------
-function KvkkSekmesi() {
-  const [metinler, setMetinler] = useState<KvkkMetin[]>([]);
-  const [talepler, setTalepler] = useState<KvkkTalep[]>([]);
-  const [acikMetin, setAcikMetin] = useState<string | null>(null);
-  const [taslak, setTaslak] = useState("");
-  const [kaydediliyor, setKaydediliyor] = useState(false);
-
-  const cek = useCallback(async () => {
-    const [m, t] = await Promise.all([api.superKvkkMetinler(), api.superKvkkTalepler()]);
-    if (m.ok) setMetinler(m.veri);
-    if (t.ok) setTalepler(t.veri);
-  }, []);
-
-  useEffect(() => {
-    void cek();
-  }, [cek]);
-
-  async function metinKaydet(anahtar: string) {
-    setKaydediliyor(true);
-    const c = await api.superKvkkMetinGuncelle(anahtar, { icerik: taslak });
-    setKaydediliyor(false);
-    if (!c.ok) {
-      toast.error(c.mesaj);
-      return;
-    }
-    toast.success("Metin güncellendi ve yayına alındı.");
-    setAcikMetin(null);
-    void cek();
-  }
-
-  async function talepIsle(t: KvkkTalep, durum: string) {
-    const c = await api.superKvkkTalepIsle(t.id, durum);
-    if (!c.ok) {
-      toast.error(c.mesaj);
-      return;
-    }
-    toast.success("Talep güncellendi.");
-    void cek();
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Talepler */}
-      <section>
-        <p className="mb-3 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-          İlgili kişi talepleri (KVKK - 30 gün yasal süre)
-        </p>
-        {talepler.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-8 text-center font-govde text-sm text-ikincil">
-            Bekleyen talep yok.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {talepler.map((t) => (
-              <div key={t.id} className="min-w-0 rounded-2xl border border-ayrac bg-yuzey p-4">
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-govde text-sm font-medium text-murekkep">
-                      {talepTipi(t.tip)} · {t.email}
-                    </p>
-                    <p className="metin-yasli mt-1 font-govde text-sm text-ikincil">
-                      {t.aciklama}
-                    </p>
-                    <p className="mt-1 font-govde text-xs text-ikincil">
-                      Son yanıt: {tarihKisa(t.son_yanit_tarihi)}
-                    </p>
-                  </div>
-                  <Rozet
-                    metin={talepDurumu(t.durum)}
-                    tip={t.durum === "yeni" ? "uyari" : "soluk"}
-                  />
-                </div>
-                {(t.durum === "yeni" || t.durum === "islemde") && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => talepIsle(t, "islemde")}
-                      className="rounded-full border border-ayrac px-4 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                    >
-                      İşleme al
-                    </button>
-                    <button
-                      onClick={() => talepIsle(t, "tamamlandi")}
-                      className="rounded-full bg-sarap px-4 py-1.5 font-govde text-xs font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
-                    >
-                      Tamamlandı
-                    </button>
-                    <button
-                      onClick={() => talepIsle(t, "reddedildi")}
-                      className="rounded-full border border-ayrac px-4 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                    >
-                      Reddet
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Metinler */}
-      <section>
-        <p className="mb-3 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-          Yasal metinler (KVKK, gizlilik, kullanım koşulları)
-        </p>
-        {metinler.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-8 text-center font-govde text-sm text-ikincil">
-            Henüz metin tanımlanmamış.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {metinler.map((m) => (
-              <div key={m.anahtar} className="min-w-0 rounded-2xl border border-ayrac bg-yuzey p-4">
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-govde text-sm font-medium text-murekkep">
-                      {m.baslik}
-                    </p>
-                    <p className="font-govde text-xs text-ikincil">
-                      Yürürlük: {tarihKisa(m.yururluk_tarihi)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setAcikMetin(acikMetin === m.anahtar ? null : m.anahtar);
-                      setTaslak(m.icerik);
-                    }}
-                    className="shrink-0 rounded-full border border-ayrac px-4 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                  >
-                    {acikMetin === m.anahtar ? "Kapat" : "Düzenle"}
-                  </button>
-                </div>
-
-                {acikMetin === m.anahtar && (
-                  <div className="mt-3">
-                    <textarea
-                      value={taslak}
-                      onChange={(e) => setTaslak(e.target.value)}
-                      rows={12}
-                      className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm leading-relaxed text-murekkep outline-none focus:border-sarap"
-                    />
-                    <button
-                      onClick={() => metinKaydet(m.anahtar)}
-                      disabled={kaydediliyor}
-                      className="mt-3 rounded-full bg-sarap px-6 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
-                    >
-                      {kaydediliyor ? "Kaydediliyor..." : "Kaydet ve yayına al"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

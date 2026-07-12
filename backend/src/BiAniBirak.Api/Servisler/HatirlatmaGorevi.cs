@@ -116,9 +116,13 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         var idler = defterler.Select(d => d.Id).ToList();
 
-        // INDIRENLER: filigransiz cikti almis defterler. Bunlara hatirlatma GITMEZ.
+        // INDIRENLER: eserini indirmis defterler. Bunlara hatirlatma GITMEZ.
+        //
+        // Onceki surumde "filigransiz cikti" diye bir ayrim vardi - cunku filigranli
+        // PDF de indirilebiliyordu. O aciklik kapatildi: artik PDF cikisi TEK anlama
+        // gelir, gercek indirme. Onizleme dosya uretmez, goruntu uretir.
         var indirenler = (await db.KurasyonCiktilari.AsNoTracking()
-            .Where(c => idler.Contains(c.EtkinlikId) && !c.Filigranli)
+            .Where(c => idler.Contains(c.EtkinlikId))
             .Select(c => c.EtkinlikId)
             .Distinct()
             .ToListAsync(ct))

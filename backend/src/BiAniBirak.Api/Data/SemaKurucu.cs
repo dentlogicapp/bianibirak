@@ -268,7 +268,6 @@ public static class SemaKurucu
             "EtkinlikId" uuid NOT NULL,
             "Tip" text NOT NULL,
             "AyarlarAnlik" jsonb NOT NULL DEFAULT '{}'::jsonb,
-            "Filigranli" boolean NOT NULL DEFAULT false,
             "SayfaSayisi" integer NOT NULL DEFAULT 0,
             "DilekSayisi" integer NOT NULL DEFAULT 0,
             "OlusturanKullaniciId" uuid NULL,
@@ -343,6 +342,31 @@ public static class SemaKurucu
         -- HUKUKI KANIT: metin surum + hash (onaylanan metnin o gunku hali ispatlanabilsin)
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Surum" text NOT NULL DEFAULT '';
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Hash" text NOT NULL DEFAULT '';
+
+        -- FILIGRAN KALDIRILDI - is modelinin duzeltilmesi.
+        --
+        -- Eski model: satin alma oncesi FILIGRANLI PDF indiriliyordu. Bu, urunu bedava
+        -- dagitmakti: filigran bir goruntu modeliyle saniyeler icinde silinir - ustelik
+        -- silmeye bile gerek yok, baskiya hazir dosya ZATEN elde ediliyordu.
+        --
+        -- Yeni model: onizleme PDF DEGIL, 96 DPI goruntudur. PDF cikisi = GERCEK indirme.
+        --
+        -- 1) Eski "onizleme" kayitlari SILINIR: onlar indirme degildi, ama yeni modelde
+        --    her cikti kaydi indirme sayilir. Kalsalardi, o cifte "zaten indirmis" deyip
+        --    hatirlatma GONDERMEZDIK - ve cift mirasini kaybederdi.
+        -- DINAMIK BLOK ZORUNLU: kolon yoksa duz DELETE parse hatasi verir (PostgreSQL,
+        -- EXISTS kosulu false olsa bile kolon adini cozmeye calisir). Idempotent.
+        DO $imha$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'kurasyon_ciktilari' AND column_name = 'Filigranli'
+            ) THEN
+                EXECUTE 'DELETE FROM kurasyon_ciktilari WHERE "Filigranli" = true';
+                EXECUTE 'ALTER TABLE kurasyon_ciktilari DROP COLUMN "Filigranli"';
+            END IF;
+        END
+        $imha$;
 
         -- METIN KATALOGU (Planlama sema deseni): kapsam / zorunlu / sira / deprecated
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Kapsam" text NOT NULL DEFAULT 'es';

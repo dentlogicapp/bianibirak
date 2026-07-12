@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, defteriIndir, type Katki, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { DefterOnizleme } from "@/components/site/DefterOnizleme";
 import { DefterKarti } from "@/components/site/DefterKarti";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DilekInceleme } from "@/components/site/DilekInceleme";
@@ -150,19 +151,15 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     }
   }
 
-  async function defterUret(onizleme: boolean) {
-    setUretiliyor(onizleme ? "onizleme" : "baski");
-    const c = await defteriIndir(onizleme);
+  async function defterUret() {
+    setUretiliyor("baski");
+    const c = await defteriIndir();
     setUretiliyor(null);
     if (!c.ok) {
       toast.error(c.mesaj);
       return;
     }
-    toast.success(
-      onizleme
-        ? "Önizleme indirildi - filigranlı, baskıya uygun değil."
-        : "Baskıya hazır defterin indirildi."
-    );
+    toast.success("Baskıya hazır defterin indirildi.");
   }
 
   async function mirasiTamamla() {
@@ -496,6 +493,23 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         </div>
       </div>
 
+      {/* ONIZLEME - defterin kendisi. FILIGRAN YOK.
+          Once GORSUN: gurur duysun, paylasmak istesin. Satin alma arzusu buradan dogar.
+          Filigran bunun tam tersini yapardi - urunu cirkinlestirip arzuyu dusururdu. */}
+      {dahilOgeler.length > 0 && (
+        <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
+          <div className="text-center">
+            <p className="font-display text-xl text-murekkep">Defterin</p>
+            <p className="metin-yasli mx-auto mt-2 max-w-lg font-govde text-sm leading-relaxed text-ikincil">
+              Sayfaları çevir, gör. Bastığında elinde tam olarak bu olacak.
+            </p>
+          </div>
+          <div className="mx-auto mt-6 max-w-md">
+            <DefterOnizleme />
+          </div>
+        </section>
+      )}
+
       {/* CIKTI MERKEZI - eserin kagida dokuldugu yer */}
       <div className="mt-6 rounded-3xl border border-yaldiz/40 bg-yaldiz/5 p-6 sm:p-8">
         <div className="text-center">
@@ -508,32 +522,10 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           </p>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          {/* Onizleme (filigranli) */}
-          <button
-            onClick={() => defterUret(true)}
-            disabled={uretiliyor !== null || dahilOgeler.length === 0}
-            className="flex min-w-0 items-center gap-3 rounded-2xl border border-ayrac bg-yuzey p-5 text-left transition-colors hover:border-sarap disabled:opacity-50"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ikincil/10 text-ikincil">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-                <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth={1.6} fill="none" />
-              </svg>
-            </span>
-            <span className="min-w-0">
-              <span className="block font-govde text-sm font-medium text-murekkep">
-                {uretiliyor === "onizleme" ? "Hazırlanıyor..." : "Önizlemeyi indir"}
-              </span>
-              <span className="block font-govde text-xs text-ikincil">
-                Filigranlı - kalitesini gör, sonra karar ver
-              </span>
-            </span>
-          </button>
-
+        <div className="mt-6">
           {/* Baskiya hazir */}
           <button
-            onClick={() => defterUret(false)}
+            onClick={() => defterUret()}
             disabled={uretiliyor !== null || dahilOgeler.length === 0}
             className="flex min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
           >

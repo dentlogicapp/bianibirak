@@ -72,7 +72,7 @@ export function DefterDetayModal({
     setRontgenBekliyor(true);
     const c = await rontgenIndir(defterId);
     setRontgenBekliyor(false);
-    if (c.ok) toast.success("Röntgen indirildi (filigranlı).");
+    if (c.ok) toast.success("Röntgen indirildi.");
     else toast.error(c.mesaj);
   }
 
@@ -175,9 +175,7 @@ export function DefterDetayModal({
                     {veri.ciktilar.length > 0 && (
                       <Satir
                         etiket="Son çıktı"
-                        deger={`${tarih(veri.ciktilar[0].created_at)} · ${
-                          veri.ciktilar[0].filigranli ? "önizleme" : "indirme"
-                        }`}
+                        deger={`${tarih(veri.ciktilar[0].created_at)} · ${veri.ciktilar[0].dilek_sayisi} dilek`}
                       />
                     )}
                   </div>
@@ -249,7 +247,7 @@ export function DefterDetayModal({
             title={
               veri && !veri.kurasyon
                 ? "Kürasyon açılmamış - PDF üretilemez"
-                : "Çiftin gördüğü PDF'i üret (filigranlı)"
+                : "Çiftin gördüğü PDF'i üret"
             }
             className="flex-1 rounded-full bg-sarap px-5 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-40"
           >

@@ -26,12 +26,47 @@ public static class DefterDerleyici
     public sealed record Hata(string Kod, string Mesaj);
 
     // Etkinligin defterini derler. Yetki/tenant kontrolu CAGIRANDA yapilmis olmalidir.
-    public static async Task<(Sonuc? sonuc, Hata? hata)> DerleAsync(
+    // BELGE - PDF'e de goruntuye de donusturulebilen ara form.
+    //
+    // Onizleme PNG uretir (96 DPI, ekran), indirme PDF uretir (300 DPI, baski). Ikisi
+    // de AYNI belgeden gelir - yani onizlemede gordugun sey, bastiginda alacagin seyin
+    // BIREBIR AYNISIDIR. Sadece cozunurluk farkli.
+    //
+    // Bu ayrim, filigranin yerini alan is modelidir: gormek bedava, BASMAK ucretli.
+    public static async Task<(QuestPDF.Infrastructure.IDocument? belge, Hata? hata)> BelgeAsync(
         Guid etkinlikId,
         BiAniBirakDbContext db,
         DepolamaServisi depo,
         string icerikKoku,
-        bool filigranli)
+        CancellationToken ct = default)
+    {
+        var (eser, hata) = await EserAsync(etkinlikId, db, depo, icerikKoku, ct);
+        if (hata != null) return (null, hata);
+        return (BaskiServisi.DefterBelgesi(eser!.Eser), null);
+    }
+
+    public static async Task<(Sonuc? sonuc, Hata? hata)> DerleAsync(
+        Guid etkinlikId,
+        BiAniBirakDbContext db,
+        DepolamaServisi depo,
+        string icerikKoku)
+    {
+        var (veri, hata) = await EserAsync(etkinlikId, db, depo, icerikKoku);
+        if (hata != null) return (null, hata);
+
+        var pdf = BaskiServisi.DefterUret(veri!.Eser);
+        return (new Sonuc(pdf, veri.Kurasyon, veri.DilekSayisi), null);
+    }
+
+    private sealed record EserVeri(
+        BaskiServisi.EserVerisi Eser, Kurasyon Kurasyon, int DilekSayisi);
+
+    private static async Task<(EserVeri? veri, Hata? hata)> EserAsync(
+        Guid etkinlikId,
+        BiAniBirakDbContext db,
+        DepolamaServisi depo,
+        string icerikKoku,
+        CancellationToken ct = default)
     {
         var etkinlik = await db.Etkinlikler.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == etkinlikId && !e.SilindiMi);
@@ -138,10 +173,8 @@ public static class DefterDerleyici
             KapakGorseli: kapakG,
             IthafGorseli: ithafG,
             KapanisGorseli: kapanisG,
-            BolumGorselleri: bolumG,
-            Filigranli: filigranli);
+            BolumGorselleri: bolumG);
 
-        var pdf = BaskiServisi.DefterUret(eser);
-        return (new Sonuc(pdf, kurasyon, dilekler.Count), null);
+        return (new EserVeri(eser, kurasyon, dilekler.Count), null);
     }
 }

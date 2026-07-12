@@ -26,13 +26,30 @@ public static class KurasyonUclari
         app.MapPost("/api/etkinlik/aktif/kurasyon/sirala", Sirala).RequireAuthorization();
         app.MapPost("/api/etkinlik/aktif/kurasyon/tamamla", Tamamla).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/kurasyon/defter.pdf", DefterPdf).RequireAuthorization();
+
+        // ONIZLEME - PDF DEGIL, GORUNTU.
+        //
+        // Eski surumde burada "?onizleme=true" ile FILIGRANLI PDF indiriliyordu. Bu,
+        // urunu bedava dagitmakti: filigran bir goruntu modeliyle saniyeler icinde
+        // silinir - ustelik silmeye bile gerek yok, baskiya hazir dosya ZATEN elde.
+        //
+        // Simdi: PDF hic uretilmez. Sunucu 96 DPI PNG gonderir. Ekranda kusursuz,
+        // kagitta bulanik. Gormek bedava, BASMAK ucretli.
+        app.MapGet("/api/etkinlik/aktif/kurasyon/onizleme", OnizlemeBilgi).RequireAuthorization();
+        app.MapGet("/api/etkinlik/aktif/kurasyon/onizleme/{sayfa:int}.png", OnizlemeSayfa).RequireAuthorization();
     }
 
-    // BASKIYA HAZIR DEFTER (Belge 01 - asil deger).
-    // onizleme=true -> filigranli (satin alma oncesi; Belge 05 paywall matrisi).
+    // BASKIYA HAZIR DEFTER - 300 DPI, tam kalite (Belge 01: asil deger).
+    //
+    // FILIGRANLI SURUM YOK. "onizleme=true" parametresi KALDIRILDI: satin alma
+    // oncesi dosya vermek, urunu bedava dagitmaktir. Onizleme icin OnizlemeSayfa
+    // ucu var - PDF degil, 96 DPI goruntu doner.
+    //
+    // Odeme katmani baglandiginda bu uc paywall'in ARDINA gecer; onizleme ucu acik
+    // kalir. Paywall'in cizgisi tam olarak burasidir.
     private static async Task<IResult> DefterPdf(
         HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
-        DepolamaServisi depo, bool onizleme = false)
+        DepolamaServisi depo)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
@@ -49,7 +66,7 @@ public static class KurasyonUclari
         // ayni servisi cagirir - iki kopya olsaydi kacinilmaz olarak ayrisir ve
         // yonetici, cift'in gordugunden BASKA bir PDF gorurdu.
         var (derleme, derlemeHatasi) = await DefterDerleyici.DerleAsync(
-            etkinlikId, db, depo, ortam.ContentRootPath, filigranli: onizleme);
+            etkinlikId, db, depo, ortam.ContentRootPath);
 
         if (derlemeHatasi != null)
             return Hata(
@@ -78,20 +95,77 @@ public static class KurasyonUclari
                 kapak = kurasyon.KapakBaslik,
                 tarih = kurasyon.TarihGoster,
             }),
-            Filigranli = onizleme,
             DilekSayisi = derleme.DilekSayisi,
             OlusturanKullaniciId = kullaniciId,
             CreatedAt = DateTimeOffset.UtcNow,
         });
+        // Her PDF cikisi GERCEK INDIRMEDIR - onizleme diye bir cikti tipi yok.
+        // Hatirlatma gorevi bu kayda bakar: "indirdi mi?" sorusunun yaniti.
         await Denetim(db, etkinlikId, kullaniciId,
-            onizleme ? "ESER_ONIZLENDI" : "ESER_INDIRILDI", kurasyon.Id,
+            "ESER_INDIRILDI", kurasyon.Id,
             new { dilek_sayisi = derleme.DilekSayisi, tema = kurasyon.Tema });
         await db.SaveChangesAsync();
 
-        var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri")
-                       + (onizleme ? "-onizleme" : "") + ".pdf";
+        var dosyaAdi = Temizle($"{etkinlik.Es1Ad}-{etkinlik.Es2Ad}-ani-defteri") + ".pdf";
 
         return Results.File(pdf, "application/pdf", dosyaAdi);
+    }
+
+    // ---------------- ONIZLEME (goruntu) ----------------
+
+    // Kac sayfa, hangi cozunurlukte - goruntuleyici bunu bilerek yuklenir.
+    private static async Task<IResult> OnizlemeBilgi(
+        HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
+        DepolamaServisi depo)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var (sayfalar, hata) = await OnizlemeServisi.SayfalarAsync(
+            etkinlikId, db, depo, ortam.ContentRootPath);
+
+        if (hata != null)
+            return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);
+
+        return Results.Json(new
+        {
+            sayfa_sayisi = sayfalar!.Count,
+            onizleme_dpi = OnizlemeServisi.OnizlemeDpi,
+            baski_dpi = OnizlemeServisi.BaskiDpi,
+        });
+    }
+
+    // TEK SAYFA - PNG. Kullanicinin eline dosya GECMEZ, goruntu gecer.
+    //
+    // "Farkli kaydet" derse elinde 96 DPI bir PNG olur: ekranda guzel, A4'e
+    // basildiginda gorunur sekilde bulanik. Baski 300 DPI ister; bu onun ucte biri.
+    // Kopyalamayi ENGELLEMIYORUZ - kopyanin ISE YARAMAMASINI sagliyoruz.
+    private static async Task<IResult> OnizlemeSayfa(
+        int sayfa, HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
+        DepolamaServisi depo)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var (sayfalar, hata) = await OnizlemeServisi.SayfalarAsync(
+            etkinlikId, db, depo, ortam.ContentRootPath);
+
+        if (hata != null)
+            return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);
+
+        if (sayfa < 0 || sayfa >= sayfalar!.Count)
+            return Hata(404, "SAYFA_BULUNAMADI", "Sayfa bulunamadı.");
+
+        // Onbellek: parmak izi degismedikce tarayici tekrar istemesin.
+        ctx.Response.Headers.CacheControl = "private, max-age=300";
+
+        return Results.File(sayfalar[sayfa], "image/png");
     }
 
     // Dosya adi icin ASCII-guvenli sadelestirme (Turkce karakterler indirmede bozulmasin)

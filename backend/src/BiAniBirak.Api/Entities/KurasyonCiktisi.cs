@@ -14,8 +14,6 @@ public class KurasyonCiktisi
     // Uretim anindaki kurasyon ayarlarinin anlik goruntusu (JSONB)
     public string AyarlarAnlik { get; set; } = "{}";
 
-    // Filigranli mi? (satin alma oncesi onizleme - B3)
-    public bool Filigranli { get; set; }
 
     public int SayfaSayisi { get; set; }
     public int DilekSayisi { get; set; }

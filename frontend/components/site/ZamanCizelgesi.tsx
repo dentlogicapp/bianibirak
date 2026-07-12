@@ -172,9 +172,10 @@ export function ZamanCizelgesi({ etkinlik }: { etkinlik: Etkinlik }) {
           Ücretlendirme nasıl işler
         </p>
         <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
-          Dilek toplamak, defterinizi kurmak, düzenlemek ve filigranlı önizleme almak{" "}
-          <span className="font-medium text-murekkep">ücretsizdir</span>. Ücret yalnızca
-          filigransız, baskıya hazır nüshayı indirirken alınır — bir kereye mahsus.
+          Dilek toplamak, defterinizi kurmak, düzenlemek ve{" "}
+          <span className="font-medium text-murekkep">defterinizi sayfa sayfa görmek</span>{" "}
+          ücretsizdir. Ücret yalnızca baskıya hazır nüshayı indirirken alınır — bir kereye
+          mahsus.
         </p>
         <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
           <span className="font-medium text-murekkep">İndirmek için beklemeniz gerekmez.</span>{" "}

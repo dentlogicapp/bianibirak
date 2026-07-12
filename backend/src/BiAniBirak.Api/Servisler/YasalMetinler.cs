@@ -53,9 +53,9 @@ Kullanıcı; bildirim izni vermemesi, bildirimleri kapatması, uygulamaya girmem
 
 4. ÖDEME, İNDİRME VE İADE
 
-Dilek toplamak, defteri kurmak, düzenlemek ve filigranlı önizleme almak ÜCRETSİZDİR.
+Dilek toplamak, defteri kurmak, düzenlemek ve defterin tamamını ekranda sayfa sayfa görmek ÜCRETSİZDİR.
 
-Ücret yalnızca filigransız, baskıya hazır nüshanın indirilmesi için alınır.
+Ücret yalnızca baskıya hazır nüshanın (yüksek çözünürlüklü, basılabilir dosya) indirilmesi için alınır. Ekranda gösterilen önizleme, baskıya elverişli çözünürlükte değildir.
 
 Ödeme yapılmış olması, imha süresini UZATMAZ. Ödeme yapan kullanıcı da 37. günün sonuna kadar eserini indirmekle yükümlüdür.
 

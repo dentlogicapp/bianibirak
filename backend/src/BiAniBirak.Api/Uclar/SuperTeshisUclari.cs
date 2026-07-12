@@ -45,6 +45,9 @@ public static class SuperTeshisUclari
         // METIN KATALOGU - surum gecmisi dahil.
         app.MapGet("/api/super/metinler", MetinKatalogu).RequireAuthorization();
         app.MapGet("/api/super/metin/{anahtar}/surumler", MetinSurumleri).RequireAuthorization();
+
+        // ONAM KAYITLARI - toplu belge (denetim/avukat icin). Planlama deseni.
+        app.MapGet("/api/super/onaylar/belge.csv", OnaylarCsv).RequireAuthorization();
     }
 
     // ---------------- ORTAK ----------------
@@ -135,7 +138,6 @@ public static class SuperTeshisUclari
             .Select(c => new
             {
                 c.Tip,
-                c.Filigranli,
                 c.DilekSayisi,
                 c.CreatedAt,
             })
@@ -285,8 +287,9 @@ public static class SuperTeshisUclari
             .Join(db.Kurasyonlar.AsNoTracking(), o => o.KurasyonId, k => k.Id, (o, k) => k.EtkinlikId)
             .Distinct().ToListAsync()).ToHashSet();
 
+        // Her PDF cikisi GERCEK INDIRMEDIR - "filigranli onizleme" diye bir cikti
+        // tipi artik YOK (o aciklik urunu bedava dagitiyordu).
         var indirenSet = (await db.KurasyonCiktilari.AsNoTracking()
-            .Where(c => !c.Filigranli)
             .Select(c => c.EtkinlikId).Distinct().ToListAsync()).ToHashSet();
 
         // Ilk katki zamani (defter basina) - "link -> ilk dilek" gecikmesini olcer
@@ -544,6 +547,97 @@ public static class SuperTeshisUclari
         return Results.File(pdf, "application/pdf", $"onay-kaniti-{id}.pdf");
     }
 
+    // ---------------- ONAM KAYITLARI - TOPLU BELGE ----------------
+    //
+    // Tek tek kanit PDF'i, TEK bir ihtilaf icindir. Ama denetim (KVKK Kurumu incelemesi,
+    // avukat talebi, ic denetim) TUM kayitlari ister: "kac kisi, hangi metni, hangi
+    // surumde onayladi?"
+    //
+    // CSV cunku: Excel dogrudan acar, avukat filtreler, denetci siralar. XLSX uretmek
+    // icin ek kutuphane gerekirdi - CSV ayni isi ek bagimlilik olmadan yapar.
+    //
+    // UTF-8 BOM ZORUNLU: BOM'suz CSV'yi Excel Windows-1254 sanip Turkce karakterleri
+    // bozar (ayni tuzak PowerShell'de de var - Bolum 5).
+    private static async Task<IResult> OnaylarCsv(
+        HttpContext ctx, BiAniBirakDbContext db, string? kapsam)
+    {
+        var (ok, aktor) = await SuperAdminMi(ctx, db);
+        if (!ok || aktor == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var sorgu = db.KullanimOnaylari.AsNoTracking().AsQueryable();
+
+        // Kapsam filtresi: "es" -> hesap sahipleri, "davetli" -> davetliler.
+        if (kapsam == "es")
+            sorgu = sorgu.Where(o => o.KullaniciId != null);
+        else if (kapsam == "davetli")
+            sorgu = sorgu.Where(o => o.KullaniciId == null);
+
+        var kayitlar = await sorgu
+            .OrderByDescending(o => o.CreatedAt)
+            .GroupJoin(db.Kullanicilar.AsNoTracking(),
+                o => o.KullaniciId, k => (Guid?)k.Id,
+                (o, ks) => new { Onay = o, Kullanicilar = ks })
+            .SelectMany(x => x.Kullanicilar.DefaultIfEmpty(),
+                (x, k) => new { x.Onay, Kullanici = k })
+            .Take(10000)
+            .ToListAsync();
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Onay Kimligi;Sifat;Ad;E-posta;Hesap Silinmis;Metin;Surum;Parmak Izi;IP;Onay Zamani (TR)");
+
+        foreach (var x in kayitlar)
+        {
+            var davetliMi = x.Onay.KullaniciId == null;
+            var trZaman = x.Onay.CreatedAt.ToOffset(TimeSpan.FromHours(Sabitler.TurkiyeSaatFarki));
+
+            sb.Append(Kacir(x.Onay.Id.ToString())).Append(';')
+              .Append(davetliMi ? "Davetli" : "Hesap sahibi").Append(';')
+              .Append(Kacir(davetliMi ? "(anonim)" : x.Kullanici?.Ad ?? "(silinmis)")).Append(';')
+              .Append(Kacir(davetliMi ? "" : x.Kullanici?.Email ?? "(silinmis)")).Append(';')
+              .Append(!davetliMi && (x.Kullanici == null || x.Kullanici.DeletedAt != null) ? "Evet" : "Hayir").Append(';')
+              .Append(Kacir(x.Onay.MetinAnahtar)).Append(';')
+              .Append(Kacir(x.Onay.MetinSurum)).Append(';')
+              .Append(Kacir(x.Onay.MetinHash)).Append(';')
+              .Append(Kacir(x.Onay.IpAdresi ?? "")).Append(';')
+              .Append(trZaman.ToString("dd.MM.yyyy HH:mm:ss"))
+              .AppendLine();
+        }
+
+        // Adli iz: yonetici toplu onam kaydi disari aldi.
+        db.DenetimGunlukleri.Add(new Entities.DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            KullaniciId = aktor.Id,
+            Eylem = "ONAM_KAYITLARI_DISA_AKTARILDI",
+            Varlik = "kullanim_onaylari",
+            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(
+                new { kayit = kayitlar.Count, kapsam = kapsam ?? "tumu" }),
+            SistemEylemi = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        // UTF-8 BOM - Excel Turkce karakterleri bozmasin.
+        var bom = new byte[] { 0xEF, 0xBB, 0xBF };
+        var govde = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+        var dosya = new byte[bom.Length + govde.Length];
+        bom.CopyTo(dosya, 0);
+        govde.CopyTo(dosya, bom.Length);
+
+        return Results.File(dosya, "text/csv",
+            $"onam-kayitlari-{DateTimeOffset.UtcNow:yyyy-MM-dd}.csv");
+    }
+
+    // CSV kacisi: noktali virgul ve tirnak icerigi bozmasin.
+    private static string Kacir(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        if (s.IndexOf(';') >= 0 || s.IndexOf('"') >= 0 || s.IndexOf('\n') >= 0)
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        return s;
+    }
+
     // ---------------- METIN KATALOGU ----------------
     //
     // Planlama Defteri'nin sema deseni: metinler kodda sabit degil, YONETILEN bir
@@ -652,8 +746,8 @@ public static class SuperTeshisUclari
     // Yonetici, cift'in gordugu PDF'i uretir. Impersonation'a GEREK YOK: daha az
     // yetki, ayni fayda. "Ciktim bozuk" diyen cifte saniyede teshis.
     //
-    // Cikti HER ZAMAN filigranlidir: bu bir DESTEK araci, cift'in odedigi urun degil.
-    // Filigransiz cikti uretme yetkisi yalnizca ciftin kendisindedir.
+    // Bu bir DESTEK aracidir. Cikti denetim gunlugune yazilir (SUPER_DEFTER_RONTGEN);
+    // yonetici bir ciftin defterini gordugunde iz kalir, silinemez.
     private static async Task<IResult> DefterRontgen(
         Guid id, HttpContext ctx, BiAniBirakDbContext db,
         DepolamaServisi depo, IWebHostEnvironment ortam)
@@ -663,7 +757,7 @@ public static class SuperTeshisUclari
             return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
         var (derleme, hata) = await DefterDerleyici.DerleAsync(
-            id, db, depo, ortam.ContentRootPath, filigranli: true);
+            id, db, depo, ortam.ContentRootPath);
 
         if (hata != null)
             return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);

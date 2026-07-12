@@ -429,7 +429,6 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
             e.Property(x => x.Tip).HasColumnName("Tip").IsRequired();
             e.Property(x => x.AyarlarAnlik).HasColumnName("AyarlarAnlik").HasColumnType("jsonb");
-            e.Property(x => x.Filigranli).HasColumnName("Filigranli");
             e.Property(x => x.SayfaSayisi).HasColumnName("SayfaSayisi");
             e.Property(x => x.DilekSayisi).HasColumnName("DilekSayisi");
             e.Property(x => x.OlusturanKullaniciId).HasColumnName("OlusturanKullaniciId");

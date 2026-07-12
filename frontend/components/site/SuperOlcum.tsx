@@ -59,7 +59,7 @@ export function OlcumSekmesi() {
     { ad: "Link paylaşıldı", deger: h.link_paylasildi, aciklama: "Davetli bağlantısı aktif edildi" },
     { ad: "İlk dilek geldi", deger: h.ilk_dilek_geldi, aciklama: "Ürün değerini kanıtladığı an" },
     { ad: "Kürasyon yapıldı", deger: h.kurasyon_yapildi, aciklama: "Esere en az bir dilek alındı" },
-    { ad: "Eser indirildi", deger: h.eser_indirildi, aciklama: "Filigransız PDF - ödeme eşiği" },
+    { ad: "Eser indirildi", deger: h.eser_indirildi, aciklama: "Baskıya hazır PDF - ödeme eşiği" },
   ];
 
   return (

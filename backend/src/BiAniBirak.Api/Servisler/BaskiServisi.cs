@@ -89,8 +89,7 @@ public static class BaskiServisi
         Gorsel? KapakGorseli,
         Gorsel? IthafGorseli,
         Gorsel? KapanisGorseli,
-        IReadOnlyList<Gorsel> BolumGorselleri,
-        bool Filigranli);
+        IReadOnlyList<Gorsel> BolumGorselleri);
 
     // ---------------- OLCU MANTIGI ----------------
     private enum Yon { Yatay, Kare, Dikey }
@@ -133,7 +132,22 @@ public static class BaskiServisi
     }
 
     // ---------------- BELGE ----------------
+    // ODEME SONRASI: baskiya hazir PDF (300 DPI, tam kalite).
     public static byte[] DefterUret(EserVerisi eser)
+        => DefterBelgesi(eser).GeneratePdf();
+
+    // BELGE - hem PDF'e hem GORUNTUYE donusturulebilen ara form.
+    //
+    // FILIGRAN YOK. Onceki surumde satin alma oncesi "ONIZLEME" yazili PDF
+    // indiriliyordu; bugun herhangi bir goruntu modeli o yaziyi saniyeler icinde
+    // siler - ustelik silmeye bile gerek yok, dosya ZATEN elde.
+    //
+    // Yeni model: onizleme PDF DEGIL, 96 DPI goruntudur (OnizlemeServisi). Ayni
+    // belgeden uretilir - yani cift, onizlemede tam olarak bastiracagi seyi gorur.
+    // Fark yalniz cozunurluktedir: ekranda kusursuz, kagitta bulanik.
+    //
+    // Gormek bedava, BASMAK ucretli.
+    public static IDocument DefterBelgesi(EserVerisi eser)
     {
         var belge = Document.Create(kapsayici =>
         {
@@ -168,7 +182,7 @@ public static class BaskiServisi
             }
         });
 
-        return belge.GeneratePdf();
+        return belge;
     }
 
     private static void SayfaKur(PageDescriptor sayfa, EserVerisi eser, bool altbilgi)
@@ -198,11 +212,6 @@ public static class BaskiServisi
             });
         }
 
-        if (eser.Filigranli)
-        {
-            sayfa.Foreground().AlignCenter().AlignMiddle().Text("ÖNİZLEME")
-                .FontFamily(BaslikFont).FontSize(52).FontColor("#6E243810");
-        }
     }
 
     // ---------------- SUSLEME ----------------
