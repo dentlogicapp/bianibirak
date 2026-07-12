@@ -29,6 +29,11 @@ public static class SuperTeshisUclari
         app.MapGet("/api/super/defter/{id:guid}/detay", DefterDetay).RequireAuthorization();
         app.MapGet("/api/super/olcum", Olcum).RequireAuthorization();
         app.MapGet("/api/super/defter/{id:guid}/rontgen.pdf", DefterRontgen).RequireAuthorization();
+
+        // IMHA - manuel tetikleme. Cron saatlik calisir; bu uc operasyon icindir:
+        // "gecikmis imha var" alarmini yonetici ANINDA temizleyebilmeli, bir sonraki
+        // turu beklememeli. Ayrica test edilebilirligin tek yolu.
+        app.MapPost("/api/super/imha/calistir", ImhaCalistir).RequireAuthorization();
     }
 
     // ---------------- ORTAK ----------------
@@ -378,6 +383,39 @@ public static class SuperTeshisUclari
                     .CountAsync(k => !k.SilindiMi && k.CreatedAt >= esik30),
             },
         });
+    }
+
+    // ---------------- IMHA (manuel tetikleme) ----------------
+    //
+    // Cron saatlik calisir. Bu uc, yoneticinin alarmi ANINDA temizlemesi icindir:
+    // Olcum sekmesinde "3 defter imha gecikmis" yaziyorsa, bir sonraki saati
+    // beklemek KVKK riskini uzatmak demektir.
+    private static async Task<IResult> ImhaCalistir(
+        HttpContext ctx, BiAniBirakDbContext db, IServiceProvider saglayici)
+    {
+        var (ok, aktor) = await SuperAdminMi(ctx, db);
+        if (!ok || aktor == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var depo = saglayici.GetRequiredService<DepolamaServisi>();
+        var simdi = DateTimeOffset.UtcNow;
+
+        var imhaliklar = await db.Etkinlikler
+            .Where(e => !e.ImhaEdildi && !e.SilindiMi)
+            .ToListAsync();
+
+        var hedefler = imhaliklar
+            .Where(e => e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi)
+            .ToList();
+
+        foreach (var e in hedefler)
+        {
+            // Imha mantigi TEK yerde (ImhaGorevi): cron ile manuel tetikleme ayni
+            // kodu calistirir. Iki kopya olsaydi biri eksik silerdi.
+            await ImhaGorevi.ImhaEtAsync(db, depo, e, CancellationToken.None);
+        }
+
+        return Results.Json(new { ok = true, imha_edilen = hedefler.Count });
     }
 
     // ---------------- DEFTER RONTGENI ----------------

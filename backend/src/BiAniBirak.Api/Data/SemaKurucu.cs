@@ -340,6 +340,13 @@ public static class SemaKurucu
             'KVKK_METIN_GUNCELLENDI', 'KVKK_TALEP_ISLENDI'
           );
 
+        -- IMHA TAKVIMI (Belge 08): kapanis + SaklamaGun sonrasi tam imha.
+        -- Idempotent - her restart calisir, sonuc degismez.
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaUyari14Gonderildi" boolean NOT NULL DEFAULT false;
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaUyari3Gonderildi" boolean NOT NULL DEFAULT false;
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaEdildi" boolean NOT NULL DEFAULT false;
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaZamani" timestamptz NULL;
+
         -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;

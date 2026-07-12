@@ -517,6 +517,10 @@ export const api = {
   superDefterDetay: (id: string) =>
     istek<SuperDefterDetay>(`/api/super/defter/${id}/detay`),
   superOlcum: () => istek<SuperOlcum>("/api/super/olcum"),
+  superImhaCalistir: () =>
+    istek<{ ok: boolean; imha_edilen: number }>("/api/super/imha/calistir", {
+      method: "POST",
+    }),
 
   superAdminAta: (id: string, superAdmin: boolean) =>
     istek<{ ok: boolean; super_admin: boolean }>(`/api/super/kullanici/${id}/super-admin`, {

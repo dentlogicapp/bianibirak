@@ -642,6 +642,14 @@ export function DavetliEkrani({
             <span>
               Bıraktığım bilgilerin, dileğin çiftin anı defterinde kullanılması amacıyla
               işlenmesini kabul ediyorum.{" "}
+              {/* SOMUT SAKLAMA SURESI: belirsiz riza, hukuken zayif rizadir. Davetli
+                  verisinin NE ZAMAN yok edilecegini bilmeli - ve bu, guven veren bir
+                  taahhuttur: sonsuza dek saklamiyoruz. */}
+              Verilerim, defter kapandıktan{" "}
+              <span className="font-medium text-murekkep">
+                {veri.saklama_gun} gün
+              </span>{" "}
+              sonra tümüyle silinecek.{" "}
               <a
                 href="/kvkk"
                 target="_blank"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { api, type SuperOlcum } from "@/lib/api";
 
 // OLCUM SEKMESI - "urun tutuyor mu?" sorusunun cevabi.
@@ -12,14 +13,35 @@ import { api, type SuperOlcum } from "@/lib/api";
 export function OlcumSekmesi() {
   const [veri, setVeri] = useState<SuperOlcum | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [imhaCalisiyor, setImhaCalisiyor] = useState(false);
+
+  async function cek() {
+    const c = await api.superOlcum();
+    if (c.ok) setVeri(c.veri);
+    setYukleniyor(false);
+  }
 
   useEffect(() => {
-    void (async () => {
-      const c = await api.superOlcum();
-      if (c.ok) setVeri(c.veri);
-      setYukleniyor(false);
-    })();
+    void cek();
   }, []);
+
+  // Cron saatlik calisir. Bu buton, alarmi ANINDA temizlemek icindir: gecikmis
+  // imha bir KVKK riskidir, bir sonraki saati beklemek onu uzatir.
+  async function imhaCalistir() {
+    setImhaCalisiyor(true);
+    const c = await api.superImhaCalistir();
+    setImhaCalisiyor(false);
+    if (!c.ok) {
+      toast.error(c.mesaj);
+      return;
+    }
+    toast.success(
+      c.veri.imha_edilen > 0
+        ? `${c.veri.imha_edilen} defter imha edildi.`
+        : "İmha edilecek defter yok."
+    );
+    void cek();
+  }
 
   if (yukleniyor) {
     return <p className="py-16 text-center font-govde text-sm text-ikincil">Yükleniyor...</p>;
@@ -121,11 +143,21 @@ export function OlcumSekmesi() {
         </div>
 
         {veri.yasam_dongusu.imha_gecikmis > 0 && (
-          <p className="mt-3 rounded-xl bg-sarap/10 px-4 py-3 font-govde text-xs text-sarap">
-            <span className="font-medium">Dikkat:</span> saklama süresi dolmuş{" "}
-            {veri.yasam_dongusu.imha_gecikmis} defter hâlâ duruyor. İmha görevi (cron) henüz
-            kurulmadı - bu bir KVKK riskidir.
-          </p>
+          <div className="mt-3 rounded-xl bg-sarap/10 px-4 py-3">
+            <p className="font-govde text-xs text-sarap">
+              <span className="font-medium">Dikkat:</span> saklama süresi dolmuş{" "}
+              {veri.yasam_dongusu.imha_gecikmis} defter hâlâ duruyor. İmha görevi saatlik
+              çalışır; beklemeden şimdi tetikleyebilirsin.
+            </p>
+            <button
+              type="button"
+              onClick={imhaCalistir}
+              disabled={imhaCalisiyor}
+              className="mt-2.5 rounded-full bg-sarap px-4 py-2 font-govde text-xs font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+            >
+              {imhaCalisiyor ? "İmha ediliyor..." : "İmhayı şimdi çalıştır"}
+            </button>
+          </div>
         )}
 
         {veri.imha_yaklasan.length > 0 && (

@@ -89,6 +89,10 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.SilindiMi).HasColumnName("SilindiMi");
             e.Property(x => x.SilinmeZamani).HasColumnName("SilinmeZamani");
             e.Property(x => x.Donduruldu).HasColumnName("Donduruldu");
+            e.Property(x => x.ImhaUyari14Gonderildi).HasColumnName("ImhaUyari14Gonderildi").HasDefaultValue(false);
+            e.Property(x => x.ImhaUyari3Gonderildi).HasColumnName("ImhaUyari3Gonderildi").HasDefaultValue(false);
+            e.Property(x => x.ImhaEdildi).HasColumnName("ImhaEdildi").HasDefaultValue(false);
+            e.Property(x => x.ImhaZamani).HasColumnName("ImhaZamani");
             e.Property(x => x.UstOrganizatorId).HasColumnName("UstOrganizatorId");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");

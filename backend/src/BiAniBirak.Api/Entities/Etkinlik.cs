@@ -38,4 +38,21 @@ public class Etkinlik
 
     // Dondurma (kotuye kullanim - Belge 08): davetli YAZIMI reddedilir, cift okuyabilir.
     public bool Donduruldu { get; set; }
+
+    // ---- IMHA TAKVIMI (Belge 08: kapanis + SaklamaGun sonrasi TAM IMHA) ----
+    //
+    // Bu urun bir MIRAS vaadi veriyor ama sonsuz saklama vaadi VERMIYOR: kapanistan
+    // 37 gun sonra defter tumuyle yok edilir. Bu, KVKK "gerektiginden uzun sure
+    // saklamama" ilkesinin kodla karsiligidir - ve rakiplerden ayiran bir DURUS'tur.
+    //
+    // Ama imha, ciftin mirasini kaybetmesi ANLAMINA GELMEZ: uyarilariz. Iki kez.
+    // Uyari gonderildigini isaretlemezsek her cron turunda tekrar gonderir ve
+    // cifti bogariz - bu yuzden bayrak tutulur.
+    public bool ImhaUyari14Gonderildi { get; set; }
+    public bool ImhaUyari3Gonderildi { get; set; }
+
+    // Imha tamamlandi. Satir SILINMEZ: "bu defter vardi ve imha edildi" kaydi
+    // KVKK kanitidir. Icerik (dilekler, fotograflar, kisisel veri) YOK EDILIR.
+    public bool ImhaEdildi { get; set; }
+    public DateTimeOffset? ImhaZamani { get; set; }
 }

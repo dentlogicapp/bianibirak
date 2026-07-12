@@ -32,6 +32,10 @@ var jwtGun = int.TryParse(builder.Configuration["Jwt:GecerlilikGun"], out var g)
 builder.Services.AddSingleton<SifreServisi>();
 builder.Services.AddSingleton<HizSiniri>();
 builder.Services.AddSingleton<PushGonderici>();
+
+// IMHA GOREVI - kapanis + SaklamaGun sonrasi tam imha (Belge 08).
+// Saatlik calisir, idempotent. KVKK taahhudumuzun kodla karsiligi.
+builder.Services.AddHostedService<ImhaGorevi>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
 
