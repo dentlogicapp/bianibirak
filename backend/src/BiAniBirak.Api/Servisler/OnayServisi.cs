@@ -23,11 +23,37 @@ namespace BiAniBirak.Api.Servisler;
 // gercekten degistirmissek, hash bunu ELE VERIR - biz de sorumluyuz.
 public static class OnayServisi
 {
-    // KAYIT SIRASINDA ZORUNLU ONAYLAR. Biri eksikse kayit TAMAMLANMAZ.
+    // KAPSAMLAR
+    public const string KapsamEs = "es";
+    public const string KapsamDavetli = "davetli";
+
+    // ZORUNLU METINLER ARTIK KATALOGTAN OKUNUR - kodda sabit liste YOK.
     //
-    // Neden zorunlu: "kabul etmis sayilirsiniz" turu ortuk rizalar KVKK'da gecersizdir
-    // (m.3/1-a: acik riza = belirli bir konuya iliskin, BILGILENDIRILMEYE dayanan,
-    // OZGUR IRADEYLE aciklanan). Kutucugu isaretlemeyen kaydolamaz.
+    // Sabit liste olsaydi, yeni bir zorunlu metin eklemek DEPLOY gerektirirdi. Katalog
+    // (Planlama Defteri'nin sema deseni) bunu super panele tasir: yonetici metni ekler,
+    // "zorunlu" isaretler, biter.
+    //
+    // Neden zorunlu: "kabul etmis sayilirsiniz" turu ortuk rizalar KVKK'da GECERSIZDIR
+    // (m.3/1-a: acik riza = bilgilendirilmeye dayanan, OZGUR IRADEYLE aciklanan).
+    public static async Task<List<SistemMetni>> ZorunluMetinlerAsync(
+        BiAniBirakDbContext db, string kapsam, CancellationToken ct = default)
+    {
+        var metinler = await db.SistemMetinleri.AsNoTracking()
+            .Where(m => m.Kapsam == kapsam && m.Zorunlu && !m.Deprecated)
+            .OrderBy(m => m.Sira)
+            .ToListAsync(ct);
+
+        // Hash bos ise (eski kayit) aninda hesapla - kanit zincirinde bosluk olamaz.
+        foreach (var m in metinler.Where(x => string.IsNullOrEmpty(x.Hash)))
+        {
+            m.Hash = HashUret(m.Icerik);
+            m.Surum = SurumUret(m.YururlukTarihi);
+        }
+
+        return metinler;
+    }
+
+    // GERI UYUMLULUK: eski cagrilar icin (kayit ucu). Es kapsamindaki zorunlu anahtarlar.
     public static readonly string[] ZorunluMetinler =
     {
         "kvkk_aydinlatma",
@@ -56,22 +82,112 @@ public static class OnayServisi
         metin.Surum = SurumUret(metin.YururlukTarihi);
     }
 
-    // Kayit aninda gosterilen metinler - kullanici NEYI onayladigini bilmeli.
-    public static async Task<List<SistemMetni>> ZorunluMetinleriGetirAsync(
-        BiAniBirakDbContext db, CancellationToken ct = default)
-    {
-        var metinler = await db.SistemMetinleri.AsNoTracking()
-            .Where(m => ZorunluMetinler.Contains(m.Anahtar))
-            .ToListAsync(ct);
+    // ARSIVLE + DAMGALA - metin guncellenirken cagrilir.
+    //
+    // ONCE eski surum arsivlenir, SONRA yeni damga vurulur. Sira onemli: once
+    // damgalasaydik, eski icerigi kaybederdik ve arsive YENI metni yazardik.
+    //
+    // NEDEN ARSIV SART:
+    // Kullanici 1 Ocak'ta metni onayladi (hash A). 1 Mart'ta metni degistirdik
+    // (hash B). Kullanici "onaylamadim" diyor. Elimizde hash A var - ama A'nin
+    // karsilik geldigi METIN yok, ustune yazdik. Yani "bir metni onayladi"
+    // diyebiliyoruz, HANGI metni oldugunu gosteremiyoruz.
+    //
+    // Hash, ancak metin de saklanirsa kanittir.
+    // ESKI SURUM ANLIK GORUNTUSU - guncelleme YAPILMADAN ONCE alinir.
+    //
+    // Bu record olmadan arsivleme calismaz: metin nesnesi guncellendikten sonra eski
+    // icerige ulasmanin yolu yoktur (EF nesneyi yerinde degistirir). Once fotograf
+    // cek, sonra degistir.
+    public sealed record Anlik(
+        string Anahtar, string Surum, string Hash,
+        string Baslik, string Icerik, DateTimeOffset YururlukTarihi);
 
-        // Hash bos ise (eski kayit) ANINDA hesapla - kanit zincirinde bosluk olamaz.
-        foreach (var m in metinler.Where(x => string.IsNullOrEmpty(x.Hash)))
+    public static Anlik AnlikAl(SistemMetni m)
+        => new(m.Anahtar, m.Surum, m.Hash, m.Baslik, m.Icerik, m.YururlukTarihi);
+
+    // ARSIVLE + DAMGALA. Cagri sirasi:
+    //   1. var eski = OnayServisi.AnlikAl(metin);     <- ONCE fotograf
+    //   2. metin.Icerik = yeniIcerik;                 <- sonra degistir
+    //   3. OnayServisi.ArsivleVeDamgala(db, metin, eski, aktorId);
+    public static void ArsivleVeDamgala(
+        BiAniBirakDbContext db, SistemMetni metin, Anlik eski, Guid? guncelleyen)
+    {
+        var yeniHash = HashUret(metin.Icerik);
+
+        // Icerik gercekten degistiyse ESKI surumu arsivle. Degismediyse arsivde
+        // gereksiz kopya birikmesin (ornegin yalniz baslik duzeltilmisse).
+        if (!string.IsNullOrEmpty(eski.Hash) && eski.Hash != yeniHash)
         {
-            m.Hash = HashUret(m.Icerik);
-            m.Surum = SurumUret(m.YururlukTarihi);
+            db.SistemMetinSurumleri.Add(new SistemMetinSurumu
+            {
+                Id = Guid.NewGuid(),
+                Anahtar = eski.Anahtar,
+                Surum = eski.Surum,
+                Hash = eski.Hash,
+                Baslik = eski.Baslik,
+                Icerik = eski.Icerik,          // ESKI metin - kanitin ta kendisi
+                YururlukTarihi = eski.YururlukTarihi,
+                GuncelleyenKullaniciId = guncelleyen,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
         }
 
-        return metinler;
+        MetniDamgala(metin);
+    }
+
+    // ILK SURUMU ARSIVLE - metin olusturulurken. Boylece HER surum arsivde bulunur,
+    // ilki dahil. "Ilk metin arsivde yok" bosluğu, en eski kullanicilarin onayini
+    // ispatlanamaz kilardi.
+    public static void IlkSurumuArsivle(
+        BiAniBirakDbContext db, SistemMetni metin, Guid? guncelleyen = null)
+    {
+        db.SistemMetinSurumleri.Add(new SistemMetinSurumu
+        {
+            Id = Guid.NewGuid(),
+            Anahtar = metin.Anahtar,
+            Surum = metin.Surum,
+            Hash = metin.Hash,
+            Baslik = metin.Baslik,
+            Icerik = metin.Icerik,
+            YururlukTarihi = metin.YururlukTarihi,
+            GuncelleyenKullaniciId = guncelleyen,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+    }
+
+    // Kayit aninda gosterilen metinler (es kapsami).
+    public static Task<List<SistemMetni>> ZorunluMetinleriGetirAsync(
+        BiAniBirakDbContext db, CancellationToken ct = default)
+        => ZorunluMetinlerAsync(db, KapsamEs, ct);
+
+    // EKSIK ONAYLAR - bu kullanicinin HANGI zorunlu metinleri onaylamadigi.
+    //
+    // Iki durumda dolu doner:
+    //   1. Kullanici bu sistem kurulmadan ONCE kaydolmus (onay kaydi hic yok),
+    //   2. Metin GUNCELLENMIS ve kullanici eski surumu onaylamis (hash tutmuyor).
+    //
+    // Ikinci durum kritik: metni degistirip "zaten onaylamisti" demek, onay ALMAMAK'tir.
+    // Yeni metne yeni onay gerekir - yoksa gecerli bir rizamiz yok.
+    public static async Task<List<SistemMetni>> EksikOnaylarAsync(
+        BiAniBirakDbContext db, Guid kullaniciId, CancellationToken ct = default)
+    {
+        var zorunlu = await ZorunluMetinlerAsync(db, KapsamEs, ct);
+        if (zorunlu.Count == 0) return new List<SistemMetni>();
+
+        var onaylar = await db.KullanimOnaylari.AsNoTracking()
+            .Where(o => o.KullaniciId == kullaniciId)
+            .Select(o => new { o.MetinAnahtar, o.MetinHash })
+            .ToListAsync(ct);
+
+        var onayliHashler = onaylar
+            .Select(o => $"{o.MetinAnahtar}:{o.MetinHash}")
+            .ToHashSet(StringComparer.Ordinal);
+
+        // GUNCEL hash ile eslesen onay yoksa, o metin EKSIKTIR.
+        return zorunlu
+            .Where(m => !onayliHashler.Contains($"{m.Anahtar}:{m.Hash}"))
+            .ToList();
     }
 
     // ONAYI KAYDET - append-only. Her metin icin AYRI kayit: kullanici KVKK'yi

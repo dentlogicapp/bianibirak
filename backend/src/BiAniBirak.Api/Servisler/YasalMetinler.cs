@@ -94,7 +94,7 @@ Kullanıcı, hesap oluşturarak işbu Kullanım Koşulları'nı okuduğunu, anla
 
 Özellikle 2. ve 3. maddeleri (süre, imha ve indirme sorumluluğu) ayrıca okuduğunu ve anladığını kabul eder.";
 
-    public const string KvkkAydinlatmaMetni = @"KVKK Aydınlatma Metni
+    public const string KvkkEsMetni = @"KVKK Aydınlatma Metni (Hesap Sahibi)
 
 Veri Sorumlusu: BiAnıBırak (Musa Deveci - Konya)
 
@@ -137,6 +137,93 @@ Veriler şifreli bağlantı (HTTPS) üzerinden iletilir. Şifreler geri döndür
 
 Verileriniz, hizmetin sunulması için gerekli olan altyapı sağlayıcıları dışında üçüncü kişilere aktarılmaz; pazarlama amacıyla satılmaz veya paylaşılmaz.";
 
+    // DAVETLI KVKK - AYRI METIN.
+    //
+    // Davetli bir MUSTERI DEGIL, bir KONUKTUR. Ondan "kullanim kosullarini kabul et"
+    // istemek hem hukuken yanlis (sozlesme tarafi degil) hem de urun olarak yanlistir:
+    // davetlinin isi 2 dakika surer, once 9 maddelik bir sozlesme okutmak surtunmedir.
+    //
+    // Ona sorulacak tek sey su: "biraktigin dilek ve fotograf, ciftin defterinde
+    // kullanilsin mi?" Kisa, net, tek amac. KVKK'nin istedigi de budur.
+    public const string KvkkDavetliMetni = @"KVKK Aydınlatma Metni (Davetli)
+
+Veri Sorumlusu: BiAnıBırak (Musa Deveci - Konya)
+
+1. HANGİ VERİLERİNİZ İŞLENİYOR
+
+Bu sayfada bıraktığınız: adınız (isteğe bağlı), çiftle ilişkiniz, dilek metniniz, varsa yüklediğiniz fotoğraf ve isteğe bağlı olarak verdiğiniz iletişim bilginiz.
+
+Hesap açmanız, kimlik bilgisi vermeniz veya giriş yapmanız GEREKMEZ. Ad dahil hiçbir alan zorunlu değildir; dilerseniz anonim bırakabilirsiniz.
+
+2. NEDEN İŞLENİYOR
+
+Tek amaç: bıraktığınız dileğin, çiftin anı defterinde yer alması ve baskıya hazır esere dönüştürülmesi.
+
+Hukuki sebep: açık rızanız (KVKK m.5/1). Rıza vermezseniz dilek bırakamazsınız; başka bir sonucu olmaz.
+
+Verileriniz pazarlama amacıyla kullanılmaz, satılmaz, üçüncü kişilerle paylaşılmaz.
+
+3. KİM GÖREBİLİR
+
+Dileğinizi yalnızca ilgili çift görür. Çift, dileği deftere ekleyip eklememekte serbesttir.
+
+Diğer davetliler dileğinizi göremez. Siz de başkalarının dileklerini göremezsiniz.
+
+4. NE KADAR SAKLANIYOR
+
+Verileriniz, etkinlik tarihinden itibaren en fazla 37 gün saklanır. Bu sürenin sonunda dileğiniz, fotoğrafınız ve iletişim bilginiz KALICI OLARAK SİLİNİR.
+
+Çift, defteri bu süre içinde indirir ve basar; bastırdığı kitapta dileğiniz yer alır. Sunucularımızda ise hiçbir iz kalmaz.
+
+5. HAKLARINIZ
+
+KVKK m.11 uyarınca verilerinize erişme, düzeltilmesini veya silinmesini isteme haklarına sahipsiniz. Talebinizi çifte iletebilir ya da bize yazılı olarak başvurabilirsiniz.
+
+Fotoğrafınızdaki konum bilgisi (EXIF/GPS), yükleme sırasında otomatik olarak silinir.";
+
+    public const string GizlilikMetni = @"Gizlilik Politikası
+
+BiAnıBırak, en mahrem aile hatıralarınızı emanet ettiğiniz bir yerdir. Bu politika, o emaneti nasıl koruduğumuzu anlatır.
+
+1. VERİ SAKLAMA - EN ÖNEMLİ İLKEMİZ
+
+Verilerinizi sonsuza dek saklamıyoruz. Etkinlik tarihinizden 37 gün sonra defteriniz ve içindeki her şey kalıcı olarak imha edilir.
+
+Bu bir eksiklik değil, bilinçli bir duruştur. 40 davetlinizin telefon numarasını yıllarca saklamak için hiçbir meşru sebebimiz yok. Mirasınız kâğıtta yaşamalı, sunucumuzda değil.
+
+2. GÜVENLİK
+
+Tüm veri aktarımı şifreli bağlantı (HTTPS) üzerinden yapılır. Şifreler geri döndürülemez şekilde özetlenir (hash) - biz bile göremeyiz.
+
+Her defter, veritabanı düzeyinde diğerlerinden yalıtılmıştır. Bir çiftin verisi, başka bir çifte hiçbir koşulda görünmez.
+
+Eşlerin paylaşım bağlantıları ayrıdır: bir eşin onayına düşen dilek, diğer eş tarafından görülemez.
+
+3. FOTOĞRAFLAR
+
+Yüklenen fotoğraflardaki konum bilgisi (EXIF/GPS) ve cihaz bilgisi, sunucuya ulaştığı anda silinir. Fotoğrafın nerede çekildiği bizde kalmaz.
+
+4. SİSTEM YÖNETİCİSİ ERİŞİMİ
+
+Destek talebiniz olduğunda sistem yöneticisi defterinize salt-okunur erişebilir. Bu erişim:
+  - Denetim kaydına yazılır (silinemez),
+  - Hiçbir veriyi değiştiremez,
+  - Yalnızca sorun çözmek için kullanılır.
+
+5. ÜÇÜNCÜ TARAFLAR
+
+Verilerinizi satmıyoruz, kiralamıyoruz, reklam amacıyla paylaşmıyoruz. Hizmetin çalışması için gereken altyapı sağlayıcıları dışında kimseye aktarılmaz.
+
+Uygulamada reklam gösterilmez.
+
+6. ÇEREZLER
+
+Yalnızca oturumunuzu açık tutmak için zorunlu çerez kullanılır. Takip veya reklam çerezi kullanılmaz.
+
+7. İLETİŞİM
+
+Gizlilikle ilgili her türlü soru ve talebiniz için uygulama içindeki KVKK bölümünden bize ulaşabilirsiniz. Başvurular en geç 30 gün içinde yanıtlanır.";
+
     // IDEMPOTENT SEED: metin yoksa olustur, VARSA DOKUNMA.
     //
     // "Varsa dokunma" kritik: super panelden metni guncelledigin an, bir sonraki
@@ -150,19 +237,48 @@ Verileriniz, hizmetin sunulması için gerekli olan altyapı sağlayıcıları d
 
         var eklenecek = new List<SistemMetni>();
 
+        // KATALOG - dort metin, iki kapsam.
+        //
+        // ES (hesap sahibi, kayit aninda onaylar):
+        //   kvkk_aydinlatma    - kisisel veri islenmesi (zorunlu)
+        //   kullanim_kosullari - sozlesme: sure, imha, indirme sorumlulugu (zorunlu)
+        //   gizlilik           - nasil koruduğumuz (bilgilendirici, zorunlu degil)
+        //
+        // DAVETLI (dilek birakirken onaylar):
+        //   kvkk_davetli       - kisa, tek amacli riza (zorunlu)
+        //
+        // Davetliden kullanim kosullari ISTENMEZ: o bir sozlesme tarafi degil, konuktur.
         if (!mevcut.Contains("kvkk_aydinlatma"))
-            eklenecek.Add(Olustur("kvkk_aydinlatma", "KVKK Aydınlatma Metni", KvkkAydinlatmaMetni));
+            eklenecek.Add(Olustur("kvkk_aydinlatma", "KVKK Aydınlatma Metni",
+                KvkkEsMetni, kapsam: "es", zorunlu: true, sira: 1));
 
         if (!mevcut.Contains("kullanim_kosullari"))
-            eklenecek.Add(Olustur("kullanim_kosullari", "Kullanım Koşulları", KullanimKosullariMetni));
+            eklenecek.Add(Olustur("kullanim_kosullari", "Kullanım Koşulları",
+                KullanimKosullariMetni, kapsam: "es", zorunlu: true, sira: 2));
+
+        if (!mevcut.Contains("gizlilik"))
+            eklenecek.Add(Olustur("gizlilik", "Gizlilik Politikası",
+                GizlilikMetni, kapsam: "es", zorunlu: false, sira: 3));
+
+        if (!mevcut.Contains("kvkk_davetli"))
+            eklenecek.Add(Olustur("kvkk_davetli", "KVKK Aydınlatma Metni (Davetli)",
+                KvkkDavetliMetni, kapsam: "davetli", zorunlu: true, sira: 1));
 
         if (eklenecek.Count == 0) return;
 
         db.SistemMetinleri.AddRange(eklenecek);
+
+        // ILK SURUMU DE ARSIVLE. Arsivde eksik surum kalirsa, o surumu onaylamis
+        // kullanicilarin onayi ISPATLANAMAZ hale gelir - hash var ama metin yok.
+        foreach (var m in eklenecek)
+            OnayServisi.IlkSurumuArsivle(db, m);
+
         await db.SaveChangesAsync(ct);
     }
 
-    private static SistemMetni Olustur(string anahtar, string baslik, string icerik)
+    private static SistemMetni Olustur(
+        string anahtar, string baslik, string icerik,
+        string kapsam, bool zorunlu, int sira)
     {
         var m = new SistemMetni
         {
@@ -170,6 +286,9 @@ Verileriniz, hizmetin sunulması için gerekli olan altyapı sağlayıcıları d
             Anahtar = anahtar,
             Baslik = baslik,
             Icerik = icerik,
+            Kapsam = kapsam,
+            Zorunlu = zorunlu,
+            Sira = sira,
             YururlukTarihi = Yururluk,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,

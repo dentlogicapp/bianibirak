@@ -163,6 +163,21 @@ public static class KatkiUclari
         if (mesaj.Length > 5000)
             return Hata(400, "DOGRULAMA_HATASI", "Mesaj cok uzun (en fazla 5000 karakter).");
 
+        // ---- KVKK RIZASI - ZORUNLU, SUNUCUDA DOGRULANIR ----
+        //
+        // Onceki surumde ekranda kutucuk vardi ama isaretlendigi HICBIR YERE
+        // kaydedilmiyordu. Riza aliniyordu ama ISPATLANAMIYORDU - kutucuk kanit
+        // degildir. Ustelik istemci kutucugu atlatabilirdi.
+        //
+        // Simdi: riza yoksa dilek KABUL EDILMEZ; riza varsa metnin hash'i kanit
+        // olarak saklanir.
+        if (!istek.Riza)
+            return Hata(400, "RIZA_ZORUNLU",
+                "Dileğinizi bırakmak için aydınlatma metnini onaylamanız gerekir.");
+
+        var davetliMetinleri = await OnayServisi.ZorunluMetinlerAsync(
+            db, OnayServisi.KapsamDavetli);
+
         // KaynakEs token'dan turer (izolasyon: hangi linkten geldiyse o esin kuyruguna)
         var katki = new Katki
         {
@@ -193,7 +208,32 @@ public static class KatkiUclari
             DegisenAlanlar = JsonSerializer.Serialize(new { kaynak_es = link.Es, davetli = ad }),
             CreatedAt = simdi,
         });
-        await db.SaveChangesAsync(); // atomik: katki + audit
+
+        // DAVETLI ONAY KANITI - katki ile AYNI transaction.
+        //
+        // Davetli ANONIMDIR: KullaniciId yok. Ama rizasi yine de kanit gerektirir -
+        // KVKK, rizanin KIMDEN geldigini degil, VAR OLDUGUNU sorar. Onay, biraktigi
+        // dilege baglanir: "bu dilek gonderilirken su metin, su hash ile onaylandi".
+        //
+        // Ayri transaction olsaydi: katki olusur, onay kaydi patlar -> rizasiz veri.
+        foreach (var m in davetliMetinleri)
+        {
+            db.KullanimOnaylari.Add(new KullanimOnayi
+            {
+                Id = Guid.NewGuid(),
+                KullaniciId = null,          // davetli anonim - KASITLI
+                EtkinlikId = etkinlik.Id,
+                KatkiId = katki.Id,
+                MetinAnahtar = m.Anahtar,
+                MetinSurum = m.Surum,
+                MetinHash = m.Hash,
+                IpAdresi = OnayServisi.IpAl(ctx),
+                TarayiciBilgisi = OnayServisi.TarayiciAl(ctx),
+                CreatedAt = simdi,
+            });
+        }
+
+        await db.SaveChangesAsync(); // atomik: katki + onay kaniti + audit
 
         // Push tetigi: KaynakEs sahibi ese "yeni dilek" bildirimi (fire-and-forget).
         // Davetli deneyimi bloklanmaz; push arka planda gider.

@@ -742,20 +742,27 @@ public static class SuperUclari
         }
         else
         {
+            // ONCE FOTOGRAF: eski surumun anlik goruntusu. Degisiklikten sonra eski
+            // icerige ulasmanin yolu YOKTUR - EF nesneyi yerinde degistirir.
+            var eski = OnayServisi.AnlikAl(metin);
+
             if (istek.Baslik != null) metin.Baslik = istek.Baslik.Trim();
             if (istek.Icerik != null) metin.Icerik = istek.Icerik;
             if (istek.YururlukTarihi.HasValue) metin.YururlukTarihi = istek.YururlukTarihi.Value;
             metin.GuncelleyenKullaniciId = kullanici.Id;
             metin.UpdatedAt = simdi;
-        }
 
-        // HASH + SURUM TAZELENIR - kanit zincirinin can damari.
-        //
-        // Bu cagri unutulsaydi: metin degisir ama hash eski kalirdi. O anda sistem,
-        // kullanicinin GORMEDIGI bir metni "onayladiniz" diye gosterirdi - ve bu,
-        // mahkemede aleyhimize donen bir sahtelik olurdu. Eski onaylar eski hash'i
-        // tasir; yeni onaylar yenisini. Ikisi karismaz.
-        OnayServisi.MetniDamgala(metin);
+            // ARSIVLE + DAMGALA - kanit zincirinin can damari.
+            //
+            // Arsiv olmadan hash ANLAMSIZDIR: kullanicinin onayladigi hash'in hangi
+            // metne karsilik geldigini gosteremezsek, "bir metni onayladi" demekten
+            // oteye gecemeyiz. Eski surum arsivlenir; hash'ten metne kopru kurulur.
+            //
+            // Damga unutulsaydi: metin degisir ama hash eski kalirdi - kullanicinin
+            // GORMEDIGI metni "onayladiniz" diye gosterirdik. Mahkemede aleyhimize
+            // donen bir sahtelik.
+            OnayServisi.ArsivleVeDamgala(db, metin, eski, kullanici.Id);
+        }
 
         await db.SaveChangesAsync();
         await Denetim(db, null, kullanici.Id, "KVKK_METNI_GUNCELLENDI", "sistem_metinleri",

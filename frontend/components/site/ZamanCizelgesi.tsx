@@ -177,9 +177,15 @@ export function ZamanCizelgesi({ etkinlik }: { etkinlik: Etkinlik }) {
           filigransız, baskıya hazır nüshayı indirirken alınır — bir kereye mahsus.
         </p>
         <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+          <span className="font-medium text-murekkep">İndirmek için beklemeniz gerekmez.</span>{" "}
+          Ödemenizi yaptığınız andan itibaren — ister kurulum günü, ister düğünden bir gün
+          sonra — defterinizi <span className="font-medium text-murekkep">dilediğiniz zaman
+          ve dilediğiniz kadar</span> indirebilirsiniz. Defter doldukça yeniden indirin;
+          her indirme o anki hâlini verir.
+        </p>
+        <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
           Ödeme yapmış olmanız imha süresini <span className="font-medium">uzatmaz</span>.
-          Ödedikten sonra da eserinizi {etkinlik.toplam_gun}. günün sonuna kadar indirmeniz
-          gerekir.
+          Son indirme fırsatınız {etkinlik.toplam_gun}. günün sonudur.
         </p>
       </div>
     </section>
@@ -228,7 +234,7 @@ function kur(e: Etkinlik): Adim[] {
       gunEtiketi: `özel günden ${e.toplama_gun} gün sonra`,
       aciklama:
         "Yeni dilek eklenemez. Defteriniz tamamlanmıştır — düzenlemeye ve indirmeye " +
-        `devam edebilirsiniz. Bu andan sonra ${e.indirme_gun} gününüz var.`,
+        "devam edebilirsiniz.",
       tip: "normal",
     },
     {

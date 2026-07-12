@@ -7,6 +7,7 @@ import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { UserMenu } from "@/components/site/UserMenu";
 import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
 import { GoruntulemeBandi } from "@/components/site/GoruntulemeBandi";
+import { OnayKapisi } from "@/components/site/OnayKapisi";
 import { useSwOdakDinleyici } from "@/lib/odak";
 
 // Uygulama kabugu: TEK navigasyon noktasi = avatar menusu + baglamsal ust bar.
@@ -29,6 +30,16 @@ const HIYERARSI: Record<string, Sayfa> = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const yol = usePathname();
+
+  // ONAY KAPISI - eksik onay varsa panele girilemez.
+  //
+  // Iki durumda acilir: (1) onay sistemi kurulmadan once kaydolmus kullanici,
+  // (2) metin guncellenmis ve eski surum onaylanmis. Ikisinde de elimizde GECERLI
+  // bir riza yoktur; rizasiz veri islemeye devam edemeyiz.
+  //
+  // AppShell'e baglandi cunku panelin HER sayfasinda calismali - tek bir sayfaya
+  // koysaydik, kullanici baska bir yola girip kapiyi atlatirdi.
+  const [onayGerekli, setOnayGerekli] = useState(true);
   const router = useRouter();
   const [kayan, setKayan] = useState(false);
   useSwOdakDinleyici(); // push tiklamasi -> client-side yonlendirme (her sayfada)
@@ -53,6 +64,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <>
+      {/* ONAY KAPISI - eksik onay varsa gecilemez. Onaylanmadan panel kullanilamaz. */}
+      {onayGerekli && <OnayKapisi onTamam={() => setOnayGerekli(false)} />}
+
     <div className="min-h-screen bg-parsomen">
       <GoruntulemeBandi />
 
@@ -111,5 +126,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <BildirimBaslatici />
     </div>
+    </>
   );
 }

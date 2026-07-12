@@ -38,6 +38,13 @@ public static class SuperTeshisUclari
         // ONAY KAYITLARI - hukuki kanit arsivi. Kullanici "onaylamadim" derse,
         // yonetici bu ekrandan hash + zaman + IP gosterir.
         app.MapGet("/api/super/onaylar", Onaylar).RequireAuthorization();
+
+        // KANIT BELGESI - avukata/mahkemeye sunulabilir tek PDF.
+        app.MapGet("/api/super/onay/{id:guid}/kanit.pdf", KanitPdf).RequireAuthorization();
+
+        // METIN KATALOGU - surum gecmisi dahil.
+        app.MapGet("/api/super/metinler", MetinKatalogu).RequireAuthorization();
+        app.MapGet("/api/super/metin/{anahtar}/surumler", MetinSurumleri).RequireAuthorization();
     }
 
     // ---------------- ORTAK ----------------
@@ -459,6 +466,152 @@ public static class SuperTeshisUclari
             guncel_metinler = guncelMetinler,
             toplam = await db.KullanimOnaylari.CountAsync(),
         });
+    }
+
+    // ---------------- KANIT BELGESI (PDF) ----------------
+    //
+    // Kullanici "kabul etmedim" dediginde, kanit veritabaninda DAGILMIS durumdadir:
+    // onay bir tabloda, metnin o gunku hali baska tabloda, kullanici ucuncusunde.
+    // Avukata "su SQL'i calistirin" diyemeyiz.
+    //
+    // Bu uc, hepsini TEK BELGEDE toplar: kim, ne zaman, nereden, hangi metni - ve
+    // o metnin arsivden getirilen TAM HALI.
+    private static async Task<IResult> KanitPdf(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam)
+    {
+        var (ok, aktor) = await SuperAdminMi(ctx, db);
+        if (!ok || aktor == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var onay = await db.KullanimOnaylari.AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == id);
+        if (onay == null)
+            return Hata(404, "ONAY_BULUNAMADI", "Onay kaydı bulunamadı.");
+
+        // Kullanici (silinmis olabilir - kayit yine de durur)
+        var kullanici = onay.KullaniciId == null ? null
+            : await db.Kullanicilar.AsNoTracking()
+                .FirstOrDefaultAsync(k => k.Id == onay.KullaniciId);
+
+        // ARSIVDEN metnin o gunku hali. HASH ile eslestirilir - anahtar+surum degil,
+        // cunku ayni surum damgasi altinda icerik degismis olabilir (ayni gun iki
+        // guncelleme). Hash tekildir.
+        var surum = await db.SistemMetinSurumleri.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Hash == onay.MetinHash);
+
+        // Davetli onayi ise: hangi dilek, hangi defter
+        string? davetliAd = null;
+        string? defterAdi = null;
+        if (onay.KatkiId != null)
+        {
+            var katki = await db.Katkilar.AsNoTracking()
+                .FirstOrDefaultAsync(k => k.Id == onay.KatkiId);
+            davetliAd = katki?.DavetliAd;
+        }
+        if (onay.EtkinlikId != null)
+        {
+            var e = await db.Etkinlikler.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == onay.EtkinlikId);
+            if (e != null && !e.ImhaEdildi)
+                defterAdi = $"{e.Es1Ad} & {e.Es2Ad}";
+        }
+
+        BaskiServisi.Hazirla(ortam.ContentRootPath);
+
+        var pdf = KanitBelgesi.Uret(new KanitBelgesi.Veri(
+            Onay: onay,
+            KullaniciAd: kullanici?.Ad,
+            KullaniciEmail: kullanici?.Email,
+            KullaniciSilinmis: onay.KullaniciId != null && (kullanici == null || kullanici.DeletedAt != null),
+            Surum: surum,
+            DavetliAd: davetliAd,
+            DefterAdi: defterAdi));
+
+        // Adli iz: yonetici bir kanit belgesi uretti.
+        db.DenetimGunlukleri.Add(new Entities.DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = null,
+            KullaniciId = aktor.Id,
+            Eylem = "ONAY_KANIT_URETILDI",
+            Varlik = "kullanim_onaylari",
+            VarlikId = id,
+            SistemEylemi = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        return Results.File(pdf, "application/pdf", $"onay-kaniti-{id}.pdf");
+    }
+
+    // ---------------- METIN KATALOGU ----------------
+    //
+    // Planlama Defteri'nin sema deseni: metinler kodda sabit degil, YONETILEN bir
+    // katalog. Yeni metin eklemek deploy gerektirmez.
+    private static async Task<IResult> MetinKatalogu(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, _) = await SuperAdminMi(ctx, db);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var metinler = await db.SistemMetinleri.AsNoTracking()
+            .OrderBy(m => m.Kapsam).ThenBy(m => m.Sira)
+            .ToListAsync();
+
+        // Her metin icin: kac surum arsivde, kac onay verilmis
+        var surumSayilari = (await db.SistemMetinSurumleri.AsNoTracking()
+            .GroupBy(x => x.Anahtar)
+            .Select(g => new { Anahtar = g.Key, Sayi = g.Count() })
+            .ToListAsync())
+            .ToDictionary(x => x.Anahtar, x => x.Sayi);
+
+        var onaySayilari = (await db.KullanimOnaylari.AsNoTracking()
+            .GroupBy(o => o.MetinAnahtar)
+            .Select(g => new { Anahtar = g.Key, Sayi = g.Count() })
+            .ToListAsync())
+            .ToDictionary(x => x.Anahtar, x => x.Sayi);
+
+        return Results.Json(metinler.Select(m => new
+        {
+            id = m.Id,
+            anahtar = m.Anahtar,
+            baslik = m.Baslik,
+            icerik = m.Icerik,
+            kapsam = m.Kapsam,
+            zorunlu = m.Zorunlu,
+            sira = m.Sira,
+            deprecated = m.Deprecated,
+            surum = m.Surum,
+            hash = m.Hash,
+            yururluk_tarihi = m.YururlukTarihi,
+            guncelleme = m.UpdatedAt,
+            surum_sayisi = surumSayilari.GetValueOrDefault(m.Anahtar, 0),
+            onay_sayisi = onaySayilari.GetValueOrDefault(m.Anahtar, 0),
+        }));
+    }
+
+    // SURUM GECMISI - "bu metin zaman icinde nasil degisti?"
+    private static async Task<IResult> MetinSurumleri(
+        string anahtar, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, _) = await SuperAdminMi(ctx, db);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var surumler = await db.SistemMetinSurumleri.AsNoTracking()
+            .Where(x => x.Anahtar == anahtar)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new
+            {
+                id = x.Id,
+                surum = x.Surum,
+                hash = x.Hash,
+                baslik = x.Baslik,
+                icerik = x.Icerik,
+                yururluk_tarihi = x.YururlukTarihi,
+                created_at = x.CreatedAt,
+            })
+            .ToListAsync();
+
+        return Results.Json(surumler);
     }
 
     // ---------------- IMHA (manuel tetikleme) ----------------

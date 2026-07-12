@@ -29,6 +29,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
     public DbSet<KullanimOnayi> KullanimOnaylari => Set<KullanimOnayi>();
+    public DbSet<SistemMetinSurumu> SistemMetinSurumleri => Set<SistemMetinSurumu>();
     public DbSet<Kurasyon> Kurasyonlar => Set<Kurasyon>();
     public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
@@ -315,6 +316,28 @@ public class BiAniBirakDbContext : DbContext
             e.HasIndex(x => x.Anahtar).IsUnique();
             e.Property(x => x.Surum).HasColumnName("Surum").HasDefaultValue("");
             e.Property(x => x.Hash).HasColumnName("Hash").HasDefaultValue("");
+            e.Property(x => x.Kapsam).HasColumnName("Kapsam").HasDefaultValue("es");
+            e.Property(x => x.Zorunlu).HasColumnName("Zorunlu").HasDefaultValue(true);
+            e.Property(x => x.Sira).HasColumnName("Sira").HasDefaultValue(0);
+            e.Property(x => x.Deprecated).HasColumnName("Deprecated").HasDefaultValue(false);
+        });
+
+        // ---- sistem_metin_surumleri (ARSIV - append-only, hash'ten metne kopru) ----
+        model.Entity<SistemMetinSurumu>(e =>
+        {
+            e.ToTable("sistem_metin_surumleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Anahtar).HasColumnName("Anahtar").IsRequired();
+            e.Property(x => x.Surum).HasColumnName("Surum").IsRequired();
+            e.Property(x => x.Hash).HasColumnName("Hash").IsRequired();
+            e.Property(x => x.Baslik).HasColumnName("Baslik").IsRequired();
+            e.Property(x => x.Icerik).HasColumnName("Icerik").IsRequired();
+            e.Property(x => x.YururlukTarihi).HasColumnName("YururlukTarihi");
+            e.Property(x => x.GuncelleyenKullaniciId).HasColumnName("GuncelleyenKullaniciId");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => x.Hash);
+            e.HasIndex(x => new { x.Anahtar, x.Surum });
         });
 
         // ---- kullanim_onaylari (HUKUKI KANIT - append-only, ASLA silinmez) ----
@@ -327,10 +350,13 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.MetinAnahtar).HasColumnName("MetinAnahtar").IsRequired();
             e.Property(x => x.MetinSurum).HasColumnName("MetinSurum").IsRequired();
             e.Property(x => x.MetinHash).HasColumnName("MetinHash").IsRequired();
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.KatkiId).HasColumnName("KatkiId");
             e.Property(x => x.IpAdresi).HasColumnName("IpAdresi");
             e.Property(x => x.TarayiciBilgisi).HasColumnName("TarayiciBilgisi");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => x.KullaniciId);
+            e.HasIndex(x => x.KatkiId);
         });
 
         // ---- kvkk_talepleri (ilgili kisi haklari) ----

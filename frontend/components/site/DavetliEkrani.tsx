@@ -211,6 +211,9 @@ export function DavetliEkrani({
       davetliTelefon: telefonNormalize(telefon),
       davetliIliski: iliskiMetni,
       mesaj: mesaj.trim(),
+      // RIZA SUNUCUYA GIDER: kutucuk artik kanit uretiyor. Sunucu metnin hash'ini
+      // onay kaydina yazar - "bu dilek gonderilirken su metin onaylandi".
+      riza,
     });
 
     if (!cevap.ok) {
@@ -651,7 +654,7 @@ export function DavetliEkrani({
               </span>{" "}
               sonra tümüyle silinecek.{" "}
               <a
-                href="/kvkk"
+                href="/kvkk-davetli"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-sarap hover:underline"

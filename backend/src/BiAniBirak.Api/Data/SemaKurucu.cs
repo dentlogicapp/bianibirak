@@ -344,6 +344,29 @@ public static class SemaKurucu
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Surum" text NOT NULL DEFAULT '';
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Hash" text NOT NULL DEFAULT '';
 
+        -- METIN KATALOGU (Planlama sema deseni): kapsam / zorunlu / sira / deprecated
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Kapsam" text NOT NULL DEFAULT 'es';
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Zorunlu" boolean NOT NULL DEFAULT true;
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Sira" integer NOT NULL DEFAULT 0;
+        ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Deprecated" boolean NOT NULL DEFAULT false;
+
+        -- METIN SURUM ARSIVI - hash'ten METNE kopru.
+        -- Bu tablo olmadan hash anlamsizdir: "bir metni onayladi" diyebiliriz ama
+        -- HANGI metni oldugunu gosteremeyiz. Append-only.
+        CREATE TABLE IF NOT EXISTS sistem_metin_surumleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "Anahtar" text NOT NULL,
+            "Surum" text NOT NULL,
+            "Hash" text NOT NULL,
+            "Baslik" text NOT NULL,
+            "Icerik" text NOT NULL,
+            "YururlukTarihi" timestamptz NOT NULL,
+            "GuncelleyenKullaniciId" uuid NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_metin_surum_hash ON sistem_metin_surumleri ("Hash");
+        CREATE INDEX IF NOT EXISTS ix_metin_surum_anahtar ON sistem_metin_surumleri ("Anahtar", "Surum");
+
         -- KULLANIM ONAYLARI - APPEND-ONLY hukuki kanit.
         -- Kullanici hesabini silse bile bu kayit KALIR (KVKK m.5/2-e: hakkin tesisi/
         -- korunmasi). PII icermez: kimlik UUID, hash, zaman, IP.
@@ -359,6 +382,13 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_kullanim_onaylari_kullanici
             ON kullanim_onaylari ("KullaniciId");
+
+        -- DAVETLI ONAYI: davetli anonimdir (KullaniciId yok), ama rizasi kanit gerektirir.
+        -- Onay, biraktigi dilege baglanir.
+        ALTER TABLE kullanim_onaylari ADD COLUMN IF NOT EXISTS "EtkinlikId" uuid NULL;
+        ALTER TABLE kullanim_onaylari ADD COLUMN IF NOT EXISTS "KatkiId" uuid NULL;
+        CREATE INDEX IF NOT EXISTS ix_kullanim_onaylari_katki
+            ON kullanim_onaylari ("KatkiId");
 
         -- IMHA TAKVIMI (Belge 08): kapanis + SaklamaGun sonrasi tam imha.
         -- Idempotent - her restart calisir, sonuc degismez.

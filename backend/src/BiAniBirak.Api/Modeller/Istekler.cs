@@ -34,7 +34,12 @@ public record KatkiBirakIstek(
     string DavetliEmail,
     string DavetliTelefon,
     string DavetliIliski,
-    string Mesaj);
+    string Mesaj,
+    // KVKK RIZASI - davetli icin de ZORUNLU.
+    //
+    // Onceki surumde ekranda kutucuk vardi ama isaretlendigi HICBIR YERE kaydedilmiyordu.
+    // Yani rizayi aliyorduk ama ISPATLAYAMIYORDUK. Kutucuk, kanit degildir.
+    bool Riza = false);
 
 // Web Push cihaz kaydi (abone).
 public record CihazKayitIstek(

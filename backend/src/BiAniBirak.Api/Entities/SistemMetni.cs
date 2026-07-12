@@ -31,6 +31,28 @@ public class SistemMetni
     public string Surum { get; set; } = string.Empty;
     public string Hash { get; set; } = string.Empty;
 
+    // ---- KATALOG (Planlama Defteri'nin sema deseni) ----
+    //
+    // Metinler kod icinde sabit DEGILDIR: super panelden yonetilen bir KATALOG'tur.
+    // Yeni bir metin eklemek (ornegin "Cerez Politikasi") deploy gerektirmez.
+    //
+    // Kapsam: metni KIMIN onaylayacagi.
+    //   "es"      -> hesap sahibi cift (kayit aninda)
+    //   "davetli" -> dilek birakan davetli (gonderim aninda)
+    // Ayni metni herkese dayatmak yanlistir: davetli, ciftin kullanim kosullarini
+    // kabul etmek zorunda degildir - o bir musteri degil, bir konuktur.
+    public string Kapsam { get; set; } = "es";
+
+    // Zorunlu mu? Zorunlu metinler onaylanmadan ilgili eylem (kayit / dilek birakma)
+    // TAMAMLANAMAZ. Bilgilendirici metinler (ornegin "Hakkimizda") zorunlu degildir.
+    public bool Zorunlu { get; set; } = true;
+
+    // Gosterim sirasi - kullanici metinleri mantikli bir duzende gormeli.
+    public int Sira { get; set; }
+
+    // Yururlukten kaldirilmis mi? Silinmez (eski onaylar ona baglidir), gizlenir.
+    public bool Deprecated { get; set; }
+
     public Guid? GuncelleyenKullaniciId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

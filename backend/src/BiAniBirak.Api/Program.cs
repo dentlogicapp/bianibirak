@@ -159,6 +159,7 @@ app.CihazUclariniEkle();
 app.BildirimUclariniEkle();
 app.DavetUclariniEkle();
 app.SuperUclariniEkle();
+app.OnayUclariniEkle();          // Onay: eksik onay tespiti, tek seferlik modal, davetli metni
 app.SuperTeshisUclariniEkle();   // Teshis: saglik skoru, defter detayi, olcum, rontgen
 app.KurasyonUclariniEkle();
 app.GorselUclariniEkle();

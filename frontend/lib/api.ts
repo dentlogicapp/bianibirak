@@ -455,6 +455,9 @@ export const api = {
       davetliTelefon: string;
       davetliIliski: string;
       mesaj: string;
+      // KVKK RIZASI - sunucuda ZORUNLU. Onceki surumde kutucuk vardi ama gonderilmiyordu;
+      // riza aliniyordu ama ISPATLANAMIYORDU.
+      riza: boolean;
     }
   ) =>
     istek<{ durum: string; katki_id: string; mesaj: string }>(

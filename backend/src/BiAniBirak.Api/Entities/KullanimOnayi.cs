@@ -37,6 +37,16 @@ public class KullanimOnayi
     // SHA-256 (hex). Kanitin kalbi: metnin o gunku hali, kelimesi kelimesine.
     public string MetinHash { get; set; } = string.Empty;
 
+    // ---- DAVETLI ONAYI ----
+    //
+    // Davetli ANONIMDIR: hesabi yok, KullaniciId'si yok. Ama rizasi yine de kanit
+    // gerektirir - KVKK, verinin kimden geldigini degil, RIZANIN VARLIGINI sorar.
+    //
+    // Davetlinin onayi, biraktigi dilege baglanir: "bu dilek gonderilirken su metin
+    // su hash ile onaylandi". Kimlik yok; ama ISPAT var.
+    public Guid? EtkinlikId { get; set; }
+    public Guid? KatkiId { get; set; }
+
     // Onay baglami - "bu gercekten o kisi miydi?" sorusuna delil.
     public string? IpAdresi { get; set; }
     public string? TarayiciBilgisi { get; set; }
