@@ -387,3 +387,79 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
 .koyu .isaret-yazim {
   text-decoration-color: #e57373;
 }
+
+/* ---------------- PREMIUM VURGU (odeme kopru butonu) ----------------
+   Bu buton, odeme adimi baglandiginda kasanin kapisi olacak. Dikkat cekmeli
+   ama RAHATSIZ ETMEMELI.
+
+   Yanip sonme (blink) KULLANILMADI: ucuz durur, gozu yorar, uzun bakista
+   sinir bozar - ve "acil, tikla!" diye bagiran bir reklam paneline benzer.
+   Miras satan bir urun boyle bagirmaz.
+
+   Devlerin yontemi (Stripe, Linear, Vercel): yavas gecen bir PARILTI HUZMESI
+   + nefes alan bir halka. Goz onu kendiliginden takip eder, ama yorulmaz.
+   Pahali hissettirir - cunku sakin. */
+
+@keyframes parilti-gecisi {
+  0%   { transform: translateX(-130%) skewX(-22deg); }
+  100% { transform: translateX(240%) skewX(-22deg); }
+}
+
+@keyframes nefes-halkasi {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(168, 130, 60, 0.32),
+      0 10px 28px -12px rgba(110, 36, 56, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px rgba(168, 130, 60, 0),
+      0 16px 38px -12px rgba(110, 36, 56, 0.62);
+  }
+}
+
+.premium-vurgu {
+  position: relative;
+  overflow: hidden;
+  animation: nefes-halkasi 3.6s ease-in-out infinite;
+}
+
+/* Parilti huzmesi - butonun uzerinden gecen isik. 4.5s'de bir, aceleci degil. */
+.premium-vurgu::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 253, 248, 0.13) 45%,
+    rgba(255, 253, 248, 0.2) 50%,
+    rgba(255, 253, 248, 0.13) 55%,
+    transparent 100%
+  );
+  animation: parilti-gecisi 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+/* Devre disi butonda vurgu YOK - satilacak bir sey yoksa dikkat cekmenin anlami yok. */
+.premium-vurgu:disabled {
+  animation: none;
+}
+.premium-vurgu:disabled::after {
+  display: none;
+}
+
+/* ERISILEBILIRLIK: hareket hassasiyeti olan kullanicilar (vestibuler bozukluk,
+   migren, epilepsi) icin animasyon TAMAMEN kapanir. Devler bunu atlamaz; biz de
+   atlamayiz. Buton yine calisir, yalniz kimildamaz. */
+@media (prefers-reduced-motion: reduce) {
+  .premium-vurgu {
+    animation: none;
+  }
+  .premium-vurgu::after {
+    display: none;
+  }
+}

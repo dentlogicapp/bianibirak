@@ -514,7 +514,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       <div className="mt-6 rounded-3xl border border-yaldiz/40 bg-yaldiz/5 p-6 sm:p-8">
         <div className="text-center">
           <p className="font-display text-xl text-murekkep">
-            {tamamlandi ? "Mirasın hazır" : "Eserini kağıda dök"}
+            {tamamlandi ? "Mirasın İndirilmeye Hazır" : "Eserini kağıda dök"}
           </p>
           <p className="metin-yasli mx-auto mt-2 max-w-lg font-govde text-sm leading-relaxed text-ikincil">
             {dahilOgeler.length} dilek, seçtiğin düzenle baskıya hazır bir deftere dönüşür.
@@ -522,12 +522,18 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           </p>
         </div>
 
-        <div className="mt-6">
-          {/* Baskiya hazir */}
+        {/* ORTALAMA: eskiden burada IKI buton vardi (sm:grid-cols-2). Filigranli
+            onizleme kaldirilinca tek buton kaldi ve tam genislige yayilip icerigi
+            sola yasladi. Simdi bloğun ortasinda, olculu genislikte duruyor. */}
+        <div className="mt-6 flex justify-center">
+          {/* ODEME KOPRUSU - premium vurgu.
+              Odeme adimi baglandiginda bu buton kasanin kapisi olacak; simdiden
+              dikkati uzerine cekmeli. Yanip sonme YOK (ucuz durur, gozu yorar);
+              yavas gecen parilti + nefes alan halka VAR - devlerin yontemi. */}
           <button
             onClick={() => defterUret()}
             disabled={uretiliyor !== null || dahilOgeler.length === 0}
-            className="flex min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+            className="premium-vurgu flex w-full max-w-md min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parsomen/20 text-parsomen">
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
@@ -537,10 +543,16 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </span>
             <span className="min-w-0">
               <span className="block font-govde text-sm font-medium text-parsomen">
-                {uretiliyor === "baski" ? "Eser hazırlanıyor..." : "Baskıya hazır defteri indir"}
+                {uretiliyor === "baski"
+                  ? "Eser hazırlanıyor..."
+                  : "Baskıya hazır yüksek çözünürlüklü defterini indir"}
               </span>
+              {/* "Istedigin boyutta" DOGRU bir ifade: ISO 216 kagit serisinin tamami
+                  (A3/A4/A5/A6) ayni en-boy oranina sahiptir (1:kok2). Bu yuzden A5
+                  belge A4'e buyutuldugunde HICBIR SEY BOZULMAZ - kirpma olmaz, oran
+                  kaymaz, duzen kaymaz. Yazilar vektor oldugu icin kayipsiz buyur. */}
               <span className="block font-govde text-xs text-parsomen/75">
-                A5, cilt paylı, gömülü tipografi - matbaaya hazır
+                İstediğin boyutta, cilt paylı, gömülü tipografi - matbaaya hazır!
               </span>
             </span>
           </button>
