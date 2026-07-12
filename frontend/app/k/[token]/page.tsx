@@ -316,7 +316,6 @@ function KatkiFormu({
     try {
       // Tarayicida kucult + EXIF/GPS temizle - sunucuya 8 MB degil ~700 KB gider
       const hazir = await gorselHazirla(ham);
-      if (foto) URL.revokeObjectURL(foto.onizleme);
       setFoto({
         dosya: hazir.dosya,
         onizleme: hazir.onizlemeUrl,
@@ -699,6 +698,9 @@ function KatkiFormu({
                     src={foto.onizleme}
                     alt="Seçtiğin fotoğraf"
                     className="h-full w-full object-contain"
+                    onError={() =>
+                      setHata("Fotoğraf önizlemesi yüklenemedi. Başka bir fotoğraf dener misin?")
+                    }
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -711,10 +713,7 @@ function KatkiFormu({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    URL.revokeObjectURL(foto.onizleme);
-                    setFoto(null);
-                  }}
+                  onClick={() => setFoto(null)}
                   className="shrink-0 rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
                 >
                   Kaldır

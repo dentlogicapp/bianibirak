@@ -111,6 +111,20 @@ export function DefterKarti({
             alt=""
             className="h-full w-full object-contain"
             draggable={false}
+            onError={(e) => {
+              // Sessiz bosluk YASAK: yuklenemezse gorunur bir iz birak.
+              const el = e.currentTarget;
+              el.style.display = "none";
+              const kap = el.parentElement;
+              if (kap && !kap.dataset.hatali) {
+                kap.dataset.hatali = "1";
+                kap.classList.add("items-center", "justify-center", "flex");
+                const not = document.createElement("span");
+                not.className = "font-govde text-[0.6rem] text-[#6c5f50]";
+                not.textContent = "Fotoğraf yüklenemedi";
+                kap.appendChild(not);
+              }
+            }}
           />
         </div>
       )}

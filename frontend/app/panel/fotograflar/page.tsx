@@ -61,7 +61,6 @@ export default function FotograflarSayfasi() {
         // Tarayicida kucult + EXIF temizle (GPS konumu dahil) - sonra gonder
         const hazir = await gorselHazirla(ham);
         const c = await gorselYukle({ dosya: hazir.dosya }, "galeri");
-        URL.revokeObjectURL(hazir.onizlemeUrl);
         if (!c.ok) {
           toast.error(c.mesaj);
           break;

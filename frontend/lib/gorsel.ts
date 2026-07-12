@@ -65,14 +65,38 @@ export async function gorselHazirla(ham: File): Promise<HazirGorsel> {
   return paketle(blob, g, y);
 }
 
-function paketle(blob: Blob, genislik: number, yukseklik: number): HazirGorsel {
+async function paketle(
+  blob: Blob,
+  genislik: number,
+  yukseklik: number
+): Promise<HazirGorsel> {
   const dosya = new File([blob], `gorsel-${Date.now()}.jpg`, { type: "image/jpeg" });
-  return {
-    dosya,
-    genislik,
-    yukseklik,
-    onizlemeUrl: URL.createObjectURL(blob),
-  };
+
+  // ONIZLEME URL'I: data: URL (base64), blob: URL DEGIL.
+  //
+  // NEDEN: blob: URL kirilgan bir sozlesmedir -
+  //   - service worker'in fetch handler'i onu yakalayabilir (origin'i sayfa
+  //     origin'i ile ESLESIR, "baska origin" filtresinden gecer),
+  //   - URL.revokeObjectURL bir kez cagrildiginda URL OLUR ve <img> sessizce
+  //     bosalir - hicbir hata firlatmaz,
+  //   - bellek yasam dongusu bilesen render dongusune baglidir.
+  //
+  // data: URL'in boyle bir sozlesmesi YOKTUR. Icerigi kendi icindedir; ag
+  // katmanina, service worker'a, revoke zamanlamasina bagimli DEGILDIR. Tek bir
+  // fotograf icin bellekte ~1 MB fazladan yer tutar - onizlemenin CALISMASI icin
+  // fazlasiyla ucuz bir bedel.
+  const onizlemeUrl = await veriUrl(blob);
+
+  return { dosya, genislik, yukseklik, onizlemeUrl };
+}
+
+function veriUrl(blob: Blob): Promise<string> {
+  return new Promise((coz, at) => {
+    const okuyucu = new FileReader();
+    okuyucu.onload = () => coz(String(okuyucu.result));
+    okuyucu.onerror = () => at(new Error("Fotoğraf okunamadı."));
+    okuyucu.readAsDataURL(blob);
+  });
 }
 
 // createImageBitmap EXIF yonlendirmesini (rotation) dogru uygular; fallback <img>.
