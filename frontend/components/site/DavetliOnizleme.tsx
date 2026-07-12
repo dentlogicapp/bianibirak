@@ -1,110 +1,94 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KatkiKarsilama } from "@/lib/api";
+import { DavetliEkrani } from "@/components/site/DavetliEkrani";
 
-// DAVETLI EKRANI ONIZLEMESI - GERCEK sayfanin kendisi.
+// DAVETLI EKRANI ONIZLEMESI
 //
-// NEDEN TAKLIT DEGIL, GERCEK:
-// Onceki iki surumde onizleme, davetli ekranini "taklit eden" ayri bir dizgiydi.
-// Her seferinde ayristi: once film seridi yoktu, sonra form yoktu, sonra tipografi
-// kaydi. Iki ayri dizgi tutmak, kacinilmaz olarak yalan soyleyen bir onizleme
-// uretir - ve cift, gonderdigi linkin nasil gorunecegini YANLIS bilir.
+// GERCEGIN KENDISI: DavetliEkrani bileseni, davetlinin gordugu sayfayla AYNI koddur.
+// Film seridi, sayac, iliski menusu, yazim denetimi, fotograf alani, "Dileğimi bırak"
+// butonu - hepsi burada, cunku ayni bilesen. Ayrismak icin ikinci bir kod YOK.
 //
-// Cozum: davetli sayfasinin KENDISINI goster. Ayrisma matematiksel olarak imkansiz;
-// cunku iki sey degil, TEK sey var.
+// OLCEK STABILITESI:
+// Icerik SABIT genislikte (390px - referans telefon) cizilir, sonra kapsayiciya
+// ORANLA kucultulur. Fotograf sayisi, metin uzunlugu, tema - hicbiri bu olcegi
+// degistiremez. Yatay tasma MATEMATIKSEL olarak imkansizdir.
 //
-// OLCEK STABILITESI (ikinci kok sorun):
-// Onizleme, kapsayicinin genisligine gore akiyordu. Fotograf yuklenince film seridi
-// genisliyor, dar ekranda tasip sayfayi daginik gosteriyordu. Simdi ic genislik
-// SABIT (CIHAZ_GENISLIK = 390px, referans telefon). Kapsayici ne kadar dar olursa
-// olsun icerik BOZULMAZ; yalnizca olceklenir. Fotograf sayisi, metin uzunlugu,
-// hicbir sey bu olcegi degistiremez - matematiksel olarak sabittir.
+// Cerceve: telefon maketi YOK. Sade bir kagit yuzeyi, ince kenarlik, yumusak golge.
+// Onizleme burada ICERIGIN kendisidir; suslu bir kutu icinde degil.
 
-const CIHAZ_GENISLIK = 390; // referans telefon genisligi (iPhone 14/15 sinifi)
-const CIHAZ_YUKSEKLIK = 780;
+const REFERANS_GENISLIK = 390;
 
-export function DavetliOnizleme({
-  token,
-  yenilemeAnahtari,
-}: {
-  token: string | null;
-  // Bu deger degisince onizleme yenilenir (oto-kaydet sonrasi).
-  yenilemeAnahtari: string;
-}) {
+export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
   const kapRef = useRef<HTMLDivElement>(null);
+  const icRef = useRef<HTMLDivElement>(null);
   const [olcek, setOlcek] = useState(1);
-  const [sr, setSr] = useState(0); // iframe yeniden yukleme sayaci
+  const [yukseklik, setYukseklik] = useState(700);
 
-  // Kapsayici genisligine gore olcek: icerik SABIT 390px, kutu ne olursa olsun sigar
+  // Kapsayici genisligine gore olcek
   useEffect(() => {
     const kap = kapRef.current;
     if (!kap) return;
 
-    function olcegiKur() {
-      const genislik = kap!.clientWidth;
-      if (genislik > 0) setOlcek(Math.min(genislik / CIHAZ_GENISLIK, 1));
+    function olc() {
+      const g = kap!.clientWidth;
+      if (g > 0) setOlcek(Math.min(g / REFERANS_GENISLIK, 1));
     }
 
-    olcegiKur();
-    const gozlemci = new ResizeObserver(olcegiKur);
-    gozlemci.observe(kap);
-    return () => gozlemci.disconnect();
+    olc();
+    const g = new ResizeObserver(olc);
+    g.observe(kap);
+    return () => g.disconnect();
   }, []);
 
-  // Degisiklikler kaydedildikce onizlemeyi tazele (gereksiz yeniden yukleme yok:
-  // yalniz anahtar degisince).
+  // Ic yukseklik olceklendikten sonra disariya YANSITILIR; yoksa kapsayici
+  // olceklenmemis yuksekligi ayirir ve altta kocaman bir bosluk kalir.
   useEffect(() => {
-    if (!token) return;
-    const zaman = setTimeout(() => setSr((s) => s + 1), 900);
-    return () => clearTimeout(zaman);
-  }, [yenilemeAnahtari, token]);
+    const ic = icRef.current;
+    if (!ic) return;
 
-  if (!token) {
+    function olc() {
+      setYukseklik(ic!.scrollHeight * olcek);
+    }
+
+    olc();
+    const g = new ResizeObserver(olc);
+    g.observe(ic);
+    return () => g.disconnect();
+  }, [olcek, veri]);
+
+  if (!veri) {
     return (
-      <div className="rounded-3xl border border-dashed border-ayrac bg-parsomen px-6 py-16 text-center">
-        <p className="font-govde text-sm text-ikincil">
-          Paylaşım bağlantın hazırlanıyor...
-        </p>
+      <div className="rounded-3xl border border-dashed border-ayrac bg-parsomen px-6 py-20 text-center">
+        <p className="font-govde text-sm text-ikincil">Önizleme hazırlanıyor...</p>
       </div>
     );
   }
 
   return (
-    <div ref={kapRef} className="min-w-0">
-      {/* CIHAZ CERCEVESI - "davetli bunu boyle gorecek" */}
+    <div
+      ref={kapRef}
+      className="min-w-0 overflow-hidden rounded-3xl border border-ayrac bg-parsomen"
+      style={{ height: yukseklik }}
+    >
+      {/* SABIT olculerde cizilir, sonra olceklenir. Kapsayici darlasinca icerik
+          KUCULUR - akmaz, tasmaz, bozulmaz. */}
       <div
-        className="relative mx-auto overflow-hidden rounded-[2rem] border-[7px] border-murekkep bg-murekkep shadow-[0_16px_44px_rgba(33,26,23,0.22)]"
+        ref={icRef}
         style={{
-          width: CIHAZ_GENISLIK * olcek + 14,
-          height: CIHAZ_YUKSEKLIK * olcek + 14,
+          width: REFERANS_GENISLIK,
+          transform: `scale(${olcek})`,
+          transformOrigin: "top left",
         }}
       >
-        {/* Ic yuzey: SABIT olculerde cizilir, sonra olceklenir.
-            Kapsayici darlasinca icerik kuculur - AKMAZ, BOZULMAZ. */}
-        <div
-          className="overflow-hidden rounded-[1.6rem] bg-parsomen"
-          style={{
-            width: CIHAZ_GENISLIK,
-            height: CIHAZ_YUKSEKLIK,
-            transform: `scale(${olcek})`,
-            transformOrigin: "top left",
-          }}
-        >
-          <iframe
-            key={sr}
-            src={`/k/${token}?onizleme=1`}
-            title="Davetli ekranı önizlemesi"
-            className="h-full w-full border-0"
-            // Davetli sayfasi kendi icinde calisir; bu bir GORUNTU'dur, etkilesim
-            // beklenmez. Ayni kokendir - ek izin gerekmez.
-            scrolling="yes"
-          />
-        </div>
+        <DavetliEkrani
+          token=""
+          veri={veri}
+          onGonderildi={() => {}}
+          salt
+        />
       </div>
-
-      <p className="mt-3 text-center font-govde text-[0.68rem] text-ikincil">
-        Davetlinin gördüğü ekranın kendisi - bağlantıyı açtığında bunu görecek.
-      </p>
     </div>
   );
 }

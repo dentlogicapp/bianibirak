@@ -8,6 +8,7 @@ import { VARSAYILAN } from "@/lib/varsayilan";
 import { AppShell } from "@/components/site/AppShell";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DavetliOnizleme } from "@/components/site/DavetliOnizleme";
+import type { KatkiKarsilama } from "@/lib/api";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Etkinlik & Gorunum: 3 sekme (Etkinlik / Davetli Ekrani / Sayac).
@@ -74,20 +75,30 @@ export default function EtkinlikGorunumSayfasi() {
 function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: EtkinlikAyar }) {
   const [sekme, setSekme] = useState<SekmeKod>("etkinlik");
 
-  // Onizleme, davetli sayfasinin KENDISINI gosterir (taklit degil) - kendi
-  // paylasim baglantimizin token'i ile.
-  const [onizlemeToken, setOnizlemeToken] = useState<string | null>(null);
+  // Onizleme, davetlinin GERCEKTEN gorecegi fotograflari kullanir - temsili degil.
+  const [gorseller, setGorseller] = useState<
+    { url: string; kapak: boolean; genislik: number; yukseklik: number }[]
+  >([]);
 
   useEffect(() => {
     let iptal = false;
-    void api.etkinlikLinkler().then((c) => {
-      if (iptal || !c.ok || c.veri.length === 0) return;
-      setOnizlemeToken(c.veri[0].token);
+    void api.gorselListe().then((c) => {
+      if (iptal || !c.ok) return;
+      setGorseller(
+        c.veri.gorseller.map((g) => ({
+          url: g.url,
+          kapak: g.konum === "kapak",
+          genislik: g.genislik,
+          yukseklik: g.yukseklik,
+        }))
+      );
     });
     return () => {
       iptal = true;
     };
   }, []);
+
+
 
   // --- Etkinlik alanlari ---
   const [es1Ad, setEs1Ad] = useState(ilkEtkinlik.es1_ad);
@@ -169,6 +180,25 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
   );
   // Aktif sekmeye gore gosterge
   const gosterge = otoKayitEtiket(sekme === "etkinlik" ? etkDurum : ayarDurum);
+
+  // Panelin CANLI degerlerinden davetli verisi kur: onizleme, kaydedilmemis
+  // degisiklikleri bile ANINDA gosterir - "canli onizleme" olmanin anlami budur.
+  const onizlemeVerisi: KatkiKarsilama = {
+    es1_ad: es1Ad,
+    es2_ad: es2Ad,
+    kaynak_es: "es1",
+    tur: ilkEtkinlik.tur,
+    karsilama_metni: karsilama || null,
+    prompt_metni: prompt || null,
+    acildi: true,
+    kapandi: false,
+    sayac_aktif: sayacAktif,
+    sayac_aktif_cumle: sayacAktifCumle || null,
+    sayac_bitti_cumle: sayacBittiCumle || null,
+    etkinlik_tarihi: tarih,
+    gorseller,
+    saklama_gun: 37,
+  };
 
   return (
     <AppShell>
@@ -324,10 +354,7 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
             Canlı önizleme
           </p>
           <div className="min-w-0 overflow-hidden rounded-3xl border border-ayrac bg-parsomen p-5">
-            <DavetliOnizleme
-              token={onizlemeToken}
-              yenilemeAnahtari={`${es1Ad}|${es2Ad}|${tarih}|${karsilama}|${prompt}|${sayacAktif}|${sayacAktifCumle}|${sayacBittiCumle}`}
-            />
+            <DavetliOnizleme veri={onizlemeVerisi} />
           </div>
         </div>
       </div>
