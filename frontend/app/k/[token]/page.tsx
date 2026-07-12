@@ -6,7 +6,8 @@ import { api, davetliFotoYukle, type KatkiKarsilama } from "@/lib/api";
 import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { FilmSeridi } from "@/components/site/FilmSeridi";
-import { iyelikEki } from "@/lib/es";
+import { iyelikEki, iliskiMetniKur } from "@/lib/es";
+import { DefterKarti } from "@/components/site/DefterKarti";
 import {
   yazimDenetle,
   bulguyuUygula,
@@ -167,7 +168,12 @@ function KatkiFormu({
   const [mesaj, setMesaj] = useState("");
   const [iliski, setIliski] = useState("");
   const [iliskiSerbest, setIliskiSerbest] = useState("");
-  const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
+  const [foto, setFoto] = useState<{
+    dosya: File;
+    onizleme: string;
+    genislik: number;
+    yukseklik: number;
+  } | null>(null);
   const [riza, setRiza] = useState(false);
   const [denetimUyarisi, setDenetimUyarisi] = useState(false);
   const [sozluk, setSozluk] = useState<Sozluk | null>(null);
@@ -226,10 +232,16 @@ function KatkiFormu({
   // Deftere basilacak iliski metni:
   //  - Detay yazildiysa O kullanilir (davetlinin kendi cumlesi daha degerli)
   //  - Yazilmadiysa iyelikli tip: "Musa'nin Okul Arkadasi"
+  // Defterde "kimin yakini" HER ZAMAN belli olmali. Davetli kendi cumlesini
+  // yazdiysa ve icinde esin adi gecmiyorsa, basa iyelikli ad eklenir.
   const iliskiMetni = (() => {
     const detay = iliskiSerbest.trim();
-    if (iliski === "diger") return detay;
-    if (secilenTip) return detay.length >= 2 ? detay : `${esIyelik} ${secilenTip.etiket}`;
+    if (iliski === "diger") return iliskiMetniKur(buEs, detay);
+    if (secilenTip) {
+      return detay.length >= 2
+        ? iliskiMetniKur(buEs, detay)
+        : `${esIyelik} ${secilenTip.etiket}`;
+    }
     return "";
   })();
 
@@ -305,7 +317,12 @@ function KatkiFormu({
       // Tarayicida kucult + EXIF/GPS temizle - sunucuya 8 MB degil ~700 KB gider
       const hazir = await gorselHazirla(ham);
       if (foto) URL.revokeObjectURL(foto.onizleme);
-      setFoto({ dosya: hazir.dosya, onizleme: hazir.onizlemeUrl });
+      setFoto({
+        dosya: hazir.dosya,
+        onizleme: hazir.onizlemeUrl,
+        genislik: hazir.genislik,
+        yukseklik: hazir.yukseklik,
+      });
     } catch (h) {
       setHata(h instanceof Error ? h.message : "Fotoğraf işlenemedi.");
     }
@@ -320,6 +337,8 @@ function KatkiFormu({
         iliski={iliskiMetni}
         mesaj={mesaj.trim()}
         fotoUrl={foto?.onizleme ?? null}
+        fotoGenislik={foto?.genislik ?? 0}
+        fotoYukseklik={foto?.yukseklik ?? 0}
         ciftAdi={ciftAdi}
         yukleniyor={yukleniyor}
         hata={hata}
@@ -672,16 +691,22 @@ function KatkiFormu({
 
             {foto ? (
               <div className="flex items-center gap-3 rounded-xl border border-ayrac bg-parsomen p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={foto.onizleme}
-                  alt="Seçtiğin fotoğraf"
-                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                />
+                {/* KUCUK ONIZLEME - object-contain: fotografin TAMAMI gorunur.
+                    Kirparsak davetli yanlis fotograf sectigini fark edemez. */}
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-ayrac bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={foto.onizleme}
+                    alt="Seçtiğin fotoğraf"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-govde text-xs text-murekkep">Fotoğrafın hazır</p>
                   <p className="font-govde text-[0.7rem] text-ikincil">
-                    Dileğinin yanına, deftere basılacak.
+                    {foto.genislik > 0
+                      ? `${foto.genislik}×${foto.yukseklik} - deftere basılacak`
+                      : "Dileğinin yanına, deftere basılacak."}
                   </p>
                 </div>
                 <button
@@ -910,6 +935,8 @@ function DilekOnizleme({
   iliski,
   mesaj,
   fotoUrl,
+  fotoGenislik,
+  fotoYukseklik,
   ciftAdi,
   yukleniyor,
   hata,
@@ -920,6 +947,8 @@ function DilekOnizleme({
   iliski: string;
   mesaj: string;
   fotoUrl: string | null;
+  fotoGenislik: number;
+  fotoYukseklik: number;
   ciftAdi: string;
   yukleniyor: boolean;
   hata: string;
@@ -951,37 +980,17 @@ function DilekOnizleme({
             düzenlemeye dön.
           </p>
 
-          {/* KAGIT - PDF'teki dilek kartinin birebir esi */}
-          <div className="mt-6 rounded-lg bg-[#fdf9f0] p-6 shadow-[0_6px_24px_rgba(0,0,0,0.13)]">
-            <div className="border border-[#e8dcc4] bg-[#fffdf8] p-4 text-center">
-              {fotoUrl && (
-                <div className="mx-auto mb-3.5 w-fit border border-[#a8823c] bg-white p-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={fotoUrl}
-                    alt=""
-                    className="max-h-44 w-auto max-w-full object-contain"
-                  />
-                </div>
-              )}
-
-              <p className="font-govde text-[0.84rem] leading-[1.72] text-[#3a2f28]">
-                {mesaj}
-              </p>
-
-              {/* Yaldiz ayrac - imzayi metinden ayirir (PDF ile ayni) */}
-              <div className="mx-auto my-3 flex w-fit items-center gap-1.5" aria-hidden>
-                <span className="h-px w-5 bg-[#a8823c]" />
-                <span className="h-[3px] w-[3px] rotate-45 bg-[#a8823c]" />
-                <span className="h-px w-5 bg-[#a8823c]" />
-              </div>
-
-              <p className="font-display text-[0.82rem] text-[#6e2438]">{ad}</p>
-              {iliski && (
-                <p className="mt-0.5 font-govde text-[0.62rem] text-[#6c5f50]">{iliski}</p>
-              )}
-              <p className="mt-0.5 font-govde text-[0.58rem] text-[#c9a96a]">{bugun}</p>
-            </div>
+          {/* KAGIT - icindeki kart, PDF dizgisiyle BIREBIR ayni olculerde */}
+          <div className="mt-6 overflow-hidden rounded-lg bg-[#fdf9f0] px-4 py-6 shadow-[0_6px_24px_rgba(0,0,0,0.13)]">
+            <DefterKarti
+              ad={ad}
+              iliski={iliski}
+              mesaj={mesaj}
+              fotoUrl={fotoUrl}
+              fotoGenislik={fotoGenislik}
+              fotoYukseklik={fotoYukseklik}
+              tarih={bugun}
+            />
           </div>
 
           {hata && (

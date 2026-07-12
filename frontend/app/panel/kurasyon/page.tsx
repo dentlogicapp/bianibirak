@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, defteriIndir, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { DefterKarti } from "@/components/site/DefterKarti";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // KURASYON STUDYOSU (Belge 03 - Akis 6): "Toplayici degil, kurasyon studyosu."
@@ -743,52 +744,28 @@ function IcSayfa({
 
           <div className="mt-5 space-y-6">
             {grup.ogeler.slice(0, 4).map((o) => (
-              // DILEK KARTI - fotograf, metin ve imza AYNI cercevede.
-              // Sahiplik bir bakista anlasilir (PDF ile birebir ayni kurgu).
-              <div
+              // Kagittaki kartin AYNISI - tek dogruluk kaynagi (DefterKarti).
+              // Onizleme ile baski ayri kodlardan beslenirse kacinilmaz olarak
+              // ayrisir ve onizleme yalan soylemeye baslar.
+              <DefterKarti
                 key={o.katki_id}
-                className={`${
-                  o.foto_url ? "border border-[#e8dcc4] bg-[#fffdf8] p-3.5" : ""
-                } text-center`}
-              >
-                {o.foto_url && (
-                  <div className="mx-auto mb-3 w-fit border border-[#a8823c] bg-white p-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={o.foto_url}
-                      alt=""
-                      className="max-h-36 w-auto max-w-full object-contain"
-                    />
-                  </div>
-                )}
-
-                <p
-                  className={`font-govde text-[0.82rem] leading-relaxed text-[#2a221d] ${
-                    italik ? "italic" : ""
-                  }`}
-                >
-                  {o.mesaj}
-                </p>
-
-                {/* Imza ayraci - metinden NET ayrilir */}
-                <div className="mx-auto my-2.5 h-px w-8 bg-[#a8823c]/60" />
-
-                <p className="font-display text-[0.75rem] text-[#6e2438]">{o.davetli_ad}</p>
-                {o.davetli_iliski && (
-                  <p className="mt-0.5 font-govde text-[0.6rem] text-[#6c5f50]">
-                    {o.davetli_iliski}
-                  </p>
-                )}
-                {tarihGoster && (
-                  <p className="mt-0.5 font-govde text-[0.55rem] text-[#c9a96a]">
-                    {new Date(o.birakilma).toLocaleDateString("tr-TR", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                )}
-              </div>
+                ad={o.davetli_ad}
+                iliski={o.davetli_iliski ?? ""}
+                mesaj={o.mesaj}
+                fotoUrl={o.foto_url}
+                fotoGenislik={o.foto_genislik}
+                fotoYukseklik={o.foto_yukseklik}
+                tarih={
+                  tarihGoster
+                    ? new Date(o.birakilma).toLocaleDateString("tr-TR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : null
+                }
+                tema={tema}
+              />
             ))}
           </div>
 

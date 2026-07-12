@@ -333,6 +333,10 @@ public static class KurasyonUclari
                 kaynak_es = k.KaynakEs,
                 birakilma = k.CreatedAt,
                 foto_url = k.FotoAnahtari != null ? "/api/gorsel/" + k.FotoAnahtari : null,
+                // Olcu: kurasyon onizlemesi, kagittaki kartin AYNISINI cizer.
+                // Olcu olmadan cerceve orani bilinemez -> onizleme yalan soyler.
+                foto_genislik = k.FotoGenislik,
+                foto_yukseklik = k.FotoYukseklik,
                 dahil = o.Dahil,
                 sira = o.Sira,
                 bolum_basligi = o.BolumBasligi,

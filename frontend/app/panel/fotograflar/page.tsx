@@ -188,16 +188,27 @@ export default function FotograflarSayfasi() {
           </p>
         </div>
       ) : (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid items-start gap-4 sm:grid-cols-2">
           {gorseller.map((g, i) => (
             <div key={g.id} className="min-w-0 overflow-hidden rounded-2xl border border-ayrac bg-yuzey">
-              {/* Gorsel */}
-              <div className="relative aspect-[4/3] w-full overflow-hidden bg-parsomen">
+              {/* GORSEL - kutu, fotografin GERCEK oranini alir.
+                  Onceki surumde kutu sabit 4:3 idi ve object-cover kullaniliyordu:
+                  dikey fotograflar kirpiliyor, kadraj tasiyordu. Kutu orani =
+                  fotograf orani oldugunda ne kirpma ne bosluk kalir. */}
+              <div
+                className="relative w-full overflow-hidden bg-parsomen"
+                style={{
+                  aspectRatio:
+                    g.genislik > 0 && g.yukseklik > 0
+                      ? `${g.genislik} / ${g.yukseklik}`
+                      : "4 / 3",
+                }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={g.url}
                   alt="Fotoğraf"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
                 {g.konum !== "galeri" && (
                   <span className="absolute left-3 top-3 rounded-full bg-sarap px-2.5 py-1 font-govde text-[0.6rem] uppercase tracking-etiket text-parsomen">

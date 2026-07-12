@@ -300,6 +300,8 @@ export type KurasyonOgesi = {
   bolum_basligi: string | null;
   davetli_iliski: string;
   foto_url: string | null;
+  foto_genislik: number;
+  foto_yukseklik: number;
 };
 
 export type Kurasyon = {

@@ -50,3 +50,41 @@ export function iyelikEki(ad: string): string {
 export function ileKalibi(ad: string): string {
   return `${(ad ?? "").trim()} ile`;
 }
+
+// ILISKI METNI - deftere basilacak son hal.
+//
+// SORUN: davetli kendini serbestce tanimlayabiliyor. "Universiteden sinif arkadasi"
+// yazdiginda defterde SADECE bu gorunuyordu - kimin sinif arkadasi? Defter butunlugu
+// bozuluyordu. Ama davetli "Musa'nin cocukluk arkadasi" yazdiysa basa bir kez daha
+// "Musa'nin" eklemek de sacma olurdu.
+//
+// COZUM: metin esin adini ZATEN iceriyor mu diye bakariz.
+//   iceriyor  -> davetlinin cumlesi AYNEN korunur (o daha iyi biliyor)
+//   icermiyor -> basa iyelikli ad eklenir ("Musa'nin universiteden sinif arkadasi")
+//
+// Ek incelik: onek eklenince ilk kelime kucuk harfe duser - Turkce tamlamada dogru
+// olan budur ("Musa'nin universiteden..."). Ama OZEL AD ise buyuk kalir: kesme
+// isareti tasiyan kelimeler ("Ankara'dan") ozel addir, ellenmez.
+export function iliskiMetniKur(esAd: string, serbestMetin: string): string {
+  const metin = (serbestMetin ?? "").trim();
+  if (metin.length === 0) return "";
+
+  const ad = (esAd ?? "").trim();
+  if (ad.length === 0) return metin;
+
+  // Es adi metinde geciyor mu? (Musa / Musa'nin / Musa ile ...)
+  const kucukMetin = metin.toLocaleLowerCase("tr-TR");
+  const kucukAd = ad.toLocaleLowerCase("tr-TR");
+  if (kucukMetin.includes(kucukAd)) return metin;
+
+  // Ilk kelimeyi kucult - ama ozel ad ise dokunma
+  const parcalar = metin.split(" ");
+  const ilk = parcalar[0];
+  const ozelAd = ilk.includes("'") || ilk.includes("\u2019");
+
+  if (!ozelAd && ilk.length > 0) {
+    parcalar[0] = ilk.charAt(0).toLocaleLowerCase("tr-TR") + ilk.slice(1);
+  }
+
+  return `${iyelikEki(ad)} ${parcalar.join(" ")}`;
+}
