@@ -94,5 +94,5 @@ public record OgeGuncelleIstek(bool? Dahil, string? BolumBasligi);
 public record SiralaIstek(Guid[]? KatkiIdler);
 
 // ---- GORSELLER ----
-public record GorselGuncelleIstek(string? Konum, string? Altyazi);
+public record GorselGuncelleIstek(string? Konum);
 public record GorselSiralaIstek(Guid[]? Idler);

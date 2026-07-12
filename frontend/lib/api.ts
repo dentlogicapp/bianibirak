@@ -75,7 +75,7 @@ export type KatkiKarsilama = {
   sayac_aktif_cumle: string | null;
   sayac_bitti_cumle: string | null;
   etkinlik_tarihi: string;
-  gorseller: { url: string; altyazi: string | null; kapak: boolean }[];
+  gorseller: { url: string; kapak: boolean; genislik: number; yukseklik: number }[];
   saklama_gun: number;
 };
 
@@ -197,17 +197,15 @@ export type CopKutusu = {
 
 // Cift gorseli yukle (multipart - istek<T> JSON gonderir, bu ayri yol).
 export async function gorselYukle(
-  hazir: { dosya: File; genislik: number; yukseklik: number },
+  hazir: { dosya: File },
   konum = "galeri"
 ): Promise<{ ok: true; veri: EtkinlikGorseli } | { ok: false; mesaj: string }> {
   try {
     const form = new FormData();
     form.append("dosya", hazir.dosya);
-    form.append("konum", konum);
-    form.append("genislik", String(hazir.genislik));
-    form.append("yukseklik", String(hazir.yukseklik));
 
-    const yanit = await fetch("/api/etkinlik/aktif/gorsel", {
+    // konum QUERY ile gider - minimal API form alanlarini query'den bind eder
+    const yanit = await fetch(`/api/etkinlik/aktif/gorsel?konum=${encodeURIComponent(konum)}`, {
       method: "POST",
       body: form,
       credentials: "include",
@@ -223,19 +221,16 @@ export async function gorselYukle(
 }
 
 // Davetli fotografi yukle (token + katkiId ile; davetli basina 1 adet)
+// Not: olcu GONDERILMEZ - backend fotografin baytlarindan okur (istemciye guvenilmez;
+// ayrica minimal API form alanlarini query'den bind ettigi icin zaten ulasmiyordu).
 export async function davetliFotoYukle(
   token: string,
   katkiId: string,
-  dosya: File,
-  genislik: number,
-  yukseklik: number
+  dosya: File
 ): Promise<{ ok: boolean; mesaj?: string }> {
   try {
     const form = new FormData();
     form.append("dosya", dosya);
-    // Olcu: deftere YATAY/DIKEY oranina gore yerlestirilir (kirpma yok)
-    form.append("genislik", String(genislik));
-    form.append("yukseklik", String(yukseklik));
     const yanit = await fetch(`/api/k/${token}/foto/${katkiId}`, {
       method: "POST",
       body: form,
@@ -289,7 +284,6 @@ export type EtkinlikGorseli = {
   url: string;
   konum: string; // kapak | ithaf | bolum | kapanis | galeri
   sira: number;
-  altyazi: string | null;
   genislik: number;
   yukseklik: number;
 };
@@ -324,7 +318,7 @@ export type Kurasyon = {
   tur: string;
   etkinlik_tarihi: string;
   ogeler: KurasyonOgesi[];
-  gorseller: { url: string; konum: string; altyazi: string | null }[];
+  gorseller: { url: string; konum: string }[];
 };
 
 // Denetim gunlugu kaydi.
@@ -541,10 +535,10 @@ export const api = {
   // ---- GORSELLER ----
   gorselListe: () =>
     istek<{ gorseller: EtkinlikGorseli[]; tavan: number }>("/api/etkinlik/aktif/gorseller"),
-  gorselGuncelle: (id: string, v: { konum?: string; altyazi?: string }) =>
+  gorselGuncelle: (id: string, v: { konum?: string }) =>
     istek<{ ok: boolean }>(`/api/etkinlik/aktif/gorsel/${id}`, {
       method: "PUT",
-      body: JSON.stringify({ Konum: v.konum ?? null, Altyazi: v.altyazi ?? null }),
+      body: JSON.stringify({ Konum: v.konum ?? null }),
     }),
   gorselSirala: (idler: string[]) =>
     istek<{ ok: boolean }>("/api/etkinlik/aktif/gorsel/sirala", {

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { api, davetliFotoYukle, type KatkiKarsilama } from "@/lib/api";
 import { gorselHazirla } from "@/lib/gorsel";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 import { FilmSeridi } from "@/components/site/FilmSeridi";
 import { iyelikEki } from "@/lib/es";
+import { yazimDenetle, bulguyuUygula, tumunuUygula, type Bulgu } from "@/lib/yazim";
 
 // ILISKI TIPLERI (Musa karari).
 // Deftere iyelik ekiyle basilir: "Musa'nin Okul Arkadasi".
@@ -158,13 +159,25 @@ function KatkiFormu({
   const [mesaj, setMesaj] = useState("");
   const [iliski, setIliski] = useState("");
   const [iliskiSerbest, setIliskiSerbest] = useState("");
-  const [foto, setFoto] = useState<{
-    dosya: File;
-    onizleme: string;
-    genislik: number;
-    yukseklik: number;
-  } | null>(null);
+  const [foto, setFoto] = useState<{ dosya: File; onizleme: string } | null>(null);
   const [riza, setRiza] = useState(false);
+  const [denetimUyarisi, setDenetimUyarisi] = useState(false);
+
+  // YAZIM DENETIMI - anlik, tarayicida. Sunucuya gitmez; davetli gecikme hissetmez.
+  // Bu metin BASILACAK; kagida gecen hata sonsuza kadar orada kalir.
+  const bulgular = useMemo<Bulgu[]>(() => yazimDenetle(mesaj), [mesaj]);
+  const yazimBulgulari = bulgular.filter((b) => b.tur !== "uygunsuz");
+  const uygunsuzBulgular = bulgular.filter((b) => b.tur === "uygunsuz");
+
+  function duzeltmeUygula(b: Bulgu) {
+    setMesaj((m) => bulguyuUygula(m, b));
+    setDenetimUyarisi(false);
+  }
+
+  function tumDuzeltmeleriUygula() {
+    setMesaj((m) => tumunuUygula(m, bulgular));
+    setDenetimUyarisi(false);
+  }
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
@@ -206,6 +219,13 @@ function KatkiFormu({
       return setHata(`${buEs} ile yakınlığını seçer misin? Bu, seni yıllar sonra hatırlamalarını sağlar.`);
     if (mesaj.trim().length < 2) return setHata("Bir mesaj yazmalısın.");
 
+    // DENETIM KAPISI: bulgu varsa BIR KEZ uyar. Davetli yine de gondermek isterse
+    // yolu acik - bogmayiz, hatirlatiriz. (Ikinci tiklamada gonderim gecer.)
+    if (bulgular.length > 0 && !denetimUyarisi) {
+      setDenetimUyarisi(true);
+      return;
+    }
+
     setYukleniyor(true);
     const cevap = await api.katkiBirak(token, {
       davetliAd: ad.trim(),
@@ -223,13 +243,7 @@ function KatkiFormu({
 
     // Fotograf 2. adimda gider: dilek ZATEN kaydedildi, foto basarisiz olsa bile kaybolmaz.
     if (foto) {
-      const f = await davetliFotoYukle(
-        token,
-        cevap.veri.katki_id,
-        foto.dosya,
-        foto.genislik,
-        foto.yukseklik
-      );
+      const f = await davetliFotoYukle(token, cevap.veri.katki_id, foto.dosya);
       if (!f.ok) {
         // Dilek gitti; yalniz foto gitmedi - davetliyi bosuna kaygilandirma
         setYukleniyor(false);
@@ -251,12 +265,7 @@ function KatkiFormu({
       // Tarayicida kucult + EXIF/GPS temizle - sunucuya 8 MB degil ~700 KB gider
       const hazir = await gorselHazirla(ham);
       if (foto) URL.revokeObjectURL(foto.onizleme);
-      setFoto({
-        dosya: hazir.dosya,
-        onizleme: hazir.onizlemeUrl,
-        genislik: hazir.genislik,
-        yukseklik: hazir.yukseklik,
-      });
+      setFoto({ dosya: hazir.dosya, onizleme: hazir.onizlemeUrl });
     } catch (h) {
       setHata(h instanceof Error ? h.message : "Fotoğraf işlenemedi.");
     }
@@ -275,25 +284,40 @@ function KatkiFormu({
               TUM fotograflar dongude; sabit sergi degil, nefes alan bir vitrin. */}
           <FilmSeridi fotograflar={veri.gorseller} baslik={ciftAdi} />
 
-          <div className="p-8 text-center">
-          <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-            {ciftAdi}
-          </p>
-          <p className="mt-4 font-display text-xl leading-snug text-murekkep">
-            {karsilama}
-          </p>
-          {veri.prompt_metni && (
-            <p className="metin-yasli mt-3 font-govde text-sm text-ikincil">{veri.prompt_metni}</p>
-          )}
+          <div className="px-8 pb-8 pt-9 text-center">
+            {/* CIFT ADI - ekranin ODAK NOKTASI. Davetli buraya bakip "dogru yerdeyim"
+                der. Onceki surumde kucuk ve silikti; sayfaya karisiyordu. */}
+            <h1 className="font-display text-[2rem] leading-[1.15] text-sarap sm:text-[2.4rem]">
+              {ciftAdi}
+            </h1>
 
-          {/* Geri sayim (etkinlik ayarindan; kapaliysa gosterilmez) */}
-          {veri.sayac_aktif && (
-            <DavetliSayac
-              hedef={veri.etkinlik_tarihi}
-              aktifCumle={veri.sayac_aktif_cumle}
-              bittiCumle={veri.sayac_bitti_cumle}
-            />
-          )}
+            {/* Yaldiz ayrac - baslik ile metni ayirir, toren hissi verir */}
+            <div className="mx-auto mt-4 flex w-fit items-center gap-2" aria-hidden>
+              <span className="h-px w-9 bg-yaldiz/70" />
+              <span className="h-1 w-1 rotate-45 bg-yaldiz" />
+              <span className="h-px w-9 bg-yaldiz/70" />
+            </div>
+
+            <p className="metin-yasli mx-auto mt-5 max-w-sm font-govde text-[0.95rem] leading-relaxed text-murekkep">
+              {karsilama}
+            </p>
+
+            {/* Geri sayim */}
+            {veri.sayac_aktif && (
+              <DavetliSayac
+                hedef={veri.etkinlik_tarihi}
+                aktifCumle={veri.sayac_aktif_cumle}
+                bittiCumle={veri.sayac_bitti_cumle}
+              />
+            )}
+
+            {/* PROMPT - sayacin ALTINDA, ortali (Musa karari).
+                Davetliye ne yapacagini soyleyen son cumle; forma koprudur. */}
+            {veri.prompt_metni && (
+              <p className="mx-auto mt-7 max-w-sm text-center font-display text-base italic leading-snug text-sarap">
+                {veri.prompt_metni}
+              </p>
+            )}
           </div>
 
           {/* TEK BLOK: karsilama ile form arasinda kopukluk yok - ayni kagit uzerinde
@@ -419,12 +443,76 @@ function KatkiFormu({
             <span className="mb-1 block font-govde text-xs text-ikincil">Mesajın</span>
             <textarea
               value={mesaj}
-              onChange={(e) => setMesaj(e.target.value)}
+              onChange={(e) => {
+                setMesaj(e.target.value);
+                setDenetimUyarisi(false);
+              }}
               rows={5}
               className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
               placeholder="Dileğini, anını ya da tavsiyeni buraya yaz..."
             />
           </label>
+
+          {/* YAZIM DENETIMI - anlik oneriler. Dayatmaz, ONERIR. */}
+          {bulgular.length > 0 && (
+            <div className="mt-2.5 rounded-xl border border-yaldiz/40 bg-yaldiz/5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1.5 font-govde text-[0.7rem] font-medium text-murekkep">
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-yaldiz" aria-hidden>
+                    <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" fill="none" />
+                  </svg>
+                  <span className="truncate">
+                    {yazimBulgulari.length > 0
+                      ? `${yazimBulgulari.length} yazım önerisi`
+                      : "Dikkat edilecek ifade"}
+                  </span>
+                </span>
+
+                {yazimBulgulari.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={tumDuzeltmeleriUygula}
+                    className="shrink-0 rounded-full bg-sarap px-3 py-1 font-govde text-[0.7rem] font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+                  >
+                    Tümünü düzelt
+                  </button>
+                )}
+              </div>
+
+              <ul className="mt-2 space-y-1.5">
+                {yazimBulgulari.slice(0, 5).map((b, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-govde text-xs">
+                      <span className="text-ikincil line-through">{b.hatali.trim() || "␣␣"}</span>
+                      <span className="mx-1.5 text-ikincil/60">→</span>
+                      <span className="font-medium text-murekkep">{b.dogru.trim() || "␣"}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => duzeltmeUygula(b)}
+                      className="shrink-0 rounded-full border border-sarap px-2.5 py-0.5 font-govde text-[0.65rem] text-sarap transition-colors hover:bg-sarap hover:text-parsomen"
+                    >
+                      Düzelt
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {yazimBulgulari.length > 5 && (
+                <p className="mt-1.5 font-govde text-[0.65rem] text-ikincil">
+                  ve {yazimBulgulari.length - 5} öneri daha
+                </p>
+              )}
+
+              {/* Uygunsuz ifade - duzeltilmez, DUSUNDURULUR */}
+              {uygunsuzBulgular.length > 0 && (
+                <p className="mt-2 border-t border-yaldiz/25 pt-2 font-govde text-[0.7rem] text-sarap">
+                  Bu mesaj deftere basılacak ve yıllarca okunacak - ifadeni bir kez daha
+                  gözden geçirmek ister misin?
+                </p>
+              )}
+            </div>
+          )}
 
           {/* FOTOGRAF - davetli basina 1 adet */}
           <div className="mt-4">
@@ -504,6 +592,38 @@ function KatkiFormu({
           >
             {yukleniyor ? "Gönderiliyor..." : "Dileğimi bırak"}
           </button>
+
+          {/* DENETIM UYARISI - kirmizi, ama cikis yolu acik */}
+          {denetimUyarisi && (
+            <div className="mt-3 rounded-xl border border-red-400/60 bg-red-50 p-3.5 dark:bg-red-950/20">
+              <p className="font-govde text-xs font-medium text-red-700 dark:text-red-400">
+                {yazimBulgulari.length > 0
+                  ? `${yazimBulgulari.length} yazım önerisi var - bunlar deftere basılacak.`
+                  : "Mesajında dikkat çeken bir ifade var."}
+              </p>
+              <p className="metin-yasli mt-1 font-govde text-[0.7rem] text-red-700/80 dark:text-red-400/80">
+                Yukarıdaki düzeltmeleri uygulamak ister misin? Bu metin yıllarca okunacak.
+              </p>
+
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {yazimBulgulari.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={tumDuzeltmeleriUygula}
+                    className="rounded-full bg-sarap px-4 py-1.5 font-govde text-xs font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+                  >
+                    Düzeltmeleri uygula
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="rounded-full border border-ikincil/40 px-4 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-ikincil"
+                >
+                  Yine de dileğimi bırak
+                </button>
+              </div>
+            </div>
+          )}
           </form>
         </div>
 

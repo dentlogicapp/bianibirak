@@ -18,9 +18,6 @@ public class EtkinlikGorseli
     // Sira (galeri gosterimi + ayni konumda birden fazla varsa)
     public int Sira { get; set; }
 
-    // Cift kendi yazisini ekleyebilir (defterde gorsel altina basilir)
-    public string? Altyazi { get; set; }
-
     public int Genislik { get; set; }
     public int Yukseklik { get; set; }
     public long Bayt { get; set; }

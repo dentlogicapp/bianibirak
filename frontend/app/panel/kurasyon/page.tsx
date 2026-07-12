@@ -576,7 +576,7 @@ function EserOnizleme({
   es1Ad: string;
   es2Ad: string;
   sekme: Sekme;
-  gorseller: { url: string; konum: string; altyazi: string | null }[];
+  gorseller: { url: string; konum: string }[];
   tarihGoster: boolean;
 }) {
   // Kapak sekmesinde kapak sayfasi, digerlerinde ic sayfa gosterilir

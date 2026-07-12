@@ -94,7 +94,7 @@ public static class KurasyonUclari
                 gg = olcu?.Genislik ?? 0;
                 yy = olcu?.Yukseklik ?? 0;
             }
-            return new BaskiServisi.Gorsel(veri, g.Altyazi, gg, yy);
+            return new BaskiServisi.Gorsel(veri, gg, yy);
         }
 
         var kapakG = await GorselYukle(gorseller.FirstOrDefault(g => g.Konum == "kapak"));
@@ -348,7 +348,6 @@ public static class KurasyonUclari
             {
                 url = "/api/gorsel/" + g.DepolamaAnahtari,
                 konum = g.Konum,
-                altyazi = g.Altyazi,
             })
             .ToListAsync();
 

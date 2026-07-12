@@ -73,7 +73,7 @@ public static class BaskiServisi
         int FotoGenislik,
         int FotoYukseklik);
 
-    public sealed record Gorsel(byte[] Veri, string? Altyazi, int Genislik, int Yukseklik);
+    public sealed record Gorsel(byte[] Veri, int Genislik, int Yukseklik);
 
     public sealed record EserVerisi(
         string Tema,
@@ -350,17 +350,8 @@ public static class BaskiServisi
                     {
                         var bg = eser.BolumGorselleri[bolumSirasi];
                         var (g, y) = Olcule(bg.Genislik, bg.Yukseklik, azamiG: 276f, azamiY: 168f);
-                        sutun.Item().PaddingTop(bolumSirasi > 0 ? 16 : 0).ShowEntire().Column(bc =>
-                        {
-                            bc.Item().AlignCenter().Element(c => Cerceveli(c, bg.Veri, g, y));
-                            if (!string.IsNullOrWhiteSpace(bg.Altyazi))
-                            {
-                                bc.Item().Height(6);
-                                bc.Item().AlignCenter().Text(bg.Altyazi)
-                                    .FontFamily(GovdeFont).FontSize(7.5f)
-                                    .FontColor(Ikincil).Italic();
-                            }
-                        });
+                        sutun.Item().PaddingTop(bolumSirasi > 0 ? 16 : 0).ShowEntire()
+                            .AlignCenter().Element(c => Cerceveli(c, bg.Veri, g, y));
                     }
                     bolumSirasi++;
 
@@ -466,13 +457,6 @@ public static class BaskiServisi
                 var kg = eser.KapanisGorseli;
                 var (g, y) = Olcule(kg.Genislik, kg.Yukseklik, azamiG: 276f, azamiY: 208f);
                 sutun.Item().AlignCenter().Element(c => Cerceveli(c, kg.Veri, g, y));
-
-                if (!string.IsNullOrWhiteSpace(kg.Altyazi))
-                {
-                    sutun.Item().Height(7);
-                    sutun.Item().AlignCenter().Text(kg.Altyazi)
-                        .FontFamily(GovdeFont).FontSize(7.5f).FontColor(Ikincil).Italic();
-                }
                 sutun.Item().Height(32);
             }
 

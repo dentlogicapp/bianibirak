@@ -284,7 +284,6 @@ public static class SemaKurucu
             "DepolamaAnahtari" text NOT NULL,
             "Konum" text NOT NULL DEFAULT 'galeri',
             "Sira" integer NOT NULL DEFAULT 0,
-            "Altyazi" text NULL,
             "Genislik" integer NOT NULL DEFAULT 0,
             "Yukseklik" integer NOT NULL DEFAULT 0,
             "Bayt" bigint NOT NULL DEFAULT 0,
@@ -302,6 +301,9 @@ public static class SemaKurucu
         -- Kurasyon: QR koprusu KALDIRILDI (Musa karari); tarih gosterimi eklendi
         ALTER TABLE kurasyonlar ADD COLUMN IF NOT EXISTS "TarihGoster" boolean NOT NULL DEFAULT true;
         ALTER TABLE kurasyonlar DROP COLUMN IF EXISTS "QrKoprusuAktif";
+
+        -- Altyazi kaldirildi (Musa karari): gorsel kendi basina konusur
+        ALTER TABLE etkinlik_gorselleri DROP COLUMN IF EXISTS "Altyazi";
 
         -- Push: kullanicilara sessiz saat kolonlari (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SessizSaatAktif" boolean NOT NULL DEFAULT false;

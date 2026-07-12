@@ -64,8 +64,11 @@ public static class KatkiUclari
             .Select(g => new
             {
                 url = "/api/gorsel/" + g.DepolamaAnahtari,
-                altyazi = g.Altyazi,
                 kapak = g.Konum == "kapak",
+                // Olcu: film seridinin layout'u fotograf YUKLENMEDEN kurulur.
+                // Aksi halde serit genisligi 0 baslar, animasyon bozulur (mobil bug'in koku).
+                genislik = g.Genislik,
+                yukseklik = g.Yukseklik,
             })
             .ToListAsync();
 

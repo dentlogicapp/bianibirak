@@ -397,7 +397,6 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.DepolamaAnahtari).HasColumnName("DepolamaAnahtari").IsRequired();
             e.Property(x => x.Konum).HasColumnName("Konum").IsRequired();
             e.Property(x => x.Sira).HasColumnName("Sira");
-            e.Property(x => x.Altyazi).HasColumnName("Altyazi");
             e.Property(x => x.Genislik).HasColumnName("Genislik");
             e.Property(x => x.Yukseklik).HasColumnName("Yukseklik");
             e.Property(x => x.Bayt).HasColumnName("Bayt");

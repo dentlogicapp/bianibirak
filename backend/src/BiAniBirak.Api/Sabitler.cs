@@ -23,24 +23,29 @@ public static class Sabitler
         string SayacBittiCumle);
 
     // Dugun
+    // NOT: Metinler ZAMANDAN BAGIMSIZ yazilir. Davetli linki dugunden haftalar once
+    // de acabilir, aylar sonra da - "bugun" demek yanlis olur. Bu yuzden metin,
+    // acildigi ana degil, PAYLASILAN ANIYA seslenir.
     private static readonly TurVarsayilan Dugun = new(
         KarsilamaMetni:
-            "Bugün hayatımızın en güzel gününü yaşıyoruz. Bu mutluluğu bizimle paylaştığın için teşekkür ederiz. " +
-            "Bize bir anı bırakır mısın? Yazdıkların, yıllar sonra çocuklarımıza okuyacağımız defterimizde yaşayacak.",
+            "Hayatımızın en güzel gününü sevdiklerimizle paylaşıyoruz. Bu yolculukta yanımızda " +
+            "olduğun için teşekkür ederiz. Bıraktığın satırlar, yıllar sonra çocuklarımıza " +
+            "okuyacağımız defterimizde yaşayacak.",
         PromptMetni:
-            "Bize bir dilek, bir hatıra ya da bir tavsiye bırak.",
+            "Bize bir dilek, hatıra ya da içinden geleni paylaşacağın bir mesaj bırak!",
         SayacAktifCumle:
             "Düğünümüze kalan süre",
         SayacBittiCumle:
-            "Bugün en güzel günümüz");
+            "Hayatımızın en güzel günü");
 
     // Nisan
     private static readonly TurVarsayilan Nisan = new(
         KarsilamaMetni:
-            "Birlikte yürüyeceğimiz yolun ilk adımını attık. Bu güzel günde yanımızda olduğun için teşekkür ederiz. " +
-            "Bize bir anı bırakır mısın? Sözlerin, birlikte yazacağımız hikâyenin ilk sayfası olacak.",
+            "Birlikte yürüyeceğimiz yolun ilk adımını atıyoruz. Bu güzel yolculukta yanımızda " +
+            "olduğun için teşekkür ederiz. Sözlerin, birlikte yazacağımız hikâyenin ilk " +
+            "sayfası olacak.",
         PromptMetni:
-            "Bize bir dilek, bir hatıra ya da bir tavsiye bırak.",
+            "Bize bir dilek, hatıra ya da içinden geleni paylaşacağın bir mesaj bırak!",
         SayacAktifCumle:
             "Nişanımıza kalan süre",
         SayacBittiCumle:
@@ -49,10 +54,10 @@ public static class Sabitler
     // Nikah
     private static readonly TurVarsayilan Nikah = new(
         KarsilamaMetni:
-            "Bugün birbirimize 'evet' dedik. Bu anlamlı günde bizimle olduğun için teşekkür ederiz. " +
-            "Bize bir anı bırakır mısın? Bıraktığın satırlar, ortak defterimizde bir ömür kalacak.",
+            "Birbirimize 'evet' diyoruz. Bu anlamlı yolda bizimle olduğun için teşekkür ederiz. " +
+            "Bıraktığın satırlar, ortak defterimizde bir ömür kalacak.",
         PromptMetni:
-            "Bize bir dilek, bir hatıra ya da bir tavsiye bırak.",
+            "Bize bir dilek, hatıra ya da içinden geleni paylaşacağın bir mesaj bırak!",
         SayacAktifCumle:
             "Nikahımıza kalan süre",
         SayacBittiCumle:
@@ -68,11 +73,12 @@ public static class Sabitler
 
     // Geriye donuk uyumluluk (eski cagrilar): dugun blogundan.
     public const string VarsayilanKarsilamaMetni =
-        "Bugün hayatımızın en güzel gününü yaşıyoruz. Bu mutluluğu bizimle paylaştığın için teşekkür ederiz. " +
-        "Bize bir anı bırakır mısın? Yazdıkların, yıllar sonra çocuklarımıza okuyacağımız defterimizde yaşayacak.";
+        "Hayatımızın en güzel gününü sevdiklerimizle paylaşıyoruz. Bu yolculukta yanımızda " +
+        "olduğun için teşekkür ederiz. Bıraktığın satırlar, yıllar sonra çocuklarımıza " +
+        "okuyacağımız defterimizde yaşayacak.";
 
     public const string VarsayilanPromptMetni =
-        "Bize bir dilek, bir hatıra ya da bir tavsiye bırak.";
+        "Bize bir dilek, hatıra ya da içinden geleni paylaşacağın bir mesaj bırak!";
 
     // ---- KURASYON VARSAYILANLARI (Asama 6) ----
     // Cift hicbir seye dokunmasa bile ESER kusursuz cikar. Editoryel Turkce.
@@ -114,7 +120,7 @@ public static class Sabitler
             "nisan" =>
                 "Bu satırlar burada bitiyor; hikâyemiz daha yeni başlıyor.",
             "nikah" =>
-                "Bugün yazılanlar burada kalacak; sevginiz bizimle yürüyecek.",
+                "Burada yazılanlar bizimle kalacak; sevginiz bizimle yürüyecek.",
             _ =>
                 "Bu defter kapanıyor ama bıraktıklarınız bizimle kalıyor. " +
                 "Bir gün bu sayfaları çocuklarımızla birlikte açacağız.",

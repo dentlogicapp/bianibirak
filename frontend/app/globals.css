@@ -13,6 +13,12 @@
   --sarap-koyu: #571b2c; /* hover/pressed */
   --yaldiz: #a8823c; /* imza aksani */
   --yaldiz-acik: #c4a25e; /* yaldiz vurgu */
+
+  /* Film seridi - SICAK KOYU kahve. Siyah degil: sayfayi kesmez, parsomenin
+     ailesinden gelir. Delikler ve cerceve zeminden yumusakca ayrilir. */
+  --film: #3a2e24;
+  --film-delik: #d9cbb2;
+  --film-cerceve: rgba(196, 162, 94, 0.45);
   --ayrac: #d8c7a9; /* ince cizgi */
 }
 
@@ -280,6 +286,67 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
 }
 
 /* Inceleme daveti: fare uzerindeyken serit yavaslar */
+.film-seridi:hover .film-akis {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film-akis {
+    animation: none;
+  }
+}
+
+/* ---- FILM SERIDI ----
+   Dikissiz dongu: serit tam YARISINA kayar. Dizi iki kez basildigi icin yarim
+   nokta = birinci kopyanin sonu = ikinci kopyanin basi. Kullanici basa donusu
+   GOREMEZ. Zamanlayici yok; ritim mutlak, sicrama imkansiz.
+
+   Kareler aspect-ratio ile olculur -> genislik fotograf YUKLENMEDEN bilinir.
+   (Mobilde serit bu yuzden bozuluyordu: genislik 0 basliyor, sonra siciriyordu.) */
+@keyframes filmAkis {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+.bg-film {
+  background-color: var(--film);
+}
+
+.film-akis {
+  animation-name: filmAkis;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* Kare cercevesi: yaldiz hat. Tailwind ring KULLANILMAZ - CSS degiskenli
+   renklerde opacity modifier (ring-yaldiz/25) gecersiz olur ve Tailwind
+   varsayilan MAVI ring'e duser. Bu, koyu fotograflarda gorsel hata gibi durur. */
+.film-kare {
+  box-shadow:
+    0 0 0 1px var(--film-cerceve),
+    0 2px 14px rgba(0, 0, 0, 0.35);
+  background-color: color-mix(in srgb, var(--film) 70%, black);
+}
+
+.film-perforasyon {
+  background-color: color-mix(in srgb, var(--film) 82%, black);
+}
+
+.film-delik {
+  background-color: var(--film-delik);
+  opacity: 0.75;
+}
+
+/* Kenar erimeleri - serit sonsuza akiyor hissi */
+.film-kenar-sol {
+  background: linear-gradient(to right, var(--film) 0%, transparent 100%);
+}
+.film-kenar-sag {
+  background: linear-gradient(to left, var(--film) 0%, transparent 100%);
+}
+
+/* Inceleme daveti: fare uzerindeyken serit durur */
 .film-seridi:hover .film-akis {
   animation-play-state: paused;
 }

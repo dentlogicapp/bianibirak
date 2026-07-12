@@ -77,7 +77,6 @@ public static class GorselUclari
                 url = "/api/gorsel/" + g.DepolamaAnahtari,
                 konum = g.Konum,
                 sira = g.Sira,
-                altyazi = g.Altyazi,
                 genislik = g.Genislik,
                 yukseklik = g.Yukseklik,
             })
@@ -160,7 +159,6 @@ public static class GorselUclari
             url = "/api/gorsel/" + anahtar,
             konum = gorsel.Konum,
             sira = gorsel.Sira,
-            altyazi = (string?)null,
             genislik = gorsel.Genislik,
             yukseklik = gorsel.Yukseklik,
         });
@@ -195,9 +193,6 @@ public static class GorselUclari
             }
             gorsel.Konum = istek.Konum;
         }
-
-        if (istek.Altyazi != null)
-            gorsel.Altyazi = string.IsNullOrWhiteSpace(istek.Altyazi) ? null : istek.Altyazi.Trim();
 
         await db.SaveChangesAsync();
         return Results.Json(new { ok = true });

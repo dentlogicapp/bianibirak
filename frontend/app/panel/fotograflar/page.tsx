@@ -60,7 +60,7 @@ export default function FotograflarSayfasi() {
       try {
         // Tarayicida kucult + EXIF temizle (GPS konumu dahil) - sonra gonder
         const hazir = await gorselHazirla(ham);
-        const c = await gorselYukle(hazir, "galeri");
+        const c = await gorselYukle({ dosya: hazir.dosya }, "galeri");
         URL.revokeObjectURL(hazir.onizlemeUrl);
         if (!c.ok) {
           toast.error(c.mesaj);
@@ -92,14 +92,6 @@ export default function FotograflarSayfasi() {
     void cek();
   }
 
-  async function altyaziKaydet(g: EtkinlikGorseli, altyazi: string) {
-    const c = await api.gorselGuncelle(g.id, { altyazi });
-    if (!c.ok) {
-      toast.error(c.mesaj);
-      return;
-    }
-    setGorseller((l) => l.map((x) => (x.id === g.id ? { ...x, altyazi } : x)));
-  }
 
   async function tasi(index: number, yon: -1 | 1) {
     const hedef = index + yon;
@@ -204,7 +196,7 @@ export default function FotograflarSayfasi() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={g.url}
-                  alt={g.altyazi ?? "Fotoğraf"}
+                  alt="Fotoğraf"
                   className="h-full w-full object-cover"
                 />
                 {g.konum !== "galeri" && (
@@ -233,14 +225,6 @@ export default function FotograflarSayfasi() {
                 <p className="mt-1 font-govde text-[0.7rem] text-ikincil">
                   {KONUMLAR.find((k) => k.kod === g.konum)?.aciklama}
                 </p>
-
-                {/* Altyazi */}
-                <input
-                  defaultValue={g.altyazi ?? ""}
-                  onBlur={(e) => altyaziKaydet(g, e.target.value)}
-                  placeholder="Altyazı (isteğe bağlı)"
-                  className="mt-3 w-full rounded-lg border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep outline-none focus:border-sarap"
-                />
 
                 {/* Islemler */}
                 <div className="mt-3 flex items-center justify-between gap-2">
