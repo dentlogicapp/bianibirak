@@ -558,6 +558,33 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           </button>
         </div>
 
+        {/* BASKI AYARLARI NOTU.
+            "Istedigin boyutta" diyoruz ama kullanici NASIL yapacagini bilmiyor -
+            yazici ayarlarindan secmesi gerektigini kimse soylemiyor ona. Soylemezsek
+            varsayilanla basar, sonuctan memnun kalmaz ve sucu bizde arar.
+
+            TEKNIK GERCEK: PDF, yazici diyalogunun kagit boyutunu ZORLAYAMAZ. PDF
+            spec'inde boyle bir tercih yoktur (PrintScaling var, ama Firefox onu bile
+            dikkate almiyor). Dolayisiyla tek dogru yol: kullaniciyi BILGILENDIRMEK. */}
+        <div className="mx-auto mt-4 max-w-md rounded-2xl border border-yaldiz/30 bg-parsomen/60 p-4">
+          <p className="flex items-start gap-2.5">
+            <span className="mt-0.5 shrink-0 text-yaldiz" aria-hidden>
+              <svg viewBox="0 0 24 24" className="h-4 w-4">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M12 8h.01M11 12h1v4h1" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </span>
+            <span className="metin-yasli min-w-0 font-govde text-xs leading-relaxed text-ikincil">
+              Basım öncesinde kağıt boyutunu (A3, A4, A5 vb.), baskı kalitesini (DPI
+              ayarı) ve ölçeklendirme ayarlarını (kağıda sığdır, yazdırılabilir alana
+              sığdır, özel vb.) yapmayı unutma!{" "}
+              <span className="font-medium text-murekkep">
+                Hiçbir şey bozulmaz, düzenlemelerin aynı kalır.
+              </span>
+            </span>
+          </p>
+        </div>
+
         {/* Muhurleme */}
         {!tamamlandi && (
           <div className="mt-5 border-t border-yaldiz/30 pt-5 text-center">
