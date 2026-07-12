@@ -78,6 +78,15 @@ public static class SuperUclari
         return (true, k);
     }
 
+    // DENETIM (super panel) - HER KAYIT SISTEM EYLEMIDIR.
+    //
+    // SistemEylemi = true SABITTIR, parametre DEGILDIR. Bilerek boyle:
+    // parametre olsaydi bir gun biri unutur ve yonetici eylemi ciftin denetim
+    // sayfasina duserdi. Bu dosyadan yazilan hicbir kayit ciftin ekraninda
+    // GORUNEMEZ - dilin izin verdigi en sert garanti budur.
+    //
+    // Kayit yine de tutulur: yonetici sorumludur, iz silinmez, super panelde
+    // ve Canli Akis'ta gorunur. Gizlenen sey ADLI IZ degil, ciftin EKRANI.
     private static async Task Denetim(
         BiAniBirakDbContext db, Guid? etkinlikId, Guid aktorId,
         string eylem, string varlik, Guid? varlikId, object? degisen = null)
@@ -91,6 +100,7 @@ public static class SuperUclari
             Varlik = varlik,
             VarlikId = varlikId,
             DegisenAlanlar = degisen == null ? null : JsonSerializer.Serialize(degisen),
+            SistemEylemi = true,   // <- SABIT. Bu dosyadan yazilan her kayit gizlidir.
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync();
@@ -195,8 +205,13 @@ public static class SuperUclari
 
         // Hareketsizlik: son 30 gunde denetim kaydi yok mu?
         var otuzGunOnce = DateTimeOffset.UtcNow.AddDays(-30);
+        // !SistemEylemi ZORUNLU: yoneticinin kendi islemi (goruntuleme, rontgen)
+        // ciftin AKTIFLIGI DEGILDIR. Filtre olmasaydi, bir deftere bakmak onu
+        // "hareketli" gosterir ve saglik skoru YALAN soylerdi - teshis araci
+        // kendi olcumunu bozardi.
         var hareketli = await db.DenetimGunlukleri.AsNoTracking()
             .Where(d => d.EtkinlikId != null && idler.Contains(d.EtkinlikId!.Value)
+                        && !d.SistemEylemi
                         && d.CreatedAt >= otuzGunOnce)
             .Select(d => d.EtkinlikId!.Value)
             .Distinct()

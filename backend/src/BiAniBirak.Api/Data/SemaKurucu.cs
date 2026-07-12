@@ -312,6 +312,34 @@ public static class SemaKurucu
         -- Profilim: cinsiyet kolonu (idempotent)
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "Cinsiyet" text NULL;
 
+        -- GIZLILIK SINIRI: sistem yoneticisi eylemleri ciftin denetim gunlugunde GORUNMEZ.
+        --
+        -- Cift, en mahrem aile hatirasini bize emanet ediyor. Kendi denetim
+        -- sayfasinda "Sistem yoneticisi defterinizi goruntuledi" satirini gormek,
+        -- o guveni geri donusu olmayacak sekilde kirar. Kayit YINE TUTULUR
+        -- (append-only adli iz, super panelde gorunur) - ama ciftin ekraninda
+        -- ISLENMEZ.
+        ALTER TABLE denetim_gunlukleri
+            ADD COLUMN IF NOT EXISTS "SistemEylemi" boolean NOT NULL DEFAULT false;
+
+        -- Geriye donuk kapatma: bu kolon eklenmeden ONCE yazilmis yonetici eylemleri
+        -- ciftin ekraninda gorunuyordu. Idempotent isaretleme (tekrar calisinca
+        -- sonuc degismez). FROM denetim_gunlukleri + eylem filtresi - her yeni satiri
+        -- degil, YALNIZ yonetici eylemlerini yakalar.
+        UPDATE denetim_gunlukleri
+        SET "SistemEylemi" = true
+        WHERE "SistemEylemi" = false
+          AND "Eylem" IN (
+            'DEFTER_GORUNTULEME_BASLADI', 'DEFTER_GORUNTULEME_BITTI',
+            'DEFTER_DONDURULDU', 'DEFTER_COZULDU',
+            'DEFTER_COPE_ATILDI', 'DEFTER_GERI_ALINDI', 'DEFTER_KALICI_SILINDI',
+            'SUPER_KATKI_KALDIRILDI', 'SUPER_KATKI_GERI_ALINDI',
+            'SUPER_ADMIN_ATANDI', 'SUPER_ADMIN_KALDIRILDI',
+            'SUPER_DEFTER_RONTGEN',
+            'KULLANICI_ASKIYA_ALINDI', 'KULLANICI_GERI_ACILDI', 'KULLANICI_SILINDI',
+            'KVKK_METIN_GUNCELLENDI', 'KVKK_TALEP_ISLENDI'
+          );
+
         -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;

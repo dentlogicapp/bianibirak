@@ -510,8 +510,18 @@ public static class EtkinlikUclari
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
 
+        // GIZLILIK SINIRI - IKINCI KATMAN (defense in depth).
+        //
+        // Yazma tarafinda SuperUclari her kaydi SistemEylemi=true ile yazar; burada
+        // da OKUMA filtrelenir. Iki katman, cunku bu sizinti tek basina urunu
+        // bitirebilir: cift kendi denetim sayfasinda "Sistem yoneticisi defterinizi
+        // goruntuledi" satirini gorurse, en mahrem aile hatirasini emanet ettigi
+        // guven geri donusu olmayacak sekilde kirilir.
+        //
+        // Kayitlar SILINMEZ - append-only adli iz korunur, super panelde gorunur.
+        // Gizlenen sey iz degil, CIFTIN EKRANI.
         var kayitlar = await db.DenetimGunlukleri.AsNoTracking()
-            .Where(d => d.EtkinlikId == etkinlikId)
+            .Where(d => d.EtkinlikId == etkinlikId && !d.SistemEylemi)
             .OrderByDescending(d => d.CreatedAt)
             .Take(100)
             .ToListAsync();

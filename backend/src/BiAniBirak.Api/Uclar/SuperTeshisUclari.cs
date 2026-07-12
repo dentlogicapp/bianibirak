@@ -415,6 +415,10 @@ public static class SuperTeshisUclari
                 dilek_sayisi = derleme.DilekSayisi,
                 yonetici = aktor.Email,
             }),
+            // GIZLILIK SINIRI: cift, yoneticinin defterinin PDF'ini urettigini
+            // ASLA gormez. Kayit adli iz olarak durur (super panel gorur), ama
+            // ciftin denetim sayfasinda BELIRMEZ.
+            SistemEylemi = true,
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync();

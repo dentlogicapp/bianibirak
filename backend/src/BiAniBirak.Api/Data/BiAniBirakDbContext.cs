@@ -69,6 +69,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Varlik).HasColumnName("Varlik").IsRequired();
             e.Property(x => x.VarlikId).HasColumnName("VarlikId");
             e.Property(x => x.DegisenAlanlar).HasColumnName("DegisenAlanlar").HasColumnType("jsonb");
+            e.Property(x => x.SistemEylemi).HasColumnName("SistemEylemi").HasDefaultValue(false);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
         });
 
