@@ -63,8 +63,8 @@ export default function PaylasimSayfasi() {
       {/* Ust barda "Paylasim" yaziyor - baslik tekrarlanmaz. IZOLASYON: yalniz KENDI baglantin. */}
       <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
         Bu bağlantı yalnız <span className="font-medium text-murekkep">sana</span> ait.
-        Buradan gelen dilekler yalnız senin onay kuyruğuna düşer; eşinin bağlantısı ayrıdır
-        ve onun kuyruğuna gider. Karışıklık olmaması için yalnız kendi bağlantını görürsün.
+        Buradan gelen dilekler yalnız senin onay bekleyen dileklerine düşer; eşinin bağlantısı ayrıdır
+        ve onun onay bekleyen dileklerine düşer. Karışıklık olmaması için yalnız kendi bağlantını görürsün.
       </p>
 
       <ZamanCizelgesi etkinlik={etkinlik} pencereGun={ayar?.kapanis_pencere_gun ?? 30} />

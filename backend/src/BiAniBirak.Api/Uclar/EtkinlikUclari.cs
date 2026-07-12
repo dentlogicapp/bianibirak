@@ -636,7 +636,7 @@ public static class EtkinlikUclari
         if (katki == null)
             return Hata(404, "KATKI_BULUNAMADI", "Katki bulunamadi.");
         if (katki.KaynakEs != rol)
-            return Hata(403, "ERISIM_YOK", "Bu katki sizin onay kuyrugunuzda degil.");
+            return Hata(403, "ERISIM_YOK", "Bu dilek sizin onayınızı bekleyenler arasında değil.");
         if (katki.Durum != "beklemede")
             return Hata(409, "KATKI_ZATEN_ISLENMIS", "Bu katki zaten islenmis.");
 

@@ -92,7 +92,7 @@ export default function YonetimSayfasi() {
         />
         <AracButonu
           href="/panel/kurasyon"
-          baslik="Kürasyon Stüdyosu"
+          baslik="Baskı Stüdyosu"
           aciklama="Dilekleri baskıya hazır bir mirasa dönüştür"
           ikon={
             <>

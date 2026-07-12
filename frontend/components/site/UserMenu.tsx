@@ -212,7 +212,7 @@ export function UserMenu() {
                 <path d="m11 9 1 2.2 2.2 1-2.2 1L11 15.4 10 13.2 7.8 12.2 10 11.2 11 9Z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" fill="none" />
               </>
             }>
-              Kürasyon Stüdyosu
+              Baskı Stüdyosu
             </MenuLink>
 
             <MenuLink href="/panel/fotograflar" onClick={() => setAcik(false)} ikon={

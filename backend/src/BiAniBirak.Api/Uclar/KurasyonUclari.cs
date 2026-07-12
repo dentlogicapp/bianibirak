@@ -329,6 +329,11 @@ public static class KurasyonUclari
                 katki_id = k.Id,
                 davetli_ad = k.DavetliAd,
                 davetli_iliski = k.DavetliIliski,
+                // Iletisim: cift, esere alacagi bir dilegin sahibine gerekirse
+                // ulasabilmeli (duzeltme ricasi, tesekkur). Bu uc RequireAuthorization
+                // + tenant altinda; davetli tarafina ASLA donmez.
+                davetli_telefon = k.DavetliTelefon,
+                davetli_email = k.DavetliEmail,
                 mesaj = k.Mesaj,
                 kaynak_es = k.KaynakEs,
                 birakilma = k.CreatedAt,

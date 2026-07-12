@@ -298,6 +298,8 @@ export type EtkinlikGorseli = {
 export type KurasyonOgesi = {
   katki_id: string;
   davetli_ad: string;
+  davetli_telefon: string;
+  davetli_email: string;
   mesaj: string;
   kaynak_es: string;
   birakilma: string;

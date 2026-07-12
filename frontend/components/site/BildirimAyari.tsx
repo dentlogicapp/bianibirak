@@ -78,7 +78,7 @@ export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
       <h2 className="font-display text-lg text-murekkep">Bildirimler</h2>
       <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
         Sana bir dilek bırakıldığında ve ortak deftere yeni bir anı eklendiğinde bildirim
-        al. Böylece onay kuyruğunu kaçırmazsın.
+        al. Böylece onay bekleyen dileklerini kaçırmazsın.
       </p>
 
       {durum === "desteklenmiyor" ? (

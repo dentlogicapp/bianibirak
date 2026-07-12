@@ -6,6 +6,11 @@ import { toast } from "sonner";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { AppShell } from "@/components/site/AppShell";
+import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
+import {
+  DavetliKarsilama,
+  type KarsilamaGorseli,
+} from "@/components/site/DavetliKarsilama";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Etkinlik & Gorunum: 3 sekme (Etkinlik / Davetli Ekrani / Sayac).
@@ -71,6 +76,27 @@ export default function EtkinlikGorunumSayfasi() {
 
 function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: EtkinlikAyar }) {
   const [sekme, setSekme] = useState<SekmeKod>("etkinlik");
+
+  // Onizleme, davetlinin GERCEKTEN gorecegi fotograflari gosterir - temsili degil.
+  const [gorseller, setGorseller] = useState<KarsilamaGorseli[]>([]);
+
+  useEffect(() => {
+    let iptal = false;
+    void api.gorselListe().then((c) => {
+      if (iptal || !c.ok) return;
+      setGorseller(
+        c.veri.gorseller.map((g) => ({
+          url: g.url,
+          kapak: g.konum === "kapak",
+          genislik: g.genislik,
+          yukseklik: g.yukseklik,
+        }))
+      );
+    });
+    return () => {
+      iptal = true;
+    };
+  }, []);
 
   // --- Etkinlik alanlari ---
   const [es1Ad, setEs1Ad] = useState(ilkEtkinlik.es1_ad);
@@ -305,29 +331,26 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
           </p>
           <div className="rounded-3xl border border-ayrac bg-parsomen p-5">
             <Onizleme
-              sekme={sekme}
               es1Ad={es1Ad}
               es2Ad={es2Ad}
-              tur={ilkEtkinlik.tur}
               tarih={tarih}
               karsilama={karsilama}
               prompt={prompt}
               sayacAktif={sayacAktif}
               sayacAktifCumle={sayacAktifCumle}
               sayacBittiCumle={sayacBittiCumle}
+              gorseller={gorseller}
             />
           </div>
         </div>
       </div>
 
-      {/* Alt sabit durum bari (planlama deseni) */}
-      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-ayrac bg-parsomen/90 backdrop-blur md:bottom-0">
-        <div className="mx-auto flex max-w-icerik items-center justify-between px-5 py-2.5 sm:px-6">
-          <span className={`font-govde text-xs ${gosterge?.sinif ?? "text-ikincil"}`}>
-            {gosterge?.metin ?? "Tüm değişiklikler kayıtlı"}
-          </span>
-        </div>
-      </div>
+      <DurumBandiBoslugu />
+
+      <DurumBandi
+        metin={gosterge?.metin ?? "Tüm değişiklikler kayıtlı"}
+        sinif={gosterge?.sinif}
+      />
     </AppShell>
   );
 }
@@ -366,140 +389,63 @@ function Alan({
 }
 
 // ---- CANLI ONIZLEME ----
+// DAVETLI EKRANI ONIZLEMESI
+//
+// GERCEK ekranin AYNISI: DavetliKarsilama bileseni, davetlinin gordugu sayfayla
+// BIREBIR ayni koddan gelir - film seridi, animasyon, tipografi, sayac, prompt.
+//
+// Onceki surumde burada gercegi "taklit eden" ayri bir dizgi vardi: film seridi
+// yoktu, cift adi kucuktu. Cift, gonderdigi linkin nasil gorunecegini YANLIS
+// biliyordu. Iki dizgi kacinilmaz olarak ayrisir; tek bilesen ayrisamaz.
 function Onizleme({
-  sekme,
   es1Ad,
   es2Ad,
-  tur,
   tarih,
   karsilama,
   prompt,
   sayacAktif,
   sayacAktifCumle,
   sayacBittiCumle,
+  gorseller,
 }: {
-  sekme: SekmeKod;
   es1Ad: string;
   es2Ad: string;
-  tur: string;
   tarih: string;
   karsilama: string;
   prompt: string;
   sayacAktif: boolean;
   sayacAktifCumle: string;
   sayacBittiCumle: string;
+  gorseller: KarsilamaGorseli[];
 }) {
-  const [sk, setSk] = useState(sayacHesapla(tarih));
-
-  useEffect(() => {
-    setSk(sayacHesapla(tarih));
-    const i = setInterval(() => setSk(sayacHesapla(tarih)), 1000);
-    return () => clearInterval(i);
-  }, [tarih]);
-
-  if (sekme === "etkinlik") {
-    return (
-      <div className="rounded-2xl border border-ayrac bg-yuzey p-6 text-center">
-        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-          {turEtiketi(tur)}
-        </p>
-        <p className="mt-3 font-display text-2xl text-murekkep">
-          {es1Ad || "Birinci eş"} &amp; {es2Ad || "İkinci eş"}
-        </p>
-        <p className="mt-2 font-govde text-sm text-ikincil">{tarihMetni(tarih)}</p>
-      </div>
-    );
-  }
-
-  if (sekme === "davetli") {
-    return (
-      <div className="rounded-2xl border border-ayrac bg-yuzey p-6">
-        <p className="text-center font-govde text-xs uppercase tracking-etiket text-yaldiz">
-          {es1Ad || "Birinci eş"} &amp; {es2Ad || "İkinci eş"}
-        </p>
-        <p className="metin-yasli mt-4 font-display text-base leading-snug text-murekkep">
-          {karsilama || "Karşılama metni burada görünecek"}
-        </p>
-        {prompt && (
-          <p className="metin-yasli mt-3 font-govde text-sm text-ikincil">{prompt}</p>
-        )}
-        <div className="mt-5 space-y-2">
-          <div className="h-9 rounded-lg border border-ayrac bg-parsomen" />
-          <div className="h-9 rounded-lg border border-ayrac bg-parsomen" />
-          <div className="h-20 rounded-lg border border-ayrac bg-parsomen" />
-        </div>
-        <div className="mt-4 h-10 rounded-full bg-sarap" />
-      </div>
-    );
-  }
-
-  // Sayac onizlemesi
-  if (!sayacAktif) {
-    return (
-      <div className="rounded-2xl border border-dashed border-ayrac bg-yuzey p-8 text-center">
-        <p className="font-govde text-sm italic text-ikincil">
-          Sayaç kapalı - davetli ekranında gösterilmez.
-        </p>
-      </div>
-    );
-  }
-
-  const cumle = sk.gecti
-    ? sayacBittiCumle || "Hedef tarihe ulaşıldı"
-    : sayacAktifCumle || "Etkinliğe kalan süre";
+  const ciftAdi = `${es1Ad} & ${es2Ad}`.trim();
 
   return (
-    <div className="rounded-2xl border border-ayrac bg-yuzey p-6 text-center">
-      <p className="font-govde text-sm text-ikincil">{cumle}</p>
-      <div className="mt-4 flex items-end justify-center gap-3">
-        <Rakam d={sk.gun} e="gün" vurgu />
-        <Rakam d={sk.sa} e="saat" />
-        <Rakam d={sk.dk} e="dk" />
-        <Rakam d={sk.sn} e="sn" />
+    <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
+      <DavetliKarsilama
+        ciftAdi={ciftAdi}
+        karsilama={karsilama}
+        promptMetni={prompt || null}
+        gorseller={gorseller}
+        sayacAktif={sayacAktif}
+        etkinlikTarihi={tarih}
+        sayacAktifCumle={sayacAktifCumle || null}
+        sayacBittiCumle={sayacBittiCumle || null}
+      />
+
+      {/* Formun basi - davetli burada dilegini yazar (onizlemede kisaltilmis) */}
+      <div className="border-t border-ayrac px-8 py-6">
+        <p className="font-govde text-xs text-ikincil">Adın Soyadın</p>
+        <div className="mt-1 h-10 rounded-xl border border-ayrac bg-parsomen" />
+        <p className="mt-3 font-govde text-xs text-ikincil">Mesajın</p>
+        <div className="mt-1 h-16 rounded-xl border border-ayrac bg-parsomen" />
+        <div className="mt-4 h-10 rounded-full bg-sarap/90" />
       </div>
-      {sk.gecti && (
-        <p className="mt-3 font-govde text-xs text-yaldiz">Tarih geçti - ileri sayım</p>
-      )}
     </div>
   );
 }
 
-function Rakam({ d, e, vurgu }: { d: number; e: string; vurgu?: boolean }) {
-  return (
-    <span className="inline-flex flex-col items-center">
-      <span
-        className={
-          vurgu
-            ? "font-display text-3xl leading-none text-sarap"
-            : "font-display text-xl leading-none text-murekkep"
-        }
-      >
-        {d.toString().padStart(2, "0")}
-      </span>
-      <span className="mt-1 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
-        {e}
-      </span>
-    </span>
-  );
-}
 
-// ---- Yardimcilar ----
-function sayacHesapla(tarih: string) {
-  const hedef = new Date(tarih).getTime();
-  if (isNaN(hedef)) return { gecti: false, gun: 0, sa: 0, dk: 0, sn: 0 };
-  const fark = hedef - Date.now();
-  const gecti = fark < 0;
-  const mutlak = Math.abs(fark);
-  return {
-    gecti,
-    gun: Math.floor(mutlak / 86400000),
-    sa: Math.floor((mutlak % 86400000) / 3600000),
-    dk: Math.floor((mutlak % 3600000) / 60000),
-    sn: Math.floor((mutlak % 60000) / 1000),
-  };
-}
-
-// ISO -> datetime-local ("yyyy-MM-ddTHH:mm", yerel saat)
 function yereleCevir(iso: string): string {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return "";

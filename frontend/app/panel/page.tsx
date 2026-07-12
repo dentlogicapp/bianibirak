@@ -312,7 +312,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
           })}
         </div>
         <p className="mt-2 font-govde text-xs text-ikincil">
-          Seçtiğin eşin bağlantısından gelen dilekler senin onay kuyruğuna düşer.
+          Seçtiğin eşin bağlantısından gelen dilekler senin onay bekleyen dileklerine düşer.
         </p>
       </div>
 

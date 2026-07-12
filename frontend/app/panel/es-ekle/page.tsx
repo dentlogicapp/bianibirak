@@ -129,7 +129,7 @@ export default function EsEkleSayfasi() {
           <div>
             <p className="font-govde text-sm font-medium text-murekkep">Eşin defterinize katıldı</p>
             <p className="metin-yasli mt-1 font-govde text-sm text-ikincil">
-              Artık kendi onay kuyruğunu yönetiyor ve bildirimlerini alıyor.
+              Artık kendi onay bekleyen dileklerini yönetiyor ve bildirimlerini alıyor.
             </p>
           </div>
         </div>

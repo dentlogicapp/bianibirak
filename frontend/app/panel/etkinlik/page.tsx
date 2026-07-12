@@ -159,7 +159,7 @@ function DefterIcerik() {
 
       {/* Onay kuyrugu */}
       <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
-        <h2 className="font-display text-lg text-murekkep">Onay kuyruğun</h2>
+        <h2 className="font-display text-lg text-murekkep">Onay Bekleyen Dilekler</h2>
         <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-ikincil">
           Yalnız senin bağlantından gelen dilekler burada. Onayladıkların ortak deftere eklenir;
           reddettiklerin gizli kalır.

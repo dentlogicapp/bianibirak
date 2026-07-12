@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, defteriIndir, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
+import { api, defteriIndir, type Katki, type Kurasyon, type KurasyonOgesi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { DefterKarti } from "@/components/site/DefterKarti";
+import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
+import { DilekInceleme } from "@/components/site/DilekInceleme";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // KURASYON STUDYOSU (Belge 03 - Akis 6): "Toplayici degil, kurasyon studyosu."
@@ -82,6 +84,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
 
   // Ogeler (yerel - anlik guncelleme)
   const [ogeler, setOgeler] = useState<KurasyonOgesi[]>(ilk.ogeler);
+  const [inceleme, setInceleme] = useState<KurasyonOgesi | null>(null);
   const [tamamlaniyor, setTamamlaniyor] = useState(false);
   const [uretiliyor, setUretiliyor] = useState<"onizleme" | "baski" | null>(null);
   const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
@@ -268,19 +271,47 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                           </svg>
                         </button>
 
-                        <div className="min-w-0 flex-1">
+                        {/* Govde tiklanabilir: dilegin kagittaki tam hali + davetli
+                            bilgileri acilir (defter ekranindaki desenin AYNISI). */}
+                        <button
+                          type="button"
+                          onClick={() => setInceleme(o)}
+                          className="group min-w-0 flex-1 text-left"
+                        >
                           <div className="flex min-w-0 items-center justify-between gap-2">
                             <p className="truncate font-govde text-xs uppercase tracking-etiket text-yaldiz">
                               {o.davetli_ad}
                             </p>
-                            <span className="shrink-0 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
-                              {tarafEtiketi(o.kaynak_es, ilk.es1_ad, ilk.es2_ad)}
-                            </span>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {o.foto_url && (
+                                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-yaldiz" aria-hidden>
+                                  <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.7} strokeLinejoin="round" fill="none" />
+                                  <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.7} fill="none" />
+                                </svg>
+                              )}
+                              <span className="font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                                {tarafEtiketi(o.kaynak_es, ilk.es1_ad, ilk.es2_ad)}
+                              </span>
+                            </div>
                           </div>
-                          <p className="metin-yasli mt-1.5 font-govde text-sm leading-relaxed text-murekkep">
+
+                          {o.davetli_iliski && (
+                            <p className="mt-0.5 truncate font-govde text-[0.68rem] text-ikincil">
+                              {o.davetli_iliski}
+                            </p>
+                          )}
+
+                          <p className="metin-yasli mt-1.5 line-clamp-3 font-govde text-sm leading-relaxed text-murekkep">
                             {o.mesaj}
                           </p>
-                        </div>
+
+                          <span className="mt-2 inline-flex items-center gap-1 font-govde text-[0.68rem] text-sarap opacity-0 transition-opacity group-hover:opacity-100">
+                            Dileği incele
+                            <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden>
+                              <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          </span>
+                        </button>
 
                         {/* Sira */}
                         <div className="flex shrink-0 flex-col gap-1">
@@ -539,14 +570,24 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         )}
       </div>
 
-      {/* Alt sabit durum bari */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ayrac bg-parsomen/90 backdrop-blur">
-        <div className="mx-auto flex max-w-icerik items-center justify-between px-5 py-2.5 sm:px-6">
-          <span className={`font-govde text-xs ${gosterge?.sinif ?? "text-ikincil"}`}>
-            {gosterge?.metin ?? "Tüm değişiklikler kayıtlı"}
-          </span>
-        </div>
-      </div>
+      {/* INCELEME - dilegin kagittaki tam hali (defter ekraniyla ayni bilesen) */}
+      {inceleme && (
+        <DilekInceleme
+          katki={ogeyiKatkiyaCevir(inceleme)}
+          tema={tema}
+          tarihGoster={tarihGoster}
+          yukleniyor={false}
+          onKapat={() => setInceleme(null)}
+        />
+      )}
+
+      {/* Icerik bandin ALTINDA kalmasin */}
+      <DurumBandiBoslugu />
+
+      <DurumBandi
+        metin={gosterge?.metin ?? "Tüm değişiklikler kayıtlı"}
+        sinif={gosterge?.sinif}
+      />
     </AppShell>
   );
 }
@@ -593,32 +634,75 @@ function EserOnizleme({
     return bloklar.length ? bloklar : [{ baslik: null, ogeler }];
   }, [gruplama, ogeler, es1Ad, es2Ad]);
 
+  const kapanisGorsel = gorseller.find((g) => g.konum === "kapanis")?.url ?? null;
+
   return (
     <div className="min-w-0 rounded-3xl border border-ayrac bg-parsomen p-4 sm:p-5">
-      {/* Sayfa - kagit yuzeyi */}
-      <div className="mx-auto min-w-0 max-w-md rounded-lg bg-[#fdf9f0] p-7 shadow-[0_6px_24px_rgba(0,0,0,0.12)] sm:p-9">
-        {kapakGoster ? (
-          <KapakSayfasi
-            tema={tema}
-            baslik={kapakBaslik}
-            altBaslik={kapakAltBaslik}
-            ithaf={ithaf}
-            kapakGorsel={gorseller.find((g) => g.konum === "kapak")?.url ?? null}
-          />
-        ) : (
-          <IcSayfa
-            tema={tema}
-            gruplu={gruplu}
-            kapanis={kapanis}
-            tarihGoster={tarihGoster}
-          />
-        )}
-      </div>
+      {kapakGoster ? (
+        // KAPAK SEKMESI: defterin ACILISI ve KAPANISI birlikte gorunur - dilekler
+        // arada gosterilmez, cunku burada duzenledigin sey ESERIN CERCEVESIDIR.
+        // Iki sayfa arasindaki ayrac, bunlarin AYRI sayfalar oldugunu belli eder.
+        <div className="space-y-4">
+          <SayfaEtiketi>Kapak &amp; İthaf</SayfaEtiketi>
 
-      <p className="mt-3 text-center font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-        {kapakGoster ? "Kapak + ithaf" : `${ogeler.length} dilek · baskıya hazır düzen`}
-      </p>
+          <div className="mx-auto min-w-0 max-w-md rounded-lg bg-[#fdf9f0] p-7 shadow-[0_6px_24px_rgba(0,0,0,0.12)] sm:p-9">
+            <KapakSayfasi
+              tema={tema}
+              baslik={kapakBaslik}
+              altBaslik={kapakAltBaslik}
+              ithaf={ithaf}
+              kapakGorsel={gorseller.find((g) => g.konum === "kapak")?.url ?? null}
+            />
+          </div>
+
+          {/* Sayfa gecisi - "defterin arasindaki dilekler burada" */}
+          <div className="flex items-center gap-3 px-2 py-1">
+            <span className="h-px flex-1 bg-ayrac" />
+            <span className="shrink-0 font-govde text-[0.62rem] uppercase tracking-etiket text-ikincil">
+              {ogeler.length} dilek
+            </span>
+            <span className="h-px flex-1 bg-ayrac" />
+          </div>
+
+          <SayfaEtiketi>Kapanış Sayfası</SayfaEtiketi>
+
+          <div className="mx-auto min-w-0 max-w-md rounded-lg bg-[#fdf9f0] p-7 shadow-[0_6px_24px_rgba(0,0,0,0.12)] sm:p-9">
+            <KapanisGovdesi
+              tema={tema}
+              kapanis={kapanis}
+              kapanisGorsel={kapanisGorsel}
+            />
+          </div>
+
+          <p className="text-center font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            Eserin çerçevesi
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mx-auto min-w-0 max-w-md rounded-lg bg-[#fdf9f0] p-7 shadow-[0_6px_24px_rgba(0,0,0,0.12)] sm:p-9">
+            <IcSayfa
+              tema={tema}
+              gruplu={gruplu}
+              kapanis={kapanis}
+              tarihGoster={tarihGoster}
+            />
+          </div>
+
+          <p className="mt-3 text-center font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            {ogeler.length} dilek · baskıya hazır düzen
+          </p>
+        </>
+      )}
     </div>
+  );
+}
+
+function SayfaEtiketi({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-center font-govde text-[0.62rem] uppercase tracking-etiket text-yaldiz">
+      {children}
+    </p>
   );
 }
 
@@ -779,17 +863,64 @@ function IcSayfa({
 
       {/* Kapanis */}
       {kapanis && (
-        <div className="mt-10 border-t border-[#a8823c]/30 pt-6 text-center">
-          <p
-            className={`font-govde text-[0.78rem] leading-relaxed text-[#3a2f28] ${
-              italik ? "italic" : ""
-            }`}
-          >
-            {kapanis}
-          </p>
+        <div className="mt-10 border-t border-[#a8823c]/30 pt-6">
+          <KapanisGovdesi tema={tema} kapanis={kapanis} kapanisGorsel={null} />
         </div>
       )}
 
+    </div>
+  );
+}
+
+// KAPANIS GOVDESI - defterin son sayfasi.
+// Hem "Kapak & Ithaf" sekmesinde (ayri sayfa olarak) hem "Duzen" sekmesinde
+// (dileklerin ardindan) AYNI bilesenden cizilir - iki kopya ayrisirdi.
+function KapanisGovdesi({
+  tema,
+  kapanis,
+  kapanisGorsel,
+}: {
+  tema: string;
+  kapanis: string;
+  kapanisGorsel: string | null;
+}) {
+  const italik = tema === "zarif";
+
+  return (
+    <div className="text-center text-[#211a17]">
+      {kapanis && (
+        <p
+          className={`mx-auto max-w-xs font-govde text-[0.82rem] leading-[1.8] text-[#3a2f28] ${
+            italik ? "italic" : ""
+          }`}
+        >
+          {kapanis}
+        </p>
+      )}
+
+      {kapanisGorsel && (
+        <div className="mx-auto mt-6 w-fit border border-[#a8823c] bg-white p-1.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={kapanisGorsel}
+            alt=""
+            className="max-h-40 w-auto max-w-full object-contain"
+          />
+        </div>
+      )}
+
+      {/* Marka kilidi - defterin son sozu */}
+      <div className="mt-8">
+        <div className="mx-auto mb-4 flex w-fit items-center gap-1.5" aria-hidden>
+          <span className="h-px w-6 bg-[#a8823c]" />
+          <span className="h-[3px] w-[3px] rotate-45 bg-[#a8823c]" />
+          <span className="h-px w-6 bg-[#a8823c]" />
+        </div>
+        <p className="font-display text-[0.9rem] text-[#6e2438]">Bi Anı Bırak</p>
+        <p className="mt-0.5 font-govde text-[0.5rem] uppercase tracking-[0.3em] text-[#a8823c]">
+          Senden Bize Kalan
+        </p>
+      </div>
     </div>
   );
 }
@@ -848,4 +979,25 @@ function SecimSatiri({
 
 function tarafEtiketi(kaynakEs: string, es1Ad: string, es2Ad: string): string {
   return kaynakEs === "es1" ? `${es1Ad} tarafı` : `${es2Ad} tarafı`;
+}
+
+// KurasyonOgesi -> Katki adaptoru.
+// Inceleme modali Katki tipi bekler (defter ekraniyla ayni bilesen kullanilsin diye).
+// Kurasyon ogesi ayni davetliyi tasir, yalnizca alan adlari farklidir. Ikinci bir
+// modal yazmak yerine tek bileseni besleriz - ayrisma riski sifir.
+function ogeyiKatkiyaCevir(o: KurasyonOgesi): Katki {
+  return {
+    id: o.katki_id,
+    kaynak_es: o.kaynak_es,
+    davetli_ad: o.davetli_ad,
+    davetli_iliski: o.davetli_iliski,
+    davetli_telefon: o.davetli_telefon,
+    davetli_email: o.davetli_email,
+    mesaj: o.mesaj,
+    durum: "onayli", // kurasyona dusen her dilek zaten onaylidir
+    created_at: o.birakilma,
+    foto_url: o.foto_url,
+    foto_genislik: o.foto_genislik,
+    foto_yukseklik: o.foto_yukseklik,
+  };
 }
