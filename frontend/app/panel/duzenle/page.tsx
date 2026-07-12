@@ -7,10 +7,7 @@ import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
 import { VARSAYILAN } from "@/lib/varsayilan";
 import { AppShell } from "@/components/site/AppShell";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
-import {
-  DavetliKarsilama,
-  type KarsilamaGorseli,
-} from "@/components/site/DavetliKarsilama";
+import { DavetliOnizleme } from "@/components/site/DavetliOnizleme";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Etkinlik & Gorunum: 3 sekme (Etkinlik / Davetli Ekrani / Sayac).
@@ -77,21 +74,15 @@ export default function EtkinlikGorunumSayfasi() {
 function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: EtkinlikAyar }) {
   const [sekme, setSekme] = useState<SekmeKod>("etkinlik");
 
-  // Onizleme, davetlinin GERCEKTEN gorecegi fotograflari gosterir - temsili degil.
-  const [gorseller, setGorseller] = useState<KarsilamaGorseli[]>([]);
+  // Onizleme, davetli sayfasinin KENDISINI gosterir (taklit degil) - kendi
+  // paylasim baglantimizin token'i ile.
+  const [onizlemeToken, setOnizlemeToken] = useState<string | null>(null);
 
   useEffect(() => {
     let iptal = false;
-    void api.gorselListe().then((c) => {
-      if (iptal || !c.ok) return;
-      setGorseller(
-        c.veri.gorseller.map((g) => ({
-          url: g.url,
-          kapak: g.konum === "kapak",
-          genislik: g.genislik,
-          yukseklik: g.yukseklik,
-        }))
-      );
+    void api.etkinlikLinkler().then((c) => {
+      if (iptal || !c.ok || c.veri.length === 0) return;
+      setOnizlemeToken(c.veri[0].token);
     });
     return () => {
       iptal = true;
@@ -201,9 +192,12 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      {/* min-w-0: grid item varsayilan min-width AUTO'dur ve icerigi KUCULTMEZ.
+          Bu zincir kirilirsa genis icerik (film seridi) sayfayi yatay tasirir -
+          mobilde "olcek dagildi" gorunumunun kok nedeni budur. */}
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2">
         {/* SOL - duzenleme */}
-        <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
+        <div className="min-w-0 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           {sekme === "etkinlik" && (
             <div className="space-y-5">
               <Alan etiket="Birinci eş adı">
@@ -325,21 +319,14 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
         </div>
 
         {/* SAG - CANLI ONIZLEME (her sekmede) */}
-        <div>
+        <div className="min-w-0">
           <p className="mb-3 font-govde text-xs uppercase tracking-etiket text-ikincil">
             Canlı önizleme
           </p>
-          <div className="rounded-3xl border border-ayrac bg-parsomen p-5">
-            <Onizleme
-              es1Ad={es1Ad}
-              es2Ad={es2Ad}
-              tarih={tarih}
-              karsilama={karsilama}
-              prompt={prompt}
-              sayacAktif={sayacAktif}
-              sayacAktifCumle={sayacAktifCumle}
-              sayacBittiCumle={sayacBittiCumle}
-              gorseller={gorseller}
+          <div className="min-w-0 overflow-hidden rounded-3xl border border-ayrac bg-parsomen p-5">
+            <DavetliOnizleme
+              token={onizlemeToken}
+              yenilemeAnahtari={`${es1Ad}|${es2Ad}|${tarih}|${karsilama}|${prompt}|${sayacAktif}|${sayacAktifCumle}|${sayacBittiCumle}`}
             />
           </div>
         </div>
@@ -389,63 +376,6 @@ function Alan({
 }
 
 // ---- CANLI ONIZLEME ----
-// DAVETLI EKRANI ONIZLEMESI
-//
-// GERCEK ekranin AYNISI: DavetliKarsilama bileseni, davetlinin gordugu sayfayla
-// BIREBIR ayni koddan gelir - film seridi, animasyon, tipografi, sayac, prompt.
-//
-// Onceki surumde burada gercegi "taklit eden" ayri bir dizgi vardi: film seridi
-// yoktu, cift adi kucuktu. Cift, gonderdigi linkin nasil gorunecegini YANLIS
-// biliyordu. Iki dizgi kacinilmaz olarak ayrisir; tek bilesen ayrisamaz.
-function Onizleme({
-  es1Ad,
-  es2Ad,
-  tarih,
-  karsilama,
-  prompt,
-  sayacAktif,
-  sayacAktifCumle,
-  sayacBittiCumle,
-  gorseller,
-}: {
-  es1Ad: string;
-  es2Ad: string;
-  tarih: string;
-  karsilama: string;
-  prompt: string;
-  sayacAktif: boolean;
-  sayacAktifCumle: string;
-  sayacBittiCumle: string;
-  gorseller: KarsilamaGorseli[];
-}) {
-  const ciftAdi = `${es1Ad} & ${es2Ad}`.trim();
-
-  return (
-    <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
-      <DavetliKarsilama
-        ciftAdi={ciftAdi}
-        karsilama={karsilama}
-        promptMetni={prompt || null}
-        gorseller={gorseller}
-        sayacAktif={sayacAktif}
-        etkinlikTarihi={tarih}
-        sayacAktifCumle={sayacAktifCumle || null}
-        sayacBittiCumle={sayacBittiCumle || null}
-      />
-
-      {/* Formun basi - davetli burada dilegini yazar (onizlemede kisaltilmis) */}
-      <div className="border-t border-ayrac px-8 py-6">
-        <p className="font-govde text-xs text-ikincil">Adın Soyadın</p>
-        <div className="mt-1 h-10 rounded-xl border border-ayrac bg-parsomen" />
-        <p className="mt-3 font-govde text-xs text-ikincil">Mesajın</p>
-        <div className="mt-1 h-16 rounded-xl border border-ayrac bg-parsomen" />
-        <div className="mt-4 h-10 rounded-full bg-sarap/90" />
-      </div>
-    </div>
-  );
-}
-
-
 function yereleCevir(iso: string): string {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return "";

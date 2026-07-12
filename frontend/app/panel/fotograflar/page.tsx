@@ -187,7 +187,7 @@ export default function FotograflarSayfasi() {
           </p>
         </div>
       ) : (
-        <div className="mt-5 grid items-start gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid min-w-0 items-start gap-4 sm:grid-cols-2">
           {gorseller.map((g, i) => (
             <div key={g.id} className="min-w-0 overflow-hidden rounded-2xl border border-ayrac bg-yuzey">
               {/* GORSEL - kutu, fotografin GERCEK oranini alir.

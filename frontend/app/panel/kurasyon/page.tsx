@@ -220,7 +220,9 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      {/* min-w-0: grid item varsayilan min-width AUTO'dur, icerigi kucultmez.
+          Zincir kirilirsa genis icerik (onizleme kagidi) sayfayi yatay tasirir. */}
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2">
         {/* ---------- SOL: KURGU ---------- */}
         <div className="min-w-0 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           {sekme === "dilekler" && (
