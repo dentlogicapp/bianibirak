@@ -10,15 +10,21 @@ import { DavetliEkrani } from "@/components/site/DavetliEkrani";
 // Film seridi, sayac, iliski menusu, yazim denetimi, fotograf alani, "Dileğimi bırak"
 // butonu - hepsi burada, cunku ayni bilesen. Ayrismak icin ikinci bir kod YOK.
 //
-// OLCEK STABILITESI:
-// Icerik SABIT genislikte (390px - referans telefon) cizilir, sonra kapsayiciya
-// ORANLA kucultulur. Fotograf sayisi, metin uzunlugu, tema - hicbiri bu olcegi
-// degistiremez. Yatay tasma MATEMATIKSEL olarak imkansizdir.
+// OLCEK MANTIGI:
+//   Icerik HER ZAMAN 390px (referans telefon) genisliginde cizilir; sonra kapsayiciya
+//   ORANLA olceklenir. Dizgi bu yuzden hicbir zaman "akmaz" - yalniz buyur/kucul.
+//   Fotograf sayisi, metin uzunlugu, tema: hicbiri olcegi degistiremez. Yatay tasma
+//   MATEMATIKSEL olarak imkansizdir.
 //
-// Cerceve: telefon maketi YOK. Sade bir kagit yuzeyi, ince kenarlik, yumusak golge.
-// Onizleme burada ICERIGIN kendisidir; suslu bir kutu icinde degil.
+//   Dar ekran (mobil/PWA) -> olcek 1'in altina duser, icerik kucultulur.
+//   Genis ekran (web)     -> olcek 1'in ustune cikar, onizleme sutunu DOLDURUR.
+//                            (Tavan olmasa tipografi kabalasir; 1.55 dengeli sinir.)
+//
+// Cerceve: telefon maketi YOK. Sade kagit yuzeyi, ince kenarlik. Onizleme burada
+// ICERIGIN kendisidir; suslu bir kutunun icinde degil.
 
 const REFERANS_GENISLIK = 390;
+const AZAMI_OLCEK = 1.55;
 
 export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
   const kapRef = useRef<HTMLDivElement>(null);
@@ -33,7 +39,7 @@ export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
 
     function olc() {
       const g = kap!.clientWidth;
-      if (g > 0) setOlcek(Math.min(g / REFERANS_GENISLIK, 1));
+      if (g > 0) setOlcek(Math.min(g / REFERANS_GENISLIK, AZAMI_OLCEK));
     }
 
     olc();
@@ -42,8 +48,8 @@ export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
     return () => g.disconnect();
   }, []);
 
-  // Ic yukseklik olceklendikten sonra disariya YANSITILIR; yoksa kapsayici
-  // olceklenmemis yuksekligi ayirir ve altta kocaman bir bosluk kalir.
+  // Olceklenmis yukseklik disariya YANSITILIR; yoksa kapsayici olceklenmemis
+  // yuksekligi ayirir ve altta kocaman bir bosluk kalir.
   useEffect(() => {
     const ic = icRef.current;
     if (!ic) return;
@@ -72,8 +78,6 @@ export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
       className="min-w-0 overflow-hidden rounded-3xl border border-ayrac bg-parsomen"
       style={{ height: yukseklik }}
     >
-      {/* SABIT olculerde cizilir, sonra olceklenir. Kapsayici darlasinca icerik
-          KUCULUR - akmaz, tasmaz, bozulmaz. */}
       <div
         ref={icRef}
         style={{
@@ -82,12 +86,7 @@ export function DavetliOnizleme({ veri }: { veri: KatkiKarsilama | null }) {
           transformOrigin: "top left",
         }}
       >
-        <DavetliEkrani
-          token=""
-          veri={veri}
-          onGonderildi={() => {}}
-          salt
-        />
+        <DavetliEkrani token="" veri={veri} onGonderildi={() => {}} salt />
       </div>
     </div>
   );

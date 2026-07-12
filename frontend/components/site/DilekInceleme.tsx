@@ -113,12 +113,15 @@ export function DilekInceleme({
             Boylece fotograf da bilgiler de TEK BAKISTA gorunur; kaydirma gerekmez. */}
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[1fr_320px] lg:overflow-hidden">
           {/* Kagit */}
-          <div className="min-h-0 overflow-y-auto bg-yuzey/40 px-5 py-6 sm:px-8 lg:py-8">
+          {/* Ic kaydirma YALNIZ genis ekranda (iki sutun). Dar ekranda iki
+              kaydirma ic ice giriyor ve kagidi kirpiyordu - fotograf + not tek
+              parca gorunmuyordu. Simdi dar ekranda TEK kaydirma var: dis kapsayici. */}
+          <div className="min-h-0 bg-yuzey/40 px-5 py-6 sm:px-8 lg:overflow-y-auto lg:py-8">
             <p className="text-center font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
               Defterde böyle görünecek
             </p>
 
-            <div className="mx-auto mt-4 max-w-md overflow-hidden rounded-lg bg-[#fdf9f0] px-5 py-7 shadow-[0_10px_36px_rgba(33,26,23,0.18)]">
+            <div className="mx-auto mt-3 max-w-md overflow-hidden rounded-lg bg-[#fdf9f0] px-4 py-5 shadow-[0_10px_36px_rgba(33,26,23,0.18)]">
               <DefterKarti
                 ad={katki.davetli_ad}
                 iliski={katki.davetli_iliski}
@@ -133,12 +136,12 @@ export function DilekInceleme({
           </div>
 
           {/* Bilgiler */}
-          <aside className="min-h-0 overflow-y-auto border-t border-ayrac px-5 py-6 sm:px-8 lg:border-l lg:border-t-0 lg:px-6">
+          <aside className="min-h-0 border-t border-ayrac px-5 py-4 sm:px-8 lg:overflow-y-auto lg:border-l lg:border-t-0 lg:px-6">
             <p className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
               Davetli bilgileri
             </p>
 
-            <dl className="mt-3 space-y-0.5">
+            <dl className="mt-2">
               <Satir etiket="Ad Soyad" deger={katki.davetli_ad} />
               <Satir etiket="Yakınlık" deger={katki.davetli_iliski || "Belirtilmemiş"} />
               <Satir
@@ -230,29 +233,34 @@ function Satir({
   baglanti?: string;
 }) {
   return (
-    <div className="rounded-xl px-3 py-2.5 transition-colors hover:bg-yuzey">
-      <dt className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
+    <div className="flex items-baseline justify-between gap-3 border-b border-ayrac/40 py-1.5 last:border-b-0">
+      <dt className="shrink-0 font-govde text-[0.6rem] uppercase tracking-[0.12em] text-ikincil">
         {etiket}
       </dt>
-      <dd className="mt-0.5 flex items-center gap-2">
+
+      <dd className="flex min-w-0 items-center gap-1.5 text-right">
         {baglanti ? (
           <a
             href={baglanti}
-            className="min-w-0 truncate font-govde text-sm text-murekkep underline decoration-ayrac underline-offset-2 transition-colors hover:text-sarap hover:decoration-sarap"
+            className="min-w-0 truncate font-govde text-[0.78rem] text-murekkep underline decoration-ayrac underline-offset-2 transition-colors hover:text-sarap hover:decoration-sarap"
           >
             {deger}
           </a>
         ) : (
-          <span className="min-w-0 truncate font-govde text-sm text-murekkep">{deger}</span>
+          <span className="min-w-0 truncate font-govde text-[0.78rem] text-murekkep">
+            {deger}
+          </span>
         )}
 
-        {alt && <span className="shrink-0 font-govde text-xs text-ikincil">· {alt}</span>}
+        {alt && (
+          <span className="shrink-0 font-govde text-[0.64rem] text-ikincil">{alt}</span>
+        )}
 
         {kopyala && (
           <button
             type="button"
             onClick={() => void navigator.clipboard?.writeText(kopyala)}
-            className="ml-auto shrink-0 text-ikincil transition-colors hover:text-sarap"
+            className="shrink-0 text-ikincil transition-colors hover:text-sarap"
             aria-label={`${etiket} kopyala`}
             title="Kopyala"
           >
