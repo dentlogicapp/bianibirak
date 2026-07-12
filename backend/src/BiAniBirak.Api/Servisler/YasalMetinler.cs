@@ -264,16 +264,67 @@ Gizlilikle ilgili her türlü soru ve talebiniz için uygulama içindeki KVKK b�
             eklenecek.Add(Olustur("kvkk_davetli", "KVKK Aydınlatma Metni (Davetli)",
                 KvkkDavetliMetni, kapsam: "davetli", zorunlu: true, sira: 1));
 
-        if (eklenecek.Count == 0) return;
+        // ERKEN RETURN YOK - arsiv onarimi HER ZAMAN calismali.
+        //
+        // Burada "eklenecek yoksa cik" deseydik (ilk yazimda oyleydi), tum metinler
+        // zaten mevcut olan bir sistemde onarim ASLA calismazdi - ve canlida tam da
+        // bu oldu: iki metnin arsiv kaydi eksik kaldi.
+        if (eklenecek.Count > 0)
+        {
+            db.SistemMetinleri.AddRange(eklenecek);
 
-        db.SistemMetinleri.AddRange(eklenecek);
-
-        // ILK SURUMU DE ARSIVLE. Arsivde eksik surum kalirsa, o surumu onaylamis
-        // kullanicilarin onayi ISPATLANAMAZ hale gelir - hash var ama metin yok.
-        foreach (var m in eklenecek)
-            OnayServisi.IlkSurumuArsivle(db, m);
+            // ILK SURUMU DE ARSIVLE.
+            foreach (var m in eklenecek)
+                OnayServisi.IlkSurumuArsivle(db, m);
+        }
 
         await db.SaveChangesAsync(ct);
+
+        // ---- GERIYE DONUK ARSIV ONARIMI ----
+        //
+        // KANIT ZINCIRINDEKI DELIK (canlida yakalandi):
+        // Arsivleme sistemi kurulmadan ONCE seed edilmis metinler vardi. Yeni seed
+        // yalniz EKSIK metinleri ekler - dolayisiyla eski metinlerin arsiv kaydi
+        // OLUSMADI. Yani hash onay kaydinda duruyor ama o hash'in KARSILIK GELDIGI
+        // METIN hicbir yerde yok.
+        //
+        // Sonuc: "bir metni onayladi" diyebiliriz, HANGI metni oldugunu gosteremeyiz.
+        // Hash, ancak metin de saklanirsa kanittir - aksi halde anlamsiz bir karakter
+        // dizisidir.
+        //
+        // Bu blok, yururlukteki her metnin arsivde karsiligi OLMASINI garanti eder.
+        // Idempotent: hash zaten arsivdeyse dokunmaz.
+        await ArsiviOnarAsync(db, ct);
+    }
+
+    // Yururlukteki metinlerin arsivde karsiligi var mi? Yoksa ekle.
+    private static async Task ArsiviOnarAsync(BiAniBirakDbContext db, CancellationToken ct)
+    {
+        var metinler = await db.SistemMetinleri.ToListAsync(ct);
+        if (metinler.Count == 0) return;
+
+        var arsivdekiHashler = (await db.SistemMetinSurumleri.AsNoTracking()
+            .Select(x => x.Hash)
+            .ToListAsync(ct))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var onarilan = 0;
+
+        foreach (var m in metinler)
+        {
+            // Hash bos olabilir (arsivleme oncesi kayit) - once damgala.
+            if (string.IsNullOrEmpty(m.Hash))
+                OnayServisi.MetniDamgala(m);
+
+            if (arsivdekiHashler.Contains(m.Hash)) continue;
+
+            OnayServisi.IlkSurumuArsivle(db, m);
+            arsivdekiHashler.Add(m.Hash);
+            onarilan++;
+        }
+
+        if (onarilan > 0)
+            await db.SaveChangesAsync(ct);
     }
 
     private static SistemMetni Olustur(
