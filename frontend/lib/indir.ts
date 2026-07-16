@@ -10,6 +10,7 @@
 // SVG dogrudan string'ten; digerleri lockupCanvas'tan (Inter kusursuz).
 
 import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 import { lockupSvg, lockupCanvas, type LockupSecenek } from "@/lib/lockup";
 
 export type Format = "svg" | "png" | "jpg" | "webp" | "pdf";
@@ -24,6 +25,64 @@ export const FORMATLAR: { kod: Format; ad: string; aciklama: string }[] = [
 
 // Yuksek olcek: kucuk lockup'i buyuk raster'a cikar (matbaa/net baski).
 const RASTER_OLCEK = 6;
+
+// Tek formatin blob'unu uretir (ZIP + tekil indirme paylasir).
+async function formatBlob(
+  secenek: LockupSecenek,
+  format: Format,
+): Promise<Blob> {
+  if (format === "svg") {
+    return new Blob([lockupSvg(secenek)], { type: "image/svg+xml;charset=utf-8" });
+  }
+
+  const cv = await lockupCanvas(secenek, RASTER_OLCEK);
+
+  if (format === "pdf") {
+    const png = cv.toDataURL("image/png");
+    const enBoy = cv.width / cv.height;
+    const genislikMm = 90;
+    const yukseklikMm = genislikMm / enBoy;
+    const pdf = new jsPDF({
+      orientation: genislikMm >= yukseklikMm ? "landscape" : "portrait",
+      unit: "mm",
+      format: [genislikMm, yukseklikMm],
+    });
+    pdf.addImage(png, "PNG", 0, 0, genislikMm, yukseklikMm, undefined, "FAST");
+    return pdf.output("blob");
+  }
+
+  if (format === "jpg") {
+    const beyaz = document.createElement("canvas");
+    beyaz.width = cv.width;
+    beyaz.height = cv.height;
+    const bctx = beyaz.getContext("2d")!;
+    bctx.fillStyle = "#ffffff";
+    bctx.fillRect(0, 0, beyaz.width, beyaz.height);
+    bctx.drawImage(cv, 0, 0);
+    return canvasBlob(beyaz, "image/jpeg", 0.95);
+  }
+
+  const mime = format === "webp" ? "image/webp" : "image/png";
+  return canvasBlob(cv, mime, 0.95);
+}
+
+// TUM FORMATLAR -> TEK ZIP.
+//
+// Matbaanin kullandigi duzenleme programina gore en uygun formati secebilsin diye
+// SVG (vektor/matbaa), PNG+WEBP (seffaf), JPG (beyaz zemin), PDF (baski) hepsi bir
+// arada iner. Kullanici tek dosya alir, matbaaya iletir.
+export async function tumFormatlarZip(
+  secenek: LockupSecenek,
+  dosyaAdi: string,
+): Promise<void> {
+  const zip = new JSZip();
+  for (const f of FORMATLAR) {
+    const blob = await formatBlob(secenek, f.kod);
+    zip.file(`${dosyaAdi}.${f.kod}`, blob);
+  }
+  const paket = await zip.generateAsync({ type: "blob" });
+  indirBlob(paket, `${dosyaAdi}.zip`);
+}
 
 export async function karekodIndir(
   secenek: LockupSecenek,
