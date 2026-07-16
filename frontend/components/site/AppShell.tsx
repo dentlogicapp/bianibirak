@@ -18,6 +18,7 @@ type Sayfa = { baslik: string; ebeveyn: string | null };
 const HIYERARSI: Record<string, Sayfa> = {
   "/panel/etkinlik": { baslik: "Defter", ebeveyn: null }, // kok
   "/panel/paylasim": { baslik: "Paylaşım", ebeveyn: "/panel/etkinlik" },
+  "/panel/davetiye-karekodum": { baslik: "Davetiye Karekodum", ebeveyn: "/panel/etkinlik" },
   "/panel/yonetim": { baslik: "Yönetim", ebeveyn: "/panel/etkinlik" },
   "/panel/kurasyon": { baslik: "Baskı Stüdyosu", ebeveyn: "/panel/etkinlik" },
   "/panel/fotograflar": { baslik: "Fotoğraflar", ebeveyn: "/panel/etkinlik" },

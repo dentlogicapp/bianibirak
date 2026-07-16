@@ -103,14 +103,11 @@ export default function DavetiyeKarekodumSayfasi() {
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl">
-        {/* Baslik */}
-        <div className="mb-8">
-          <h1 className="font-serif text-2xl text-murekkep sm:text-3xl">Davetiye Karekodum</h1>
-          <p className="mt-2 max-w-xl font-govde text-sm leading-relaxed text-ikincil">
-            Bu karekodu davetiyene ekle. Okutan davetliler, senin tarafından gelen
-            dilekleri defterine bırakır. Karekod küçük basılsa bile rahatça okunur.
-          </p>
-        </div>
+        {/* Baslik ust barda ("< Davetiye Karekodum"); burada yalniz ince aciklama. */}
+        <p className="mb-8 max-w-xl font-govde text-sm leading-relaxed text-ikincil">
+          Bu karekodu davetiyene ekle. Okutan davetliler, senin tarafından gelen
+          dilekleri defterine bırakır. Karekod küçük basılsa bile rahatça okunur.
+        </p>
 
         <div className="grid gap-6 md:grid-cols-[1fr_260px]">
           {/* ---- Onizleme ---- */}
