@@ -27,6 +27,11 @@ public static class OnayServisi
     public const string KapsamEs = "es";
     public const string KapsamDavetli = "davetli";
 
+    // ODEME KAPSAMI - Mesafeli Satis Sozlesmesi + On Bilgilendirme Formu.
+    // 6502 sayili Kanun + Mesafeli Sozlesmeler Yonetmeligi uyarinca ZORUNLU.
+    // Kayit aninda degil, ODEME aninda onaylanir.
+    public const string KapsamOdeme = "odeme";
+
     // ZORUNLU METINLER ARTIK KATALOGTAN OKUNUR - kodda sabit liste YOK.
     //
     // Sabit liste olsaydi, yeni bir zorunlu metin eklemek DEPLOY gerektirirdi. Katalog

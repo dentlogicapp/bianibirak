@@ -62,6 +62,27 @@ public static class KurasyonUclari
         if (etkinlik == null)
             return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadı.");
 
+        // ================= PAYWALL CIZGISI =================
+        //
+        // Bu SATIR, urunun tum is modelidir.
+        //
+        // Ucretsiz: toplama, kurma, duzenleme, kurasyon, TAM ONIZLEME (96 DPI).
+        // Ucretli : YALNIZCA bu uc - baskiya hazir 300 DPI PDF.
+        //
+        // Onizleme ucu (/kurasyon/onizleme) BILINCLI olarak ACIK kalir. Cift eserini
+        // doyasiya gorur, gurur duyar, paylasmak ister. Odedigi sey GORUNTU degil,
+        // BASKI KALITESIDIR. "Toplamak ucretsiz. Miras, bir kereye mahsus."
+        //
+        // Kontrol TEK YERDE (OdemeServisi) - ikinci bir odeme kontrolu yazilirsa,
+        // birinde unutulan bir kosul odemis bir ciftin defterini kilitler.
+        //
+        // NOT: odeme sistemi kapaliysa (OdemeAyari.Aktif=false) bu kontrol true doner -
+        // acil durum kolu. Defterin 37 gunluk omru var; odeme arizasi yuzunden miras
+        // imha edilemez.
+        if (!await OdemeServisi.IndirmeYetkisiVarMiAsync(etkinlikId, db))
+            return Hata(402, "ODEME_GEREKLI",
+                "Baskıya hazır defterini indirmek için ödeme gerekli.");
+
         // PDF uretimi TEK yerde: DefterDerleyici. Super panel "Defter Rontgeni" de
         // ayni servisi cagirir - iki kopya olsaydi kacinilmaz olarak ayrisir ve
         // yonetici, cift'in gordugunden BASKA bir PDF gorurdu.
