@@ -40,6 +40,10 @@ builder.Services.AddHostedService<ImhaGorevi>();
 // HATIRLATMA GOREVI - indirme takvimi (+2, +10, +15, +20, +25, +30, son hafta her gun).
 // Kimse mirasini "hatirlatilmadi" diye kaybetmesin.
 builder.Services.AddHostedService<HatirlatmaGorevi>();
+
+// ODEME SURE GOREVI: bekleyen odemenin gecerliligi dolunca "suresi_doldu"ya ceker.
+// Olu kayitlar birikmesin, cift eski fiyatla odemeye kalkmasin.
+builder.Services.AddHostedService<OdemeSureGorevi>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
 
@@ -163,6 +167,9 @@ app.OnayUclariniEkle();          // Onay: eksik onay tespiti, tek seferlik modal
 app.SuperTeshisUclariniEkle();   // Teshis: saglik skoru, defter detayi, olcum, rontgen
 app.KurasyonUclariniEkle();
 app.GorselUclariniEkle();
+app.DavetiyeKarekodumUclariniEkle(); // Davetiye karekodu: ciftin kendi kisa kodu + /d/{kod} cozumleme
+app.OdemeUclariniEkle();         // Odeme: durum, MSS/On Bilgilendirme, baslat, "havalemi yaptim"
+app.SuperOdemeUclariniEkle();    // Super: odeme onayla/reddet, IBAN+fiyat ayarlari
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

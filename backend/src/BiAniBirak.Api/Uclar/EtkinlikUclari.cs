@@ -169,6 +169,7 @@ public static class EtkinlikUclari
             EtkinlikId = etkinlik.Id,
             Es = "es1",
             Token = TokenUreteci.Uret(),
+            KisaKod = KisaKodUreteci.Uret(),
             Aktif = true,
             CreatedAt = simdi,
         };
@@ -178,6 +179,7 @@ public static class EtkinlikUclari
             EtkinlikId = etkinlik.Id,
             Es = "es2",
             Token = TokenUreteci.Uret(),
+            KisaKod = KisaKodUreteci.Uret(),
             Aktif = true,
             CreatedAt = simdi,
         };

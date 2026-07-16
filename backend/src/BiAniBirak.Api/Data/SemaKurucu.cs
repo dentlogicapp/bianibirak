@@ -84,6 +84,14 @@ public static class SemaKurucu
         CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_token ON paylasim_baglantilari ("Token");
         CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_etkinlik_es ON paylasim_baglantilari ("EtkinlikId", "Es");
 
+        -- KISA KOD: davetiye karekodunun gittigi kisa adres (/d/{KisaKod} -> /k/{Token}).
+        -- Kucuk basilan karekodun okunabilmesi icin link KISA olmali. Mevcut linklere
+        -- ilk erisimde tembel atanir (nullable). Benzersiz ama NULL'lar cakismasin diye
+        -- filtreli unique index.
+        ALTER TABLE paylasim_baglantilari ADD COLUMN IF NOT EXISTS "KisaKod" text NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_kisakod
+            ON paylasim_baglantilari ("KisaKod") WHERE "KisaKod" IS NOT NULL;
+
         CREATE TABLE IF NOT EXISTS etkinlik_ayarlari (
             "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),
@@ -367,6 +375,47 @@ public static class SemaKurucu
             END IF;
         END
         $imha$;
+
+        -- ODEMELER - saglayicidan BAGIMSIZ.
+        --
+        -- Bu tablo "havale_odemeleri" DEGIL, "odemeler"dir. Yarin iyzico, obur gun
+        -- App Store IAP gelecek; hepsi AYNI kaydi uretecek. Paywall tek soru sorar:
+        -- "bu etkinlikte onaylanmis odeme var mi?" - parayi kimin tahsil ettigi
+        -- onu ilgilendirmez.
+        CREATE TABLE IF NOT EXISTS odemeler (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "EtkinlikId" uuid NOT NULL,
+            "KullaniciId" uuid NULL,
+            "Tutar" numeric(12,2) NOT NULL DEFAULT 0,
+            "ParaBirimi" text NOT NULL DEFAULT 'TRY',
+            "Saglayici" text NOT NULL DEFAULT 'havale',
+            "ReferansKodu" text NOT NULL,
+            "Durum" text NOT NULL DEFAULT 'bekliyor',
+            "OnaylayanKullaniciId" uuid NULL,
+            "OnayZamani" timestamptz NULL,
+            "Not" text NULL,
+            "SonGecerlilik" timestamptz NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_odemeler_etkinlik ON odemeler ("EtkinlikId");
+        CREATE UNIQUE INDEX IF NOT EXISTS ix_odemeler_referans ON odemeler ("ReferansKodu");
+        CREATE INDEX IF NOT EXISTS ix_odemeler_durum ON odemeler ("Durum");
+
+        -- ODEME AYARLARI - tek satir. IBAN/fiyat KODDA DEGIL, burada.
+        -- Aktif=false ile baslar: sistem hazir ama para almiyoruz.
+        CREATE TABLE IF NOT EXISTS odeme_ayarlari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "Iban" text NOT NULL DEFAULT '',
+            "AliciAd" text NOT NULL DEFAULT '',
+            "BankaAd" text NOT NULL DEFAULT '',
+            "Tutar" numeric(12,2) NOT NULL DEFAULT 0,
+            "ParaBirimi" text NOT NULL DEFAULT 'TRY',
+            "GecerlilikGun" integer NOT NULL DEFAULT 7,
+            "Aktif" boolean NOT NULL DEFAULT false,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
 
         -- METIN KATALOGU (Planlama sema deseni): kapsam / zorunlu / sira / deprecated
         ALTER TABLE sistem_metinleri ADD COLUMN IF NOT EXISTS "Kapsam" text NOT NULL DEFAULT 'es';

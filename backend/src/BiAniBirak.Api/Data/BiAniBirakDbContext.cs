@@ -30,6 +30,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
     public DbSet<KullanimOnayi> KullanimOnaylari => Set<KullanimOnayi>();
     public DbSet<SistemMetinSurumu> SistemMetinSurumleri => Set<SistemMetinSurumu>();
+    public DbSet<Odeme> Odemeler => Set<Odeme>();
+    public DbSet<OdemeAyari> OdemeAyarlari => Set<OdemeAyari>();
     public DbSet<Kurasyon> Kurasyonlar => Set<Kurasyon>();
     public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
@@ -153,12 +155,15 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
             e.Property(x => x.Es).HasColumnName("Es").IsRequired();
             e.Property(x => x.Token).HasColumnName("Token").IsRequired();
+            e.Property(x => x.KisaKod).HasColumnName("KisaKod");
             e.Property(x => x.Aktif).HasColumnName("Aktif");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             // tenant filtresi icin index
             e.HasIndex(x => x.EtkinlikId);
             // token ile public sayfa cozumleme + benzersizlik (Belge 08)
             e.HasIndex(x => x.Token).IsUnique();
+            // kisa kod ile /d/{kod} cozumleme + benzersizlik (nullable oldugundan filtreli)
+            e.HasIndex(x => x.KisaKod).IsUnique();
             // kural: etkinlik basina her es tek link
             e.HasIndex(x => new { x.EtkinlikId, x.Es }).IsUnique();
             // FK iliskisi (0C dersi: model seviyesinde)
@@ -320,6 +325,47 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Zorunlu).HasColumnName("Zorunlu").HasDefaultValue(true);
             e.Property(x => x.Sira).HasColumnName("Sira").HasDefaultValue(0);
             e.Property(x => x.Deprecated).HasColumnName("Deprecated").HasDefaultValue(false);
+        });
+
+        // ---- odemeler (saglayicidan BAGIMSIZ - havale/iyzico/IAP ayni tablo) ----
+        model.Entity<Odeme>(e =>
+        {
+            e.ToTable("odemeler");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Tutar).HasColumnName("Tutar").HasColumnType("numeric(12,2)");
+            e.Property(x => x.ParaBirimi).HasColumnName("ParaBirimi").HasDefaultValue("TRY");
+            e.Property(x => x.Saglayici).HasColumnName("Saglayici").IsRequired();
+            e.Property(x => x.ReferansKodu).HasColumnName("ReferansKodu").IsRequired();
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.OnaylayanKullaniciId).HasColumnName("OnaylayanKullaniciId");
+            e.Property(x => x.OnayZamani).HasColumnName("OnayZamani");
+            e.Property(x => x.Not).HasColumnName("Not");
+            e.Property(x => x.SonGecerlilik).HasColumnName("SonGecerlilik");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => x.EtkinlikId);
+            e.HasIndex(x => x.ReferansKodu).IsUnique();
+            e.HasIndex(x => x.Durum);
+        });
+
+        // ---- odeme_ayarlari (tek satir - IBAN/fiyat super panelden) ----
+        model.Entity<OdemeAyari>(e =>
+        {
+            e.ToTable("odeme_ayarlari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Iban).HasColumnName("Iban").HasDefaultValue("");
+            e.Property(x => x.AliciAd).HasColumnName("AliciAd").HasDefaultValue("");
+            e.Property(x => x.BankaAd).HasColumnName("BankaAd").HasDefaultValue("");
+            e.Property(x => x.Tutar).HasColumnName("Tutar").HasColumnType("numeric(12,2)");
+            e.Property(x => x.ParaBirimi).HasColumnName("ParaBirimi").HasDefaultValue("TRY");
+            e.Property(x => x.GecerlilikGun).HasColumnName("GecerlilikGun").HasDefaultValue(7);
+            e.Property(x => x.Aktif).HasColumnName("Aktif").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
 
         // ---- sistem_metin_surumleri (ARSIV - append-only, hash'ten metne kopru) ----

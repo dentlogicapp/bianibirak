@@ -276,7 +276,7 @@ export async function davetliFotoYukle(
 // seyrelir: A3'e buyutmede 300 DPI -> ~215 DPI. Dogru boyutta uretilirse kalite korunur.
 export async function defteriIndir(
   boyut: "a5" | "a4" | "a3" = "a5"
-): Promise<{ ok: true } | { ok: false; mesaj: string }> {
+): Promise<{ ok: true } | { ok: false; mesaj: string; odemeGerekli?: boolean }> {
   try {
     const yanit = await fetch(
       `/api/etkinlik/aktif/kurasyon/defter.pdf?boyut=${boyut}`,
@@ -284,7 +284,12 @@ export async function defteriIndir(
     );
     if (!yanit.ok) {
       const govde = await yanit.json().catch(() => ({}));
-      return { ok: false, mesaj: govde.mesaj ?? "Defter oluşturulamadı." };
+      // 402 ODEME_GEREKLI: paywall. Cagiran taraf odeme ekranini acar.
+      return {
+        ok: false,
+        mesaj: govde.mesaj ?? "Defter oluşturulamadı.",
+        odemeGerekli: yanit.status === 402,
+      };
     }
 
     const blob = await yanit.blob();
@@ -957,5 +962,258 @@ export async function rontgenIndir(defterId: string): Promise<{ ok: boolean; mes
     return { ok: true, mesaj: "Röntgen indirildi." };
   } catch {
     return { ok: false, mesaj: "Röntgen üretilemedi." };
+  }
+}
+
+
+/* ===================== ODEME =====================
+ *
+ * KURAL A - ODEME ONCE, DURUSTLUK SONRA:
+ *   Indirme butonu ONCE odemeye goturur. Boyut secimi, DPI uyarilari, baski notlari
+ *   odeme SONRASI gosterilir.
+ *
+ *   Gerekce: durustluk satin alma SONRASI dogru kullanim rehberligidir. Oncesi supe
+ *   tohumudur. Odeme ekranindan once "fotograflariniz seyrelir" demek, henuz kararsiz
+ *   olan cifti caydirir.
+ */
+
+export type OdemeDurum = {
+  odemeGerekli: boolean;   // sistem acik mi? (false = paywall yok, herkes indirir)
+  odendi: boolean;         // onaylanmis odeme var mi?
+  tutar: number;
+  paraBirimi: string;
+  bekleyen: {
+    referansKodu: string;
+    tutar: number;
+    sonGecerlilik: string;
+    olusturma: string;
+  } | null;
+};
+
+export type OdemeMetni = {
+  anahtar: string;
+  baslik: string;
+  icerik: string;
+  surum: string;
+};
+
+export type OdemeTalimati = {
+  referansKodu: string;
+  tutar: number;
+  paraBirimi: string;
+  sonGecerlilik: string;
+  iban: string;
+  aliciAd: string;
+  bankaAd: string;
+};
+
+export async function odemeDurumu(): Promise<OdemeDurum | null> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/odeme/durum", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as OdemeDurum;
+  } catch {
+    return null;
+  }
+}
+
+export async function odemeMetinleri(): Promise<OdemeMetni[]> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/odeme/metinler", { credentials: "include" });
+    if (!y.ok) return [];
+    return (await y.json()) as OdemeMetni[];
+  } catch {
+    return [];
+  }
+}
+
+export async function odemeBaslat(
+  riza: boolean
+): Promise<{ ok: true; talimat: OdemeTalimati } | { ok: false; mesaj: string }> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/odeme/baslat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ riza }),
+    });
+    const govde = await y.json().catch(() => ({}));
+    if (!y.ok) return { ok: false, mesaj: govde.mesaj ?? "Ödeme başlatılamadı." };
+    return { ok: true, talimat: govde as OdemeTalimati };
+  } catch {
+    return { ok: false, mesaj: "Ödeme başlatılamadı." };
+  }
+}
+
+export async function odemeBildir(): Promise<{ ok: boolean; mesaj?: string }> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/odeme/bildir", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!y.ok) {
+      const g = await y.json().catch(() => ({}));
+      return { ok: false, mesaj: g.mesaj ?? "Bildirim gönderilemedi." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Bildirim gönderilemedi." };
+  }
+}
+
+/* ---- SUPER PANEL: odeme yonetimi ---- */
+
+export type SuperOdeme = {
+  id: string;
+  etkinlikId: string;
+  defterAd: string;
+  defterSilindi: boolean;
+  odeyenAd: string | null;
+  odeyenEmail: string | null;
+  tutar: number;
+  paraBirimi: string;
+  saglayici: string;
+  referansKodu: string;
+  durum: string;
+  not: string | null;
+  onayZamani: string | null;
+  sonGecerlilik: string;
+  suresiGecti: boolean;
+  createdAt: string;
+};
+
+export type SuperOdemeListesi = {
+  odemeler: SuperOdeme[];
+  ozet: {
+    bekleyen: number;
+    onaylanan: number;
+    reddedilen: number;
+    toplamTahsilat: number;
+  };
+  sistemAktif: boolean;
+};
+
+export type OdemeAyar = {
+  iban: string;
+  aliciAd: string;
+  bankaAd: string;
+  tutar: number;
+  paraBirimi: string;
+  gecerlilikGun: number;
+  aktif: boolean;
+};
+
+export async function superOdemeler(): Promise<SuperOdemeListesi | null> {
+  try {
+    const y = await fetch("/api/super/odemeler", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as SuperOdemeListesi;
+  } catch {
+    return null;
+  }
+}
+
+export async function superOdemeOnayla(
+  id: string,
+  not?: string
+): Promise<{ ok: boolean; mesaj?: string }> {
+  try {
+    const y = await fetch(`/api/super/odeme/${id}/onayla`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ not: not ?? null }),
+    });
+    if (!y.ok) {
+      const g = await y.json().catch(() => ({}));
+      return { ok: false, mesaj: g.mesaj ?? "Onaylanamadı." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Onaylanamadı." };
+  }
+}
+
+export async function superOdemeReddet(
+  id: string,
+  not?: string
+): Promise<{ ok: boolean; mesaj?: string }> {
+  try {
+    const y = await fetch(`/api/super/odeme/${id}/reddet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ not: not ?? null }),
+    });
+    if (!y.ok) {
+      const g = await y.json().catch(() => ({}));
+      return { ok: false, mesaj: g.mesaj ?? "Reddedilemedi." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Reddedilemedi." };
+  }
+}
+
+export async function superOdemeAyarGetir(): Promise<OdemeAyar | null> {
+  try {
+    const y = await fetch("/api/super/odeme/ayar", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as OdemeAyar;
+  } catch {
+    return null;
+  }
+}
+
+export async function superOdemeAyarKaydet(
+  ayar: Omit<OdemeAyar, "paraBirimi">
+): Promise<{ ok: boolean; mesaj?: string }> {
+  try {
+    const y = await fetch("/api/super/odeme/ayar", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(ayar),
+    });
+    if (!y.ok) {
+      const g = await y.json().catch(() => ({}));
+      return { ok: false, mesaj: g.mesaj ?? "Kaydedilemedi." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, mesaj: "Kaydedilemedi." };
+  }
+}
+
+
+/* ===================== DAVETIYE KAREKODUM =====================
+ * Ciftin KENDI kisa kodu (izolasyon - yalniz kendi tarafi).
+ * Link frontend'de kurulur: `${origin}/d/${kisaKod}` (mevcut /k/ deseni gibi).
+ */
+
+export type DavetiyeKarekodum = {
+  es: string;        // es1 | es2
+  kisaKod: string;
+};
+
+export async function davetiyeKarekodum(): Promise<DavetiyeKarekodum | null> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/davetiye-karekodum", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as DavetiyeKarekodum;
+  } catch {
+    return null;
+  }
+}
+
+// Kisa kod -> token (yonlendirme icin; /d/{kod} sayfasi kullanir).
+export async function kisaKodCoz(kod: string): Promise<string | null> {
+  try {
+    const y = await fetch(`/api/kisa/${encodeURIComponent(kod)}`, { credentials: "include" });
+    if (!y.ok) return null;
+    const g = await y.json();
+    return typeof g.token === "string" ? g.token : null;
+  } catch {
+    return null;
   }
 }

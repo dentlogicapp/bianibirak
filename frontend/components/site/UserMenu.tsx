@@ -235,6 +235,17 @@ export function UserMenu() {
               Paylaşım
             </MenuLink>
 
+            <MenuLink href="/panel/davetiye-karekodum" onClick={() => setAcik(false)} ikon={
+              <>
+                <rect x="4" y="4" width="6" height="6" rx="1" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <rect x="14" y="4" width="6" height="6" rx="1" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <rect x="4" y="14" width="6" height="6" rx="1" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                <path d="M14 14h3v3M20 14v.01M14 20h.01M20 17v3h-3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+              </>
+            }>
+              Davetiye Karekodum
+            </MenuLink>
+
             <MenuLink href="/panel/yonetim" onClick={() => setAcik(false)} ikon={
               <path d="M12 3.5 5 6.2v5c0 4.2 2.9 8.1 7 9.3 4.1-1.2 7-5.1 7-9.3v-5L12 3.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
             }>
