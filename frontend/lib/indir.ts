@@ -66,22 +66,27 @@ async function formatBlob(
   return canvasBlob(cv, mime, 0.95);
 }
 
-// TUM FORMATLAR -> TEK ZIP.
-//
-// Matbaanin kullandigi duzenleme programina gore en uygun formati secebilsin diye
-// SVG (vektor/matbaa), PNG+WEBP (seffaf), JPG (beyaz zemin), PDF (baski) hepsi bir
-// arada iner. Kullanici tek dosya alir, matbaaya iletir.
-export async function tumFormatlarZip(
+// TUM FORMATLAR -> ZIP BLOB (indirmeden dondur; WhatsApp paylasimi icin).
+export async function tumFormatlarZipBlob(
   secenek: LockupSecenek,
   dosyaAdi: string,
-): Promise<void> {
+): Promise<{ blob: Blob; ad: string }> {
   const zip = new JSZip();
   for (const f of FORMATLAR) {
     const blob = await formatBlob(secenek, f.kod);
     zip.file(`${dosyaAdi}.${f.kod}`, blob);
   }
   const paket = await zip.generateAsync({ type: "blob" });
-  indirBlob(paket, `${dosyaAdi}.zip`);
+  return { blob: paket, ad: dosyaAdi };
+}
+
+// TUM FORMATLAR -> TEK ZIP (dogrudan indir).
+export async function tumFormatlarZip(
+  secenek: LockupSecenek,
+  dosyaAdi: string,
+): Promise<void> {
+  const { blob, ad } = await tumFormatlarZipBlob(secenek, dosyaAdi);
+  indirBlob(blob, `${ad}.zip`);
 }
 
 export async function karekodIndir(
