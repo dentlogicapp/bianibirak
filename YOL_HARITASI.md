@@ -3,235 +3,353 @@
 > Bu dosya, oturumlar arası SÜREKLİLİK içindir. Instruction (kalıcı çerçeve) DEĞİL;
 > projenin GÜNCEL yol haritası + alınan kararlar + biten işler + açık konular + pahalı
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
-> repodan; bu dosya "neden/ne kararlaştırıldı/sırada ne var" hafızasıdır.
+> repodan; bu dosya "neden / ne kararlaştırıldı / sırada ne var" hafızasıdır.
 
-Son güncelleme: 2026-07-11 (Süper Panel tamamlandı; Aşama 6 Kürasyon başlıyor)
-
----
-
-## 1. NEREDEYIZ - Biten Aşamalar (canlı, doğrulandı)
+**Son güncelleme: 2026-07-17** — DAVETİYE KAREKODU (Aşama 1) tamamlandı ve canlıda.
+Ödeme (havale) kodu yazıldı, canlıda ama **inert** (Aktif=false). Menü isimleri
+kullanıcı-dostu hale getirildi. **Sırada: Aşama 2 (Defter künyesi) veya ödeme (hukuki
+statü netleşince).**
 
 Canlı: https://bianibirak.dentlogicapp.com
 
-- **0B Kimlik** - kayıt/giriş/çıkış/ben + JWT + bcrypt + host-scoped çerez + append-only audit.
-- **0C Tenant çekirdeği** - etkinlikler + etkinlik_uyelikleri (rol es1/es2) + uye_davetleri.
-  Etkinlik oluştur (hazirlik + es1 üyelik + audit, atomik). Aktif-yap (JWT'ye
-  aktif_etkinlik_id claim). AktifTenant guard rolü döndürür. FK'ler MODEL seviyesinde
-  (EF insert sırası için - 0C dersi).
-- **2 Paylaşım + Ayar** - paylasim_baglantilari (es1/es2 ayrı token) + etkinlik_ayarlari
-  (karşılama/prompt/kapanış penceresi/tema). QR frontend-side (qrcode lib). Public URL
-  /k/{token}.
-- **0D Cila & Kabuk** - KVKK girişten kaldırıldı (footer link deseni), datetime saat
-  ölçeği, zero-friction (Sabitler varsayılan), düzenle/iki-adımlı-sil, PWA (sw.js API
-  asla cache + manifest start_url /giris), süreç zaman çizelgesi. Kapanış min 30 gün.
-- **0D.5 App-Shell** - dark mode (CSS değişkenli tema, flash-önleme inline script) +
-  UserMenu (avatar + tema toggle + çıkış). Dağınık çıkış butonları tek menüde. Ekranlar
-  UserMenu + Ustbar ile bağlandı.
-- **3 Davetli Katkı** - katkilar + katki_medyalari. Public /k/{token} (login YOK):
-  GET karşılama (okuma yüzeyi minimal), POST katkı bırak. Güvenlik: token doğrula +
-  pencere kontrolü (ETKINLIK_ACILMADI/ETKINLIK_KAPALI) + rate limit (HizSiniri, token+IP
-  10dk'da 5) + ad/email/telefon zorunlu (Belge 08). KaynakEs token'dan; Durum=beklemede.
-  Frontend: sade davetli yüzeyi + KVKK rıza + teyit/kapalı/açılmamış ekranları.
-- **4 Moderasyon + İzolasyon** - GET kuyruk (WHERE KaynakEs=rol AND Durum=beklemede -
-  wedge izolasyonu; bir eş diğerinin kuyruğunu göremez), onayla/reddet (KaynakEs sahiplik
-  + beklemede kontrolü + audit), GET defter (her iki eşin onaylılarının birleşimi).
-  Frontend: OnayKuyrugu + OrtakDefter bileşenleri.
-- **10-A Push** - cihazlar + ertelenen_bildirimler + kullanicilar sessiz saat kolonları.
-  PushGonderici (WebPush 1.0.13, VAPID env, 410/404 otomatik temizlik, sessiz saat
-  erteleme, audit PUSH_GONDERILDI). CihazUclari (VAPID public key + cihaz kayıt + sessiz
-  saat GET/PUT). Tetikler: katkı bırakılınca → KaynakEs sahibi eşe; onaylanınca → diğer
-  eşe. Frontend: push.ts (VAPID backend'den çekilir) + BildirimAyari (izin + sessiz saat).
-  VAPID anahtarları sunucu .env'de (repoya girmez). DOĞRULANDI: push canlı çalışıyor.
+---
 
-DB: 11 tablo (kullanicilar, denetim_gunlukleri, etkinlikler, etkinlik_uyelikleri,
-uye_davetleri, paylasim_baglantilari, etkinlik_ayarlari, katkilar, katki_medyalari,
-cihazlar, ertelenen_bildirimler).
+## 0. EN KRİTİK AÇIK KARARLAR — HER OTURUMDA HATIRLATILACAK
+
+### ⚠ A) KAYNAK FOTOĞRAF ÇÖZÜNÜRLÜĞÜ: 1600px → 2400px?
+
+> **Musa'nın talimatı (2026-07-13):** *"Bu öneriyi yol haritasının SON ADIMI olarak
+> ısrarla hatırlat. Ben deneme çıktılarını alıp karşılaştırdıktan sonra nihai kararı
+> vereceğim."*
+
+**Mevcut durum:** `frontend/lib/gorsel.ts` → `AZAMI_KENAR = 1600`, `KALITE = 0.88`.
+
+| Boyut | Foto çözünürlüğü | Durum |
+|---|---|---|
+| A5 | 430 DPI | Fazlasıyla yeterli |
+| A4 | 303 DPI | Baskı standardının tam üstünde |
+| A3 | **214 DPI** | **Standardın ALTINDA — fotoğraflar yumuşar** |
+
+**Öneri:** 2400px → A3 de 321 DPI. **Bedeli:** dosyalar ~2 kat (16→35 MB geçici, 37 gün).
+**Etki:** tüm yükleme akışı. **KARAR BEKLİYOR** — deneme baskısı karşılaştırması. Matbaa
+deneme baskısı (Hafta 2) bu kararla birlikte yapılmalı.
+
+### ⚠ B) HUKUKİ STATÜ — ÖDEMENİN ÖN ŞARTI
+
+> **Musa sigortalı kamu işinde çalışıyor.** 657 sayılı Kanun m.28 memur ticaret yasağı:
+> şahıs şirketi / ticari kazanç yasak. GVK 20/B (App Store IAP vergi istisnası) bile
+> kurtarmaz (o da ticari kazanç). Aile üyesi adına şirket fiili duruma bakılırsa korumaz
+> (Danıştay içtihadı).
+
+**Statü SORULDU, HENÜZ NET DEĞİL:**
+- Memur (4/c) → ticaret yasak
+- Kamu işçisi (4/a) → 657 uygulanmaz ama kurum yönetmeliği / TİS yasaklayabilir
+- Sözleşmeli (4/B) → ayrı değerlendirme
+
+**PENDING (Musa):** (1) kesin statüyü netleştir, (2) idare hukukçusu + mali müşavir görüşü —
+**ödeme AÇILMADAN ÖNCE.** Ödeme kodu hazır ve inert bekliyor; statü çözülene kadar
+kimseye ödeme gösterilmez. **HER OTURUMDA HATIRLAT.**
 
 ---
 
-### Bu oturumda tamamlananlar (2026-07-11)
+## 1. ÜRÜN KURALLARI — İHLAL EDİLEMEZ
 
-- **UI Mükemmelleştirme (6 öbek)** - koyu-mod yaldız wordmark + animasyonlu "Anı"; davetli
-  yönlendirme metni (kaynak_es); otomatik kaydetme (useOtoKaydet, 1.2sn debounce);
-  Profilim modalı (createPortal - stacking context dersi); push kalıcı çözüm
-  (pushSenkronEt: her açılışta sessiz yeniden abonelik).
-- **Eş kimliği bug fix** - EtkinlikOlustur'da `Rol="es1"` HARDCODED idi; kurucu her zaman
-  es1 oluyordu. Form artık "Bu hesap hangi eşe ait?" sorar (KurucuEs).
-- **Uygulama-içi bildirim (avatar çanı)** - `bildirimler` tablosu. KRİTİK TASARIM: bildirim
-  push'tan ve sessiz saatten BAĞIMSIZ oluşur (PushGonderici içinde VAPID kontrolünden ÖNCE).
-  Push sadece "anlık haber verme" katmanı; çan her zaman dolar. 15sn polling + focus refresh.
-- **Bildirimden dileğe odak** - `?focus={katkiId}` + useOdakKatki (retry'lı scroll + 4.5sn
-  çerçeve vurgusu). Dilek onaylı/reddedilmişse toast uyarısı. SW push tıklaması global
-  dinleyiciyle (AppShell) client-side yönlendirir.
-- **sonner toast** (planlama birebir) - uyarılar açılır pencerede, satır içi banner DEĞİL.
-- **Anlık güncelleme prensibi** - onaylanan dilek O AN kuyruktan ortak deftere taşınır
-  (optimistic, yenileme yok). Bu prensip tüm uygulamada standart.
-- **Menü mimarisi (v2)** - alt sekme barı TAMAMEN kaldırıldı; tek navigasyon = avatar menüsü.
-  Sıra (planlama): Profilim → Defter → Paylaşım → Yönetim → Süper Panel → Diğer etkinliklerin
-  → Tema → Bildirimler → Çıkış. **Yönetim bir SAYFA** (/panel/yonetim): araç ızgarası +
-  "+ Eşini Ekle" barı + üye listesi.
-- **Bağlamsal üst bar** - kökte wordmark, alt sayfalarda `‹ Başlık`. Geri = EBEVEYN sayfa
-  (tarayıcı geçmişi değil - deterministik). Kaydırınca inceltme + 160ms sayfa geçişi.
-- **Etkinlik & Görünüm** - 3 sekme (Etkinlik / Davetli Ekranı / Sayaç), her sekmede sağda
-  CANLI ÖNİZLEME. Sayaç açık/kapalı toggle + cümleler. TÜR-BAZLI VARSAYILANLAR
-  (Sabitler.TureGoreVarsayilan): düğün/nişan/nikah için ayrı kusursuz Türkçe bloklar -
-  çift hiçbir şeye dokunmasa bile etkinlik kusursuz çalışır.
-- **Eşini Ekle (davet)** - mail servisi YOK; paylaşılabilir davet linki + QR + Web Share.
-  Tek kullanımlık token (uye_davetleri). Katılınca JWT yenilenir, doğrudan deftere düşer,
-  kurucuya push + çan bildirimi.
-- **İzolasyon sıkılaştırma** - eşler YALNIZ kendi paylaşım bağlantısını görür
-  (AktifLinkler'de `WHERE Es == rol`). Yanlış link paylaşımı = çift-link izolasyonunun
-  çökmesi. UI'da gizlemek YETMEZ - backend filtresi.
-- **SÜPER PANEL** - `super_admin` yetkisi (JWT claim + DB doğrulaması). 5 sekme:
-  Defterler / Kullanıcılar / Çöp Kutusu / KVKK / Canlı Akış.
-  - **Görüntüleme modu (impersonation)**: geçici JWT (1 saat), `goruntuleme_modu=true`.
-    **Global write-guard middleware** (Program.cs, UseAuthentication sonrası): claim + yazma
-    metodu + tenant yolu → 403 + audit. OTORİTE JWT CLAIM'İ; frontend header'ına ASLA
-    güvenilmez (OWASP A01). İstisna: /api/super/* + /api/kimlik/* (kilitlenme önleme).
-    Süper admin o deftere ZATEN ÜYE ise normal yetkiyle girer (görüntüleme modu kapalı).
-  - **İki aşamalı silme**: çöpe at (SilindiMi) → kalıcı sil (çift adı teyidi + aktif defter
-    koruması). Denetim izi KORUNUR (EtkinlikId null'a düşer).
-  - **Dondurma** (kötüye kullanım): davetli YAZIMI reddedilir (guest token dahil - backend).
-  - **Moderasyon**: uygunsuz dilek kaldırma → çöp kutusu (çiftin kuyruk/defterinden de düşer).
-  - **KVKK yönetimi**: `sistem_metinleri` (yasal metinler, hardcoded yasak) + `kvkk_talepleri`
-    (erişim/düzeltme/silme/itiraz, 30 gün yasal süre takibi).
-  - **Canlı akış**: tüm sistem denetim günlüğü, 10sn yenileme, Türkçe eylem sözlüğü.
-  - **Korumalar**: son süper admin kendini kaldıramaz/silinemez; kendini askıya alamaz;
-    `(EtkinlikId, KullaniciId)` unique (aynı kişi bir deftere iki rolle giremez).
-  - Kullanıcı askıya alma (soft delete, DeletedAt) + kalıcı silme (e-posta teyidi).
-  - Yetim defter (üyesi kalmamış) + hareketsiz defter (30 gün) işaretleri.
+### KURAL A — ÖDEME ÖNCE, DÜRÜSTLÜK SONRA `[2026-07-13]`
+İndir butonu ÖNCE ödeme, SONRA boyut+uyarı ekranı, EN SON indirme. Ödeme öncesi hiçbir
+"ama" / DPI tablosu gösterilmez (kararsız çifti caydırır). Dürüstlük satın alma SONRASI
+doğru kullanım rehberidir. **Havale akışında bu kuruldu; `BoyutSecimi` modalı ödeme
+sonrasına taşındı (KURAL A akışı frontend'de aktif).**
 
-## 2. KESİN KARARLAR - Sıradaki Büyük İşler (Musa onayladı, yapılacak)
+### KURAL B — FİLİGRAN YASAK `[2026-07-13]`
+Filigran kilit değil hız tümseği; AI siler + dosya zaten elde. Yerine ÇÖZÜNÜRLÜK:
+önizleme 96 DPI (PDF hiç üretilmez), indirme 300 DPI. Filigran ürünü çirkinleştirir →
+arzuyu düşürür. **Not:** Davetiye/defter marka künyesi (karekod + logo) bu kurala AYKIRI
+DEĞİL — o ödeme dayatan bir filigran değil, mirasın tasarlanmış kalıcı parçası; ürünü
+tamamlar, bozmaz.
 
-### AŞAMA 6 - KÜRASYON STÜDYOSU + MİRAS ÇIKTISI (ŞU AN BAŞLIYOR - Kuzey Yıldızı)
+### KURAL C — PAYWALL ÇİZGİSİ
+Ücretsiz: dilek toplama, defter kurma/düzenleme, kürasyon, tam önizleme (96 DPI).
+Ücretli: yalnızca baskıya hazır PDF indirme (`/api/etkinlik/aktif/kurasyon/defter.pdf`).
 
-Belge 01: "Rakip ZIP verir; biz editöryel, baskıya-hazır bir ESER üretiriz."
-Belge 03 Akış 6. Bu adımın tamamlanması = Kuzey Yıldızı metriği "tamamlanan miras".
+### KURAL D — ZAMAN MODELİ TEK KANON
+`Sabitler.cs`: ToplamaGun=30, IndirmeGun=7, ToplamGun=37. İmha = etkinlik + 37 gün.
 
-**Teknik karar (Musa onayladı):**
-- **PDF: QuestPDF (backend, .NET)** - print-ready. Gerçek tipografi (Fraunces/Inter
-  self-host), sayfa akışı, kırım payı, yüksek çözünürlük. Frontend PDF kütüphaneleri
-  (jsPDF/html2canvas) ekran-görüntüsü kalitesi verir = "export", "eser" DEĞİL → konumlandırmaya aykırı, REDDEDİLDİ.
-- **Slayt: web tabanlı oynatıcı** (tam ekran, geçişli, klavye/dokunmatik) + PDF slayt export.
-
-**3 tur:**
-1. Kürasyon veri modeli + stüdyo ekranı (seçim / sıralama / gruplama / tema / kapak / ithaf)
-2. PDF üretimi (QuestPDF) + filigranlı önizleme (paywall köprüsü)
-3. Slayt oynatıcı + teşekkür kartı + AI kürasyon
-
-**Onaylanan bonuslar:**
-- B1 **AI-destekli kürasyon** (Belge 05'te tam pakete dahil): tema gruplaması, bölüm
-  başlığı önerisi, sıralama önerisi. Çift onaylar/reddeder. "Kürasyon stüdyosu"
-  iddiasını gerçek kılan şey.
-- B2 **Teşekkür kartı export** (Belge 05, tam paket): davetliye özel kart (adı + alıntı).
-  Viral döngü: kartı alan kendi düğününde ister.
-- B3 **Filigranlı önizleme**: satın alma öncesi çift mirasını GÖRÜR, indiremez
-  (Belge 05 paywall matrisi). Ödeme aşamasına köprü.
-- B4 **İthaf sayfası**: çiftin kendi paragrafı. Mirasa ruh katar.
-- B5 **Kitap-içi QR köprüsü** (Belge 05 "lansman sonrası"): basılı defterin son sayfasında
-  QR → dijital defter. Altyapı şimdi konur.
-- B6 **Çıktı sürümleme**: her export kaydedilir (kim/ne zaman/hangi ayarlarla), geri alınabilir.
-
-## 3. AÇIK KONULAR - Çözülmesi Gerekenler
-
-### K1) Durum kapısı açığı (ÖNEMLİ - Musa fark etti)
-Şu an /k/{token} katkı kabulü sadece tarih penceresine bakıyor, "Durum"a BAKMIYOR.
-Sonuç: hazirlik durumundaki etkinliğe katkı düştü. DOĞRU mantık: ödeme almadan aktif
-olmaz, aktif olmadan katkı kabul edilmez. Çözüm: katkı kabulüne Durum=aktif şartı ekle
-(hazirlik/kapali/arsiv → reddet). Bu, Aşama 5 (yaşam döngüsü) + Aşama 7 (ödeme) ile tam
-çözülür: ÖDEME etkinliği aktif yapar. Test için bir etkinlik manuel aktif yapıldı
-(3936e5ec) - geçici; ödeme gelince manuel aktifleştirme yerini ödeme-sonrası-aktife
-bırakır.
-
-### K2) Etkinlik hazirlik→aktif geçiş mekanizması YOK
-Şu an hiçbir mekanizma etkinliği aktif yapmıyor (manuel SQL dışında). Tasarım: açılış
-tarihi gelince mi (job/okuma-anı-hesap) yoksa ödeme sonrası mı? KARAR: ödeme sonrası
-aktifleşir (Musa: "ödeme almadan aktif olmaması zaten"). Aşama 7'ye bağlı.
-
-### K3) es2 üyeliği - ÇÖZÜLDÜ (2026-07-11)
-Eşini Ekle akışı kuruldu: paylaşılabilir davet linki (mail servisi gerekmiyor).
-Eş katılınca üyelik oluşur, JWT yenilenir, kendi kuyruğunu yönetir, push alır.
-
-
-### K4) Mail servisi - KAPSAM DIŞI (karar)
-Davet linki paylaşımıyla çözüldü; mail servisi lansman için gerekmiyor.
-KVKK talep kanalı için ileride e-posta gerekebilir (Aşama 7+ ile birlikte değerlendirilir).
-
-
-## 4. STANDART AŞAMA SIRASI (Belge 09) & Durum
-
-- 0B kimlik ✓ | 0C tenant ✓ | 2 paylaşım ✓ | 0D cila ✓ | 0D.5 app-shell ✓
-- 3 davetli katkı ✓ | 4 moderasyon ✓
-- 10-A push ✓
-- **SIRADA (enterprise sıra):**
-  - 10-B Akıllı Paylaşım (bağımsız, ödemeye bağlı değil - hızlı değer)
-  - 5 Yaşam döngüsü (durum kapısı K1/K2 - ödemeyle iç içe)
-  - 7 Ödeme (iyzico/PayTR; IAP vs fiziksel ayrımı; etkinliği aktif yapar)
-  - Viral hediye döngüsü (7 ile bağlı)
-  - 6 Kürasyon/export (defter PDF + slayt → North Star: tamamlanan miras)
-  - 8 Demo/önizleme paywall | 9 Fiziksel baskı
-  - Sonra: Capacitor + IAP (native mağaza; rehber erişimi 10-B'nin native tamamlayıcısı)
+### KURAL E — SÜPER ADMİN EYLEMLERİ ÇİFTİN DENETİMİNDE GÖRÜNMEZ
+`denetim_gunlukleri.SistemEylemi` yaz-sabit + oku-filtre. Süper panel yine görür.
+İstisna: `ODEME_ONAYLANDI` → SistemEylemi=false (çift güven duysun); `ODEME_REDDEDILDI` → true.
 
 ---
 
-## 5. PAHALI ÖĞRENİLEN DERSLER (tekrar etmemek için)
+## 2. NEREDEYİZ — Biten İşler (canlı, doğrulandı)
 
-- **Caddy inode:** Caddyfile sed-inode-swap sonrası eski container eski inode'a bağlı
-  kalır; `caddy reload` "unchanged" der. Çözüm: `docker compose ... up -d
-  --force-recreate --no-deps caddy` (notlar projesi, docker-compose.production.yml).
-- **FK model seviyesinde:** FK yalnız DB'de olup DbContext modelinde yoksa EF insert
-  sırasını bilmez → 23503. HasOne/WithMany/HasForeignKey MODELE eklenir.
-- **WebPush sürümü:** nuget'te en yüksek 1.0.13 (1.0.24 YOK). API tüm sürümlerde özdeş
-  (VapidDetails/PushSubscription/SendNotificationAsync/WebPushException.StatusCode).
-- **Web Push bayat SW/abonelik:** sw.js değişince eski service worker abonelikleri
-  "başarılı" (basarili>0) görünüp bildirimi GÖSTERMEYEBİLİR. Şüpheli push davranışında
-  İLK teşhis: DELETE FROM cihazlar + cihazda PWA sil/temizle/yeniden kur → taze abonelik.
-  basarili>0 ama bildirim yok = neredeyse her zaman bayat SW/abonelik.
-- **VAPID frontend'de değil backend'den:** push.ts VAPID public key'i /api/push/anahtar'
-  dan çeker; frontend build-arg'a bağlı değil (anahtar değişince frontend rebuild gerekmez).
-- **Deploy sıra:** VAPID gibi env-bağlı özellikte önce .env + compose, sonra tek deploy
-  (iki kez deploy etme).
+### Temel katmanlar
+- **Kimlik** — kayıt/giriş/çıkış/ben, JWT + bcrypt, host-scoped çerez, append-only audit
+- **Tenant çekirdeği** — TENANT = ETKİNLİK. `etkinlikler` + `etkinlik_uyelikleri`
+  (rol: es1/es2) + `uye_davetleri`. JWT'de `aktif_etkinlik_id`.
+- **Çift-link izolasyonu (WEDGE)** — her eşin AYRI token'ı. Katkı `KaynakEs` etiketli,
+  YALNIZ ilgili eşin kuyruğuna düşer. Bir eş diğerinin onaysız kuyruğunu göremez.
+- **Davetli katkı** — public `/k/{token}`, login YOK, PII zorunlu değil. Pencere kontrolü,
+  rate limit, EXIF/GPS silme.
+- **Moderasyon** — onayla/reddet. Çift katkı metnini düzenleyemez. Red bildirilmez.
+- **Push** — VAPID web push, sessiz saat. **PWA** — sw.js, manifest, ikonlar.
+- **Süper panel** — impersonation (JWT claim otoritesi), iki aşamalı silme, dondurma,
+  moderasyon, canlı akış, son-süper-admin koruması, teşhis (DefterDetay, olçum, röntgen).
+
+### Aşama 6 — KÜRASYON STÜDYOSU + MİRAS ÇIKTISI ✓
+- QuestPDF (backend .NET), gerçek tipografi (Fraunces/Inter self-host TTF), cilt payı.
+- `DefterDerleyici` — PDF üretiminin TEK kaynağı. Kürasyon (seçim/sıra/tema/kapak/ithaf).
+
+### Yaşam döngüsü, hatırlatma, hukuki onay ✓
+- `ImhaGorevi` (kapanış+37 tam imha, dosyalar EN SON, PII-free sistem kaydı).
+- `HatirlatmaGorevi` (13 bildirimlik takvim, +37 SON GÜN sabah).
+- **Hukuki onay sistemi** — metin kataloğu (`sistem_metinleri`, kapsam es/davetli),
+  sürüm arşivi (hash→metin), onay kayıtları (append-only, IP+tarayıcı), Onay Kapısı
+  (geçilemez modal), Kanıt PDF'i, KVKK Yönetimi (süper panel).
+
+### Filigran kaldırma + fotoğraf kalitesi + boyut seçimi ✓
+- `Filigranli` DROP, `OnizlemeServisi` (GenerateImages 96 DPI, PDF üretilmez, önbellek).
+- `UseOriginalImage()` (çifte sıkıştırma = nesil kaybı fix), ImageRasterDpi=300.
+- Boyut A5/A4/A3 (`.Scale()`, ISO 216 tek katsayı, margin de ölçeklenir). Önerilen = A4.
+
+### ★ DAVETİYE KAREKODU (Aşama 1) — TAMAMLANDI, CANLIDA `[2026-07-17]`
+Menüde **"Davetiyene QR Kodu Ekle"**. Çift, davetiyesine basacağı QR'ı üretir, önizler,
+matbaaya WhatsApp ile gönderir.
+
+**Fonsuz lockup (marka bloğu):** wordmark + "Senden Bize Kalan" + yaldız çizgi + karekod.
+Hiçbir arka plan yok (şeffaf) — davetiyeye/deftere doğrudan bırakılır, fonu davetiyeden
+alır. TEK işlevsel istisna: karekodun altındaki beyaz pul (okunurluk; koyu davetiyede
+şeffaf QR okunmaz). ÇAĞRI METNİ YOK.
+- **"Anı" şaraba EN UZAK tonda** (animasyonun en parlak ucu): açık #c4a25e, koyu #d4af6a.
+  Bi/Bırak = şarap (açık #6e2438, koyu #c17a4a). Kağıtta animasyon yok, sabit durur.
+- **Otomatik tema:** davetiye zemininin parlaklığından açık/koyu kendiliğinden seçilir
+  (manuel tema toggle KALDIRILDI). Eşik: perceived luminance < 0.58 → koyu.
+
+**Kısa link (küçük baskıda okunurluk):** karekod uzun token değil `/d/{KisaKod}` taşır
+(az modül = küçükken okunur). `PaylasimBaglantisi.KisaKod` (nullable, tembel atanır,
+`KisaKodUreteci` 5 karakter, karışmayan alfabe "ACDEFGHJKMNPQRTUVWXY34679"). `/d/{kod}`
+frontend sayfası kodu tokene çözüp `/k/{token}`e yönlendirir (markalı splash). Kısa link
+frontend'de `${origin}/d/{kisaKod}` kurulur — domain değişince otomatik döner.
+
+**Formatlar (geniş yelpaze):** SVG (vektör/matbaa), PNG+WEBP (şeffaf), JPG (beyaz zemin),
+PDF. Hepsi TEK ZIP'te. **WEBP "(önerilen)"** etiketli (şeffaf+küçük+yüksek kalite;
+matbaa profesyoneli zaten doğru formatı seçer). Raster **8× ölçek** (~2400px, 6cm baskıda
+~760 DPI — standardın kat kat üstü). **Para maliyeti YOK** — tüm üretim tarayıcıda
+(client-side), sunucu/depolama yok.
+
+**SVG slogan OUTLINE (font-bağımsız):** "SENDEN BİZE KALAN" Inter SemiBold ile önceden
+path'e çevrilip sabit gömüldü (`SLOGAN_PATH`, fonttools ile offline üretildi). Matbaada
+Inter olmasa bile SVG'de yazı birebir aynı görünür. Wordmark zaten vektördü; rasterlar
+canvas fillText ile font-gömülü.
+
+**Premium önizleme (örnek davetiye üstünde):** altın çift çerçeve, GERÇEK eş isimleri +
+GERÇEK tarih (etkinlik verisinden; tarih yatay "01 Eylül 2026 · Salı" yaldız çizgiler
+arasında). Çiçek/botanik KALDIRILDI (Musa isteği; isim+mesaj puntoları büyütüldü).
+- **Sınırsız zemin rengi** — native renk seçici (petek/spektrum). Hazır swatch YOK.
+- **Sürükle + boyutlandır** — karekod pointer ile taşınır (iç çerçeve dışına taşmaz;
+  clamp), boyut kaydırıcısı (%16-56); boyutta merkez korunur.
+- **JPG dürüst önizleme** — (formatta seçilirse) beyaz zemin gösterilir. (Format seçici
+  UI kaldırıldı; formatlar yönergede yazılı.)
+
+**PAYLAŞIMLI ÖNİZLEME + YAKIN-CANLI SENKRON:** `davetiye_onizleme` tablosu (etkinlik başına
+tek satır, ortak). İki eş ayni taslağı düzenler; değişiklik ~3 sn'de (polling) diğerine
+yansır — telefonda konuşurken birlikte karar. **Otomatik kaydet** ("Kaydediliyor→Kaydedildi
+✓ · eşinizin ekranına da yansır"), **"Eşiniz düzenliyor…"** izi. Son düzenleyenin hali
+kalıcı. `GET/PUT /api/etkinlik/aktif/davetiye-onizleme`. **NOT:** proje SSE/canlı-push
+altyapısı YOK (mevcut push = Web Push bildirimi); bu yüzden polling seçildi. **Aynı hesap
+çoklu cihaz da senkron olur** (uygula-koşulu rol'e göre değil, sadece "daha yeni"ye göre).
+
+**İki karekod tek gönderim (matbaa):** Gönder butonu HER İKİ eşin karekodunu iki ayrı ZIP
+olarak birlikte paylaşır (`navigator.share` çoklu dosya): `{Ad}_davetiye_karekodum_{tema}.zip`
+(Türkçe ASCII'ye çevrilir, matbaada karışmaz). WhatsApp dosya paylaşımı yalnız mobil
+`navigator.share` destekli yerde; masaüstünde iki ZIP iner + WhatsApp Web açılır.
+**İzolasyon ihlali DEĞİL** — KisaKod public link, onaysız kuyruk değil.
+`GET /api/etkinlik/aktif/davetiye-karekodum` → iki KisaKod + iki isim.
+
+**Premium işaretçi ipuçları:** el emojisi yerine markaya uygun pointer (Lucide). Sürükle/
+boyut/renk için üç ipucu; tema-duyarlı renk (her zaman görünür). Her birine bir kez
+dokununca kaybolur (cihaz başına localStorage), "Önizlemeyi sıfırla" geri getirir.
+
+**Diğer:** sarı yanıp sönen önemli uyarı (tek taraf / iki ayrı davetiye), üst bar geri-git
+deseni (AppShell hiyerarşi), yönerge iki yana yaslı.
+
+**Dosyalar** — Backend: `Entities/{PaylasimBaglantisi(+KisaKod), DavetiyeOnizleme}`,
+`Servisler/KisaKodUreteci`, `Uclar/DavetiyeKarekodumUclari`, `Data/{DbContext,SemaKurucu}`.
+Frontend: `app/panel/davetiye-karekodum/page.tsx`, `app/d/[kod]/page.tsx`,
+`lib/{lockup,indir,api}.ts`, `components/site/{AppShell,UserMenu}`. Paketler: `jspdf`,
+`jszip`, `qrcode`.
+
+### ★ ÖDEME (HAVALE) — YAZILDI, CANLIDA ama İNERT `[2026-07-17]`
+Kod canlıda ama `odeme_ayarlari` 0 satır → `OdemeServisi.IndirmeYetkisiVarMiAsync` "açık"
+döner (acil kol: herkes indirir) → **kimseye ödeme gösterilmez.** Hukuki statü (Bölüm 0-B)
+netleşince ayar satırı IBAN+fiyatla oluşturulup açılacak.
+- `Entities/{Odeme, OdemeAyari}`, `Servisler/{OdemeServisi, OdemeSureGorevi, ReferansUreteci}`
+  (BAB-XXXXX referans, karışmayan alfabe), `Uclar/{OdemeUclari, SuperOdemeUclari}`,
+  `KurasyonUclari` paywall guard (402 ODEME_GEREKLI, Aktif=false iken true döner).
+- Havale akışı: MSS + Ön Bilgilendirme (kapsam="odeme"), **cayma hakkı YOK** (6502 m.15 +
+  Yönetmelik 15/1-ğ, anında ifa). `OdemeSureGorevi` (saatlik, süresi_doldu).
+- **KİRİK KOD DERSİ:** ödeme kodu ilk deploy'da derlenmedi — `OnayServisi.ZorunluMetinlerAsync`
+  iki yerde `(kapsam, db, ct)` çağrılmıştı; doğru imza `(db, kapsam, ct)`. Cross-service
+  imzalar tek tek doğrulandı. (Bkz. Ders 22.)
+- **Fiyat önerisi: 2.490₺** (999₺ değil — tek-seferlik miras için düşük). Kesinleşmedi.
+
+### ★ MENÜ İSİMLERİ — KULLANICI-DOSTU `[2026-07-17]`
+Teknolojiyle arası zayıf çift bile anlasın diye (avatar menü + AppShell üst bar tutarlı):
+Defter→**Gelen Dilekler** · Baskı Stüdyosu→**Baskıya Hazır Defter** · Paylaşım→**Dilek
+Bağlantısını Paylaş** · Davetiye Karekodum→**Davetiyene QR Kodu Ekle** · Yönetim→**Ayarlar**.
+Fotoğraflar ve Süper Panel aynen.
 
 ---
 
-### Bu oturumda öğrenilenler (2026-07-11)
+## 3. SIRADAKİ İŞLER
 
-- **VAR-SAY-MA (en pahalı ders, defalarca tekrarlandı).** Kodu/DB'yi OKUMADAN değer
-  varsaymak, tekrar tekrar bug üretti:
-  - Katkı durum değerleri `beklemede`/`onayli`/`red` — ben `onaylandi`/`reddedildi`
-    varsaydım, hiç eşleşmedi, onay/red uyarıları hiç çıkmadı.
-  - `super_admin` kolonu ZATEN vardı (snake_case). Kontrol etmeden ikinci eşleme +
-    PascalCase kolon ekledim → EF yanlış kolonu okudu, süper panel açılmadı.
-  - `email` kolonu snake_case (PostgreSQL ekosistem standardı - Türkçeleştirilmez,
-    PascalCase yapılmaz). SQL'de `"Email"` yazdım, patladı.
-  → **Kural: her alan/kolon/imza için önce grep ile GERÇEK kodu oku, sonra yaz.**
-- **Referansı kopyala, "benzerini" yazma.** Planlama Defteri elimde çalışır haldeyken,
-  onu okumak yerine kendi versiyonumu yazdım → toast yerine banner, tıklama akışında
-  gereksiz ağ isteği, 5 tur kayıp. Planlama'nın GERÇEK kodunu oku ve deseni kopyala.
-- **Tıklama handler'ında ağ isteği = sürtünme.** Planlama durum kontrolünü tıklama anında
-  yapıyor çünkü HEDEF ROTA DEĞİŞİYOR. Bizde hedef sabit (/panel/etkinlik) → ağ isteğini
-  tıklamaya koymak akışı kırdı (ilk tık yutuluyordu). Navigasyon SENKRON olmalı;
-  durum kontrolü hedef sayfada.
-- **Wrapper bileşenler prop'u ezer.** MarkaKilidi'nin `animasyonlu=false` varsayılanı,
-  Wordmark'ın `true` varsayılanını eziyordu. Sarmalayıcıda prop'u geçir.
-- **Modal → createPortal(document.body).** Avatar menüsünün stacking context'i modalı
-  gizliyordu (açılıyor ama görünmüyor).
-- **min-w-0 zinciri.** Grid/flex çocuklarında `min-width:auto` varsayılanı, uzun URL'in
-  `truncate`'ini kırıp konteyneri genişletiyor → mobilde yatay taşma. Kart + kutu + buton
-  satırına `min-w-0`, butona `shrink-0`.
-- **Kullanıcıya görünen metin TÜRKÇE, identifier ASCII.** Push metinlerini ve hata
-  mesajlarını ASCII yazdım (kural: identifier'lar ASCII, string/UI metinleri Türkçe).
-- **Expand-Archive yapılmadan git "nothing to commit" der.** Zip açılmadıysa dosya değişmez.
+### ▶ AŞAMA 2 — DEFTER KÜNYESİ `[SIRADA — önerilen bir sonraki iş]`
+Aşama 1'in lockup altyapısı doğrudan taşınır. Defterin ilk ve son iç sayfasına gömülü
+marka künyesi:
+- Lockup: wordmark + "Senden Bize Kalan" + yaldız çizgi + karekod. "Anı" yaldız tonda.
+- Karekodun TAM ALTINA domain: **www.bianibirak.com** ("Senden Bize Kalan" font/yapısıyla,
+  www./.com sarması wordmark'ı sarmaz — düz yazı). Karekod marka adresine gider.
+- **Otomatik tema kancası CANLI kurulacak** — defter sayfa fon rengine göre açık/koyu
+  lockup kendiliğinden. (Kişiselleştirme gelince gerçek fon okunur; gelene kadar açık.)
+- **Flatten ile çıkarılamaz gömme** — kapak/sayfa kompozisyonuna piksellere kaynar,
+  ayrı katman/annotation değil. Dürüst sınır: normal kullanıcı çıkaramaz ama "mutlak
+  imkansız" değil (hiçbir dijital dosya %100 düzenlenemez değildir). KURAL B ile çelişmez.
+- **DefterDerleyici'ye cerrahi entegrasyon** (paralel yapı YASAK). Şimdilik yalnız açık
+  tema da yeterli olabilir ama otomatik tema kancası tercih edildi (enterprise).
+- **DOMAIN:** www.bianibirak.com satın alınacak (birkaç güne). Kısa link tabanı gelince
+  otomatik döner (request/origin tabanlı).
 
-## 6. KALICI MİMARİ HATIRLATMALAR (instruction'dan, sık dokunulan)
+### ▶ AŞAMA 3 — DIŞ KAPAKLAR `[Aşama 2 sonrası — en büyük iş]`
+Fotoğraf albümü gibi kalın materyal ön + arka dış kapak (defter iç sayfasından ayrı):
+- **Kapak fotoğrafı: EŞLER SEÇER, akıllı varsayılanla** (ilk sürümde otomatik seçip sonra
+  seçim ekleyebiliriz).
+- **Kapaklar AYRI PDF** (ciltli albüm iş akışı: sırt payı, taşma/wrap farklı).
+- **Sırt (spine): ilk sürümden itibaren enterprise** kurgulanır.
+- **Arka dış kapak = marka anı / künye** (reklam + miras künyesi orada yaşar).
+- Kapak-PDF akışı ve foto seçim detayları Hafta 2 matbaa deneme baskısında netleşir.
 
-- Tenant = etkinlik. Her tenant-scoped sorgu WHERE EtkinlikId=@aktif.
-- Çift-link izolasyonu: bir eş diğerinin onaysız kuyruğunu göremez (wedge kalbi).
-- Süreli yaşam döngüsü: açılış/etkinlik/kapanış; kapanışta yazım kapanır, export açılır.
-- Native: dijital = IAP zorunlu; fiziksel baskı = harici ödeme (komisyon yok).
-- Web-öncelikli PWA, native sonra (additive).
-- Idempotent + filtreli migration; tek-seferlik veri taşıma Program.cs'e YAZILMAZ.
-- Hardcoded YASAK - tenant/etkinlik ayarından çek.
-- ASCII-safe identifier; Türkçe yalnız yorum/UI/string.
-- Deploy öncesi lokal build zorunlu (backend dotnet build + frontend npm run build).
-- Push sonrası knowledge SYNC hatırlat.
+### ▶ TUR D — ÖDEME AKTİVASYONU `[hukuki statü netleşince — Bölüm 0-B]`
+Kod hazır (havale, inert). Statü + hukukçu + mali müşavir sonrası:
+1. `odeme_ayarlari` satırı (IBAN + fiyat + Aktif=true).
+2. Nihai hedef: **App Store / Google Play IAP** (GVK 20/B vergi istisnası) — ama o da
+   ticari kazanç; statü buna da bakar. Capacitor + IAP (Tur G).
+3. İleride iyzico/PayTR (web ödeme) — sağlayıcı karşılaştırması sunulacak.
+> **Native kırmızı çizgi:** dijital erişim = IAP zorunlu; fiziksel baskı = harici ödeme
+> (komisyon yok). Ayrım modelde baştan kurulu.
+
+### İŞ / ÖLÇÜM PLANI `[referans — 2026-07-16 danışmanlık]`
+- **8 Türkçe rakip** (Anı Topla, OrtakAlan, DüğünAnılarımız, Anıdepola, Düğün Galeri,
+  Storpix, Guestories, Fotify) — hepsi TOPLAYICI, hiçbiri kürasyon/baskı yapmıyor =
+  **gerçek fark**. Pazar ~552.237 çift/yıl (TÜİK).
+- **5 zayıflık:** tek-seferlik satış (LTV=fiyat), DAĞITIM (plan yok — en büyük risk),
+  mevsimsellik, geç satın-alma anı, hukuki statü. Zarar riski düşük (37 gün imha, başabaş
+  ~15 satış/yıl). **3 ürün = 3 yarım ürün UYARISI** (odak şart).
+- **Ölçüm — 3 gerçek düğün:** 2 arkadaş (Ağustos) + Musa'nın kendi düğünü (1 Eylül).
+  Ödeme AÇILMAYACAK (hediye + hukuk). Ölç: tarama → katkı → "ben de istiyorum" tık →
+  hesap açma. K-faktörü ölçülmeli. **PENDING (Musa):** arkadaş düğünleri hangi hafta.
+- **E-POSTA TOPLANMAYACAK** — İYS/MERSİS zorunlu (6563 sayılı kanun; şirketsiz ticari
+  ileti gönderilemez, ceza 15.000₺/ileti). Yerine anonim tık + hesap açtırma.
+
+### TUR E/F/G — BÜYÜME / KİŞİSELLEŞTİRME / GELECEK
+- E: **paylaşılabilir önizleme linki** (her defter satış kanalı), SEO/satış sayfaları.
+- F: 8 tema × 5 kâğıt × 5 çerçeve × 4 kapak, "Tasarım" sekmesi, 3B kitap görünümü.
+- G: slayt + AI kürasyon, fiziksel baskı (matbaa ortağı), Capacitor+IAP, süper alarmlar,
+  B2B2C (`Etkinlik.UstOrganizatorId` nullable, additive — bugünkü B2C bozulmaz).
+
+### ⚠ SON ADIM — KAYNAK ÇÖZÜNÜRLÜĞÜ + HUKUKİ STATÜ
+→ **Bölüm 0.** İkisi de karar bekliyor. **ISRARLA HATIRLAT.**
+
+---
+
+## 4. PAHALI ÖĞRENİLEN DERSLER
+
+1. **`ExecuteSqlRaw` `String.Format` uygular** — DDL için raw ADO.NET (`SemaKurucu`).
+2. **Container'da sistem fontu YOK** — QuestPDF TTF ister (`Varliklar/Fontlar/`).
+3. **Minimal API `IFormFile` olmayanı QUERY'den bind eder** — boyut server-side ölçülür.
+4. **Tailwind opacity-modifier CSS-değişkenli renkte GEÇERSİZ** → `rgba`/`box-shadow`.
+5. **`blob:` URL kırılgan** (service worker) → `data:` URL.
+6. **`object-cover` kırpar** — kutu oranı = foto oranı.
+7. **CSS grid item default `min-width:auto`** — `min-w-0` zinciri şart.
+8. **iframe `X-Frame-Options: DENY`** — header doğru, mimariyi düzelt.
+9. **Brace/paren denge kontrolü comment+string+char literal STRIP etmeli** — proper tokenizer.
+10. **Süper admin eylemleri çiftin denetiminde GÖRÜNMEMELİ** — `SistemEylemi` yaz-sabit+oku-filtre.
+11. **Zaman modeli tek kanon** — user-configurable pencere çizelgeyi yalancı yapar.
+12. **İmhada dosyalar EN SON** (DB commit sonrası), denetim de silinir (PII-free kayıt).
+13. **Hash tek başına ANLAMSIZ** — metin de arşivlenmeli.
+14. **Idempotent seed'de ERKEN RETURN geriye dönük onarımı ATLAR** — onarım her zaman çalışmalı.
+15. **`docker exec` servis adı `bianibirak-postgres`** (bare `postgres` çalışmaz).
+16. **Filigran kilit değil** — çözünürlük.
+17. **QuestPDF `GenerateImages` ~30MB/çağrı** → önbellek zorunlu, deploy sonrası gözle doğrula.
+18. **QuestPDF görüntüleri YENİDEN SIKIŞTIRIR** → `UseOriginalImage()`.
+19. **`Scale()` margin'e dokunmaz** — margin'i de ölçekle.
+20. **PDF yazıcı kâğıt boyutunu ZORLAYAMAZ** — PDF'in kendi sayfa boyutu tek kontrol.
+21. **VAR-SAY-MA** — her düzeltme kanıta dayanmalı (gerçek dosya/kolon/spec).
+22. **Kod "build geçti" kaydı YANLIŞ olabilir** — ödeme kodu hiç derlenmemişti
+    (`ZorunluMetinlerAsync` arg sırası). Cross-service çağrıları imzalarıyla tek tek eşleştir. `[2026-07-17]`
+23. **`package.json` değişince `package-lock.json` da commit'lenmeli** — sunucu `npm ci`
+    lock senkron ister, yoksa build patlar (jspdf/jszip eklerken yandı). `[2026-07-17]`
+24. **`docker compose up -d --build` çalışan container'ı OTOMATİK yenilemeyebilir** — image
+    build olur ama eski container koşmaya devam eder ("Up 15 hours"). `--force-recreate` gerekir. `[2026-07-17]`
+25. **Tarayıcı indirmede `(1).zip` ekler** — Musa yanlış (eski) zip'i açıp durabilir; komutta
+    en son indirileni teyit ettir. `[2026-07-17]`
+26. **SVG `<text>` matbaada font-fallback'e düşer** (Inter yoksa) — sabit metinleri offline
+    outline path'e çevir (fonttools). Raster'lar canvas fillText ile zaten font-gömülü. `[2026-07-17]`
+27. **SVG `<img>` ile rasterize edilince belge fontuna erişemez** (font-sandbox) — canvas
+    `fillText` belge fontunu kullanır; raster üretimi canvas primitifleriyle yapılmalı. `[2026-07-17]`
+28. **Küçük baskıda QR okunurluğu = KISA LİNK** (az veri = iri modül). Error-correction değil,
+    link uzunluğu belirleyici. `[2026-07-17]`
+29. **`navigator.share` dosya paylaşımı yalnız mobilde güvenilir** — masaüstünde `canShare({files})`
+    çoğu tarayıcıda false; fallback indir + WhatsApp Web. `[2026-07-17]`
+30. **localStorage GERÇEK uygulamada serbest** — yasak yalnız Claude.ai artifact'lerinde;
+    bu Next.js app'i, kalıcılık için localStorage/DB kullanılır. `[2026-07-17]`
+31. **Aynı hesap çoklu cihaz senkronu** — uygula-koşulu `sonDuzenleyen != rol`'e bağlanırsa
+    aynı kullanıcının iki cihazı senkron OLMAZ; koşul sadece "daha yeni sürüm" olmalı,
+    rol yalnız "eşiniz düzenliyor" ibaresi için. `[2026-07-17]`
+
+---
+
+## 5. MİMARİ SABİTLER (hatırlatma)
+
+- **TENANT = ETKİNLİK.** Her tenant-scoped tabloda `EtkinlikId`.
+- **Çift-link birleşim-öncesi izolasyon** — wedge, asla ihlal edilmez. (KisaKod public link;
+  matbaaya iki karekod göndermek bu izolasyona aykırı değildir.)
+- **Süreli yaşam döngüsü** — pencere kontrolü backend'de.
+- **Erişim satışı ≠ fiziksel ürün** — native'de IAP ayrımı.
+- **Web-öncelikli PWA**, native sonra.
+- **Append-only audit** — `denetim_gunlukleri`; ayrı audit tablosu YOK.
+- **Defense in depth** — kritik sınırlarda en az 2 katman.
+- **Hardcoded değer YASAK** — tenant/etkinlik ayarlarından çek.
+- **Paralel yapı YASAK** — mevcuda entegre. (PDF TEK kaynak: `DefterDerleyici`. Lockup TEK
+  kaynak: `lib/lockup.ts` frontend; defter künyesi backend'de aynı tasarım tokenlarıyla.)
+- **Migration idempotent + filtreli.**
+
+---
+
+## 6. ALTYAPI
+
+- VPS `46.225.101.248` (Ubuntu 24), SSH `bianibirak-prod`, repo `/opt/bianibirak`
+- Servisler: `bianibirak-frontend`, `bianibirak-backend`, `bianibirak-postgres`
+- Postgres: user `bianibirakuser`, db `bianibirak`
+- Medya: volume `bianibirak_medya:/veri/medya`
+- Paylaşımlı Caddy: `/api/*` → backend:8080, else → frontend:3000
+- Deploy: `cd /opt/bianibirak && git pull && docker compose -f docker-compose.production.yml up -d --build <servis>`
+  — **container yenilenmezse `--force-recreate` ekle** (Ders 24).
+- Lokal: `C:\Projeler\bianibirak` (yazılır); indirmeler `C:\Users\Win10\Downloads`.
+- **Push sonrası: project knowledge SYNC gerekir** (otomatik değil).
+- **Deploy öncesi lokal build ZORUNLU** (frontend `npm run build`, backend `dotnet build`).
+  Backend build = Musa'nın gate'i (Claude container'ında .NET SDK yok).
+
+---
+
+## 7. AÇIK KONULAR
+
+1. **Hukuki statü (memur ticaret yasağı)** → Bölüm 0-B. Ödemenin ön şartı. Hukukçu + mali
+   müşavir. **HER OTURUMDA HATIRLAT.**
+2. **Kaynak çözünürlüğü 2400px?** → Bölüm 0-A. Deneme baskısı karşılaştırması.
+3. **Domain www.bianibirak.com** — satın alınacak (Aşama 2 künye + kısa link için).
+4. **Fiyat** — öneri 2.490₺, kesinleşmedi.
+5. **Arkadaş düğünleri hangi hafta** — ölçüm takvimi (Ağustos).
+6. **Aşama 2 açık nokta:** defter künyesinde şimdilik yalnız açık tema mı, otomatik tema mı
+   (KARAR: otomatik tema kancası kurulacak).
+7. **Aşama 3 açık noktalar:** kapak-PDF akışı + foto seçim → Hafta 2 matbaa deneme baskısı.
+8. **QuestPDF Linux render doğrulaması** — önizleme/PDF birebir mi (gözle).
+9. **Ödeme sağlayıcısı** (iyzico vs PayTR) — web ödeme gerekirse; asıl hedef IAP.
