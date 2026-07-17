@@ -24,7 +24,7 @@ export const FORMATLAR: { kod: Format; ad: string; aciklama: string }[] = [
 ];
 
 // Yuksek olcek: kucuk lockup'i buyuk raster'a cikar (matbaa/net baski).
-const RASTER_OLCEK = 6;
+const RASTER_OLCEK = 8;
 
 // Tek formatin blob'unu uretir (ZIP + tekil indirme paylasir).
 async function formatBlob(
@@ -75,7 +75,7 @@ export async function tumFormatlarZipBlob(
   for (const f of FORMATLAR) {
     const blob = await formatBlob(secenek, f.kod);
     // Matbaaya yonlendirici: yalniz WEBP "(onerilen)" etiketiyle (seffaf + kucuk + net).
-    const ek = f.kod === "webp" ? " (önerilen)" : "";
+    const ek = f.kod === "svg" ? " (önerilen)" : "";
     zip.file(`${dosyaAdi}${ek}.${f.kod}`, blob);
   }
   const paket = await zip.generateAsync({ type: "blob" });
