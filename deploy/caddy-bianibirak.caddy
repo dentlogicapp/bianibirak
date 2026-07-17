@@ -1,10 +1,12 @@
-# BiAniBirak - paylasilan notlar_caddy'ye eklenen site blogu (DOKUMAN/REFERANS).
+﻿# BiAniBirak - paylasilan notlar_caddy'ye eklenen site bloklari (DOKUMAN/REFERANS).
 # Gercek dosya: /opt/notlar/deploy/Caddyfile (Notlar ile paylasilir).
-# 0B: handle /api/* -> bianibirak-backend:8080 (ayni-origin /api, host-scoped cerez).
-#     handle       -> bianibirak-frontend:3000
-# CSP degismedi (connect-src 'self' ayni-origin /api'yi kapsar).
+#
+# TASIMA (B1): app artik www.bianibirak.com'da yayinlanir.
+#   - www.bianibirak.com  -> ana (reverse proxy; ayni-origin /api, host-scoped cerez)
+#   - bianibirak.com      -> www'ye 301
+#   - bianibirak.dentlogicapp.com -> www'ye 301 (basili QR/davet linkleri /d/{kod}, /k/{token} calisir)
 
-bianibirak.dentlogicapp.com {
+www.bianibirak.com {
     encode gzip zstd
     handle /api/* {
         reverse_proxy bianibirak-backend:8080
@@ -21,4 +23,12 @@ bianibirak.dentlogicapp.com {
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
         -Server
     }
+}
+
+bianibirak.com {
+    redir https://www.bianibirak.com{uri} permanent
+}
+
+bianibirak.dentlogicapp.com {
+    redir https://www.bianibirak.com{uri} permanent
 }
