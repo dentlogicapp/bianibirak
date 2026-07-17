@@ -29,6 +29,7 @@ export function DilekInceleme({
   yukleniyor,
   onOnayla,
   onReddet,
+  onCopeTasi,
   onKapat,
 }: {
   katki: Katki;
@@ -37,6 +38,7 @@ export function DilekInceleme({
   yukleniyor: boolean;
   onOnayla?: () => void;
   onReddet?: () => void;
+  onCopeTasi?: () => void;
   onKapat: () => void;
 }) {
   useEffect(() => {
@@ -200,6 +202,27 @@ export function DilekInceleme({
                   {yukleniyor ? "..." : "Deftere ekle"}
                 </button>
               </div>
+            </>
+          ) : onaylanmis && onCopeTasi ? (
+            <>
+              <button
+                type="button"
+                onClick={onKapat}
+                className="flex-1 rounded-full border border-ayrac px-5 py-2.5 font-govde text-sm text-ikincil transition-colors hover:border-murekkep hover:text-murekkep"
+              >
+                Kapat
+              </button>
+              <button
+                type="button"
+                onClick={onCopeTasi}
+                disabled={yukleniyor}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-sarap/40 px-5 py-2.5 font-govde text-sm text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-60"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                  <path d="M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M6.5 7l.7 12a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-12" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
+                Çöpe Taşı
+              </button>
             </>
           ) : (
             <button

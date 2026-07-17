@@ -705,6 +705,8 @@ export const api = {
     istek<{ durum: string }>(`/api/katki/${id}/geri-al`, { method: "POST" }),
   copKaliciSil: (id: string) =>
     istek<{ silindi: boolean }>(`/api/katki/${id}/kalici-sil`, { method: "POST" }),
+  copeat: (id: string) =>
+    istek<{ copeAtildi: boolean }>(`/api/katki/${id}/copeat`, { method: "POST" }),
 
   // --- Push (Asama 10-A; cihaz kaydi + sessiz saat) ---
   pushAnahtar: () => istek<{ anahtar: string }>("/api/push/anahtar"),

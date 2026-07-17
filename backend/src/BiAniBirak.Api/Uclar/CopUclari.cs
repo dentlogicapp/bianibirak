@@ -33,6 +33,7 @@ public static class CopUclari
         app.MapGet("/api/etkinlik/aktif/cop", CopListe).RequireAuthorization();
         app.MapPost("/api/katki/{id}/geri-al", GeriAl).RequireAuthorization();
         app.MapPost("/api/katki/{id}/kalici-sil", KaliciSil).RequireAuthorization();
+        app.MapPost("/api/katki/{id}/copeat", CopeAt).RequireAuthorization();
     }
 
     private static bool KullaniciKimligi(HttpContext ctx, out Guid id)
@@ -177,5 +178,48 @@ public static class CopUclari
         foreach (var a in anahtarlar) depo.Sil(a);
 
         return Results.Ok(new { silindi = true });
+    }
+
+    // ---- COPE AT (ONAYLI dilegi cope tasi - karar degistirme) ----
+    // Cift, ortak deftere eklenmis bir dilegi sonradan cope tasiyabilir. Onaylanmis dilek
+    // -> Durum="red" + SilindiMi=true (ciftin cop kutusuna duser). Geri alinirsa beklemedeye
+    // doner (yeniden karar). Bekleyen dilek buradan degil /reddet'ten cope gider.
+    private static async Task<IResult> CopeAt(
+        string id, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        if (!KullaniciKimligi(ctx, out var kid))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!Guid.TryParse(id, out var katkiId))
+            return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+
+        var katki = await db.Katkilar.FirstOrDefaultAsync(k => k.Id == katkiId && k.EtkinlikId == etkinlikId);
+        if (katki == null) return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");
+        if (katki.KaynakEs != rol) return Hata(403, "ERISIM_YOK", "Bu dilek sizin tarafinizda degil.");
+        if (katki.SilindiMi) return Hata(409, "KATKI_ZATEN_COPTE", "Bu dilek zaten cop kutusunda.");
+        if (katki.Durum != "onayli") return Hata(409, "KATKI_ONAYLI_DEGIL", "Yalnizca onaylanmis dilek buradan cope tasinir.");
+
+        var simdi = DateTimeOffset.UtcNow;
+        katki.Durum = "red";
+        katki.SilindiMi = true;
+        katki.SilinmeZamani = simdi;
+        katki.SilenKullaniciId = kid;
+        katki.UpdatedAt = simdi;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = etkinlikId,
+            KullaniciId = kid,
+            Eylem = "KATKI_ONAYLI_COPE_TASINDI",
+            Varlik = "katkilar",
+            VarlikId = katkiId,
+            DegisenAlanlar = JsonSerializer.Serialize(new { kaynak_es = katki.KaynakEs }),
+            CreatedAt = simdi,
+        });
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new { copeAtildi = true });
     }
 }
