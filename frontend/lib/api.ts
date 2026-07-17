@@ -90,6 +90,16 @@ export type KatkiKarsilama = {
 };
 
 // Katki (moderasyon kuyrugu / defter).
+export type CopDilek = {
+  id: string;
+  davetliAd: string;
+  mesaj: string;
+  tur: string;
+  fotoVar: boolean;
+  silinmeZamani: string | null;
+  kalanGun: number;
+};
+
 export type Katki = {
   id: string;
   kaynak_es: string;
@@ -687,6 +697,14 @@ export const api = {
     istek<{ durum: string }>(`/api/katki/${id}/onayla`, { method: "POST" }),
   katkiReddet: (id: string) =>
     istek<{ durum: string }>(`/api/katki/${id}/reddet`, { method: "POST" }),
+
+  // Cop kutusu (reddedilen dilekler)
+  copListe: () =>
+    istek<{ dilekler: CopDilek[]; copGun: number }>("/api/etkinlik/aktif/cop"),
+  copGeriAl: (id: string) =>
+    istek<{ durum: string }>(`/api/katki/${id}/geri-al`, { method: "POST" }),
+  copKaliciSil: (id: string) =>
+    istek<{ silindi: boolean }>(`/api/katki/${id}/kalici-sil`, { method: "POST" }),
 
   // --- Push (Asama 10-A; cihaz kaydi + sessiz saat) ---
   pushAnahtar: () => istek<{ anahtar: string }>("/api/push/anahtar"),

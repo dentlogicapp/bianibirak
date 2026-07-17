@@ -19,6 +19,7 @@ const HIYERARSI: Record<string, Sayfa> = {
   "/panel/etkinlik": { baslik: "Gelen Dilekler", ebeveyn: null }, // kok
   "/panel/paylasim": { baslik: "Dilek Bağlantısını Paylaş", ebeveyn: "/panel/etkinlik" },
   "/panel/davetiye-karekodum": { baslik: "Davetiyene QR Kodu Ekle", ebeveyn: "/panel/etkinlik" },
+  "/panel/cop": { baslik: "Çöp Kutusu", ebeveyn: "/panel/etkinlik" },
   "/panel/yonetim": { baslik: "Ayarlar", ebeveyn: "/panel/etkinlik" },
   "/panel/kurasyon": { baslik: "Baskıya Hazır Defter", ebeveyn: "/panel/etkinlik" },
   "/panel/fotograflar": { baslik: "Fotoğraflar", ebeveyn: "/panel/etkinlik" },

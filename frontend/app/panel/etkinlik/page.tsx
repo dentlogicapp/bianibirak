@@ -38,6 +38,7 @@ function DefterIcerik() {
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
   const [islenen, setIslenen] = useState<string | null>(null);
   const [inceleme, setInceleme] = useState<Katki | null>(null);
+  const [redHedef, setRedHedef] = useState<Katki | null>(null);
 
   const odakId = arama.get("focus");
 
@@ -114,7 +115,7 @@ function DefterIcerik() {
       setDefter((o) => [{ ...k, durum: "onayli" }, ...o]);
       toast.success("Dilek onaylandı ve ortak deftere eklendi.");
     } else {
-      toast("Dilek reddedildi. Ortak deftere eklenmedi.");
+      toast("Dilek çöp kutusuna taşındı. 30 gün içinde geri alabilirsin.");
     }
   }
 
@@ -162,7 +163,7 @@ function DefterIcerik() {
         <h2 className="font-display text-lg text-murekkep">Onay Bekleyen Dilekler</h2>
         <p className="metin-yasli mt-2 font-govde text-sm leading-relaxed text-ikincil">
           Yalnız senin bağlantından gelen dilekler burada. Onayladıkların ortak deftere eklenir;
-          reddettiklerin gizli kalır.
+          reddettiklerin çöp kutusuna taşınır (30 gün içinde geri alınabilir).
         </p>
 
         {kuyruk.length === 0 ? (
@@ -229,7 +230,7 @@ function DefterIcerik() {
                     {islenen === k.id ? "..." : "Onayla"}
                   </button>
                   <button
-                    onClick={() => islem(k, false)}
+                    onClick={() => setRedHedef(k)}
                     disabled={islenen === k.id}
                     className="rounded-full border border-ayrac px-5 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-60"
                   >
@@ -299,16 +300,77 @@ function DefterIcerik() {
           katki={inceleme}
           yukleniyor={islenen === inceleme.id}
           onOnayla={() => islem(inceleme, true)}
-          onReddet={() => islem(inceleme, false)}
+          onReddet={() => { const k = inceleme; setInceleme(null); setRedHedef(k); }}
           onKapat={() => setInceleme(null)}
+        />
+      )}
+
+      {/* RED UYARI - yanlis reddi onle (Notlar SilDialog deseni): icerik onizleme + uyari */}
+      {redHedef && (
+        <RedUyariModal
+          katki={redHedef}
+          yukleniyor={islenen === redHedef.id}
+          onOnayla={() => { const k = redHedef; islem(k, false); setRedHedef(null); }}
+          onKapat={() => setRedHedef(null)}
         />
       )}
     </AppShell>
   );
 }
 
-function turEtiketi(tur: string): string {
-  if (tur === "dugun") return "Düğün";
+// Red uyari modali - yanlis reddi onler. Icerik onizleme + "cop kutusuna tasinacak" uyarisi.
+function RedUyariModal({ katki, yukleniyor, onOnayla, onKapat }: {
+  katki: Katki; yukleniyor: boolean; onOnayla: () => void; onKapat: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onKapat}>
+      <div className="w-full max-w-md rounded-3xl border border-ayrac bg-yuzey p-6" onClick={(e) => e.stopPropagation()}>
+        <p className="font-display text-lg text-murekkep">Bu dileği reddet</p>
+
+        {/* Uyari blogu */}
+        <div className="mt-3 rounded-r-xl border-l-4 border-amber-400 bg-amber-500/10 px-4 py-3">
+          <p className="font-govde text-sm leading-relaxed text-murekkep">
+            Bu dilek <span className="font-semibold">çöp kutusuna</span> taşınacak ve ortak deftere eklenmeyecek.
+            İstersen <span className="font-semibold">Çöp Kutusu</span> sayfasından geri alabilirsin;
+            30 gün sonra otomatik olarak kalıcı silinir.
+          </p>
+        </div>
+
+        {/* Icerik onizleme - yanlis dilegi reddetme */}
+        <div className="mt-3 rounded-xl border border-ayrac bg-parsomen px-4 py-3">
+          <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            {katki.davetli_ad}{katki.davetli_iliski ? ` · ${katki.davetli_iliski}` : ""}
+          </p>
+          <p className="metin-yasli mt-1.5 line-clamp-3 whitespace-pre-wrap font-govde text-sm leading-relaxed text-murekkep">
+            {katki.mesaj}
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            onClick={onKapat}
+            disabled={yukleniyor}
+            className="rounded-full border border-ayrac px-5 py-2.5 font-govde text-sm text-ikincil transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
+          >
+            İptal
+          </button>
+          <button
+            onClick={onOnayla}
+            disabled={yukleniyor}
+            className="flex items-center justify-center gap-1.5 rounded-full bg-sarap px-5 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-60"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path d="M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M6.5 7l.7 12a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-12" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+            {yukleniyor ? "..." : "Reddet ve Çöpe Taşı"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function turEtiketi(tur: string): string {  if (tur === "dugun") return "Düğün";
   if (tur === "nisan") return "Nişan";
   if (tur === "nikah") return "Nikah";
   return tur;
