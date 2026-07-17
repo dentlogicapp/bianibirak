@@ -16,11 +16,11 @@ import { useSwOdakDinleyici } from "@/lib/odak";
 type Sayfa = { baslik: string; ebeveyn: string | null };
 
 const HIYERARSI: Record<string, Sayfa> = {
-  "/panel/etkinlik": { baslik: "Defter", ebeveyn: null }, // kok
-  "/panel/paylasim": { baslik: "Paylaşım", ebeveyn: "/panel/etkinlik" },
-  "/panel/davetiye-karekodum": { baslik: "Davetiye Karekodum", ebeveyn: "/panel/etkinlik" },
-  "/panel/yonetim": { baslik: "Yönetim", ebeveyn: "/panel/etkinlik" },
-  "/panel/kurasyon": { baslik: "Baskı Stüdyosu", ebeveyn: "/panel/etkinlik" },
+  "/panel/etkinlik": { baslik: "Gelen Dilekler", ebeveyn: null }, // kok
+  "/panel/paylasim": { baslik: "Dilek Bağlantısını Paylaş", ebeveyn: "/panel/etkinlik" },
+  "/panel/davetiye-karekodum": { baslik: "Davetiyene QR Kodu Ekle", ebeveyn: "/panel/etkinlik" },
+  "/panel/yonetim": { baslik: "Ayarlar", ebeveyn: "/panel/etkinlik" },
+  "/panel/kurasyon": { baslik: "Baskıya Hazır Defter", ebeveyn: "/panel/etkinlik" },
   "/panel/fotograflar": { baslik: "Fotoğraflar", ebeveyn: "/panel/etkinlik" },
   "/panel/duzenle": { baslik: "Etkinlik & Görünüm", ebeveyn: "/panel/yonetim" },
   "/panel/denetim": { baslik: "Denetim Günlüğü", ebeveyn: "/panel/yonetim" },
@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }`}
         >
           {kokte ? (
-            <Link href="/panel/etkinlik" aria-label="Defter" className="min-w-0">
+            <Link href="/panel/etkinlik" aria-label="Gelen Dilekler" className="min-w-0">
               <span
                 className={`block transition-all duration-200 ${
                   kayan ? "scale-90 origin-left" : ""

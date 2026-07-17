@@ -203,7 +203,7 @@ export function UserMenu() {
                 <path d="M8 8h6M8 11h6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
               </>
             }>
-              Defter
+              Gelen Dilekler
             </MenuLink>
 
             <MenuLink href="/panel/kurasyon" onClick={() => setAcik(false)} ikon={
@@ -212,7 +212,7 @@ export function UserMenu() {
                 <path d="m11 9 1 2.2 2.2 1-2.2 1L11 15.4 10 13.2 7.8 12.2 10 11.2 11 9Z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" fill="none" />
               </>
             }>
-              Baskı Stüdyosu
+              Baskıya Hazır Defter
             </MenuLink>
 
             <MenuLink href="/panel/fotograflar" onClick={() => setAcik(false)} ikon={
@@ -232,7 +232,7 @@ export function UserMenu() {
                 <path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
               </>
             }>
-              Paylaşım
+              Dilek Bağlantısını Paylaş
             </MenuLink>
 
             <MenuLink href="/panel/davetiye-karekodum" onClick={() => setAcik(false)} ikon={
@@ -243,13 +243,13 @@ export function UserMenu() {
                 <path d="M14 14h3v3M20 14v.01M14 20h.01M20 17v3h-3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
               </>
             }>
-              Davetiye Karekodum
+              Davetiyene QR Kodu Ekle
             </MenuLink>
 
             <MenuLink href="/panel/yonetim" onClick={() => setAcik(false)} ikon={
               <path d="M12 3.5 5 6.2v5c0 4.2 2.9 8.1 7 9.3 4.1-1.2 7-5.1 7-9.3v-5L12 3.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
             }>
-              Yönetim
+              Ayarlar
             </MenuLink>
 
             {/* Super Panel - yalniz sistem yoneticisi gorur (yaldiz vurgu) */}
