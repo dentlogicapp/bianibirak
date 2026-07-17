@@ -20,6 +20,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<EtkinlikUyeligi> EtkinlikUyelikleri => Set<EtkinlikUyeligi>();
     public DbSet<UyeDaveti> UyeDavetleri => Set<UyeDaveti>();
     public DbSet<PaylasimBaglantisi> PaylasimBaglantilari => Set<PaylasimBaglantisi>();
+    public DbSet<DavetiyeOnizleme> DavetiyeOnizlemeleri => Set<DavetiyeOnizleme>();
     public DbSet<EtkinlikAyari> EtkinlikAyarlari => Set<EtkinlikAyari>();
     public DbSet<Katki> Katkilar => Set<Katki>();
     public DbSet<KatkiMedyasi> KatkiMedyalari => Set<KatkiMedyasi>();
@@ -170,7 +171,20 @@ public class BiAniBirakDbContext : DbContext
             e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
         });
 
-        // ---- etkinlik_ayarlari (hardcoded yasak; bire-bir etkinlik) ----
+        // ---- davetiye_onizleme (cift paylasimli onizleme; etkinlik basina tek satir) ----
+        model.Entity<DavetiyeOnizleme>(e =>
+        {
+            e.ToTable("davetiye_onizleme");
+            e.HasKey(x => x.EtkinlikId);
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Zemin).HasColumnName("Zemin").IsRequired();
+            e.Property(x => x.Olcek).HasColumnName("Olcek");
+            e.Property(x => x.PosX).HasColumnName("PosX");
+            e.Property(x => x.PosY).HasColumnName("PosY");
+            e.Property(x => x.SonDuzenleyen).HasColumnName("SonDuzenleyen");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasOne<Etkinlik>().WithMany().HasForeignKey(x => x.EtkinlikId);
+        });
         model.Entity<EtkinlikAyari>(e =>
         {
             e.ToTable("etkinlik_ayarlari");

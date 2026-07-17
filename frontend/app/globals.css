@@ -463,3 +463,39 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
     display: none;
   }
 }
+
+/* ============ DAVETIYE KAREKODUM - kullanici yonlendirme ipuclari ============
+   El emojisi yerine markaya uygun ince isaretci. Kullanici bir kez dokununca durur
+   (sifirlamaya kadar). Amac: "burayi hareket ettirebilir / boyutlandirabilirsin"
+   hissini sakin ve premium sekilde vermek. */
+
+.karekod-ipucu {
+  pointer-events: none;
+  filter: drop-shadow(0 2px 6px rgba(33, 26, 23, 0.35));
+}
+
+@keyframes ipucu-suruk {
+  0%, 100% { transform: translate(-9px, -2px) rotate(-4deg); }
+  50%      { transform: translate(9px, 5px) rotate(2deg); }
+}
+@keyframes ipucu-kaydir {
+  0%, 100% { transform: translateX(-11px); }
+  50%      { transform: translateX(11px); }
+}
+@keyframes ipucu-dokun {
+  0%, 100% { transform: scale(1); opacity: 0.95; }
+  50%      { transform: scale(0.82); opacity: 0.7; }
+}
+@keyframes ipucu-halka {
+  0%   { transform: scale(0.5); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.ipucu-suruk  { animation: ipucu-suruk 2.2s ease-in-out infinite; }
+.ipucu-kaydir { animation: ipucu-kaydir 1.9s ease-in-out infinite; }
+.ipucu-dokun  { animation: ipucu-dokun 1.7s ease-in-out infinite; }
+.ipucu-halka  { animation: ipucu-halka 1.7s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ipucu-suruk, .ipucu-kaydir, .ipucu-dokun, .ipucu-halka { animation: none; }
+}

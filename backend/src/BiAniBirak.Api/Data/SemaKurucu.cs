@@ -92,6 +92,18 @@ public static class SemaKurucu
         CREATE UNIQUE INDEX IF NOT EXISTS ux_paylasim_baglantilari_kisakod
             ON paylasim_baglantilari ("KisaKod") WHERE "KisaKod" IS NOT NULL;
 
+        -- DAVETIYE ONIZLEME: ciftin paylastigi karekod onizleme durumu (etkinlik basina
+        -- tek satir). Iki es ayni onizlemeyi duzenler; son duzenleyenin hali kalir.
+        CREATE TABLE IF NOT EXISTS davetiye_onizleme (
+            "EtkinlikId" uuid PRIMARY KEY REFERENCES etkinlikler ("Id"),
+            "Zemin" text NOT NULL DEFAULT '#525151',
+            "Olcek" integer NOT NULL DEFAULT 35,
+            "PosX" double precision NOT NULL DEFAULT 50,
+            "PosY" double precision NOT NULL DEFAULT 100,
+            "SonDuzenleyen" text NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+
         CREATE TABLE IF NOT EXISTS etkinlik_ayarlari (
             "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
             "EtkinlikId" uuid NOT NULL REFERENCES etkinlikler ("Id"),

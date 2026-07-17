@@ -1217,3 +1217,55 @@ export async function kisaKodCoz(kod: string): Promise<string | null> {
     return null;
   }
 }
+
+
+/* ===================== DAVETIYE KAREKODUM (genisletilmis) =====================
+ * Her iki esin kisa kodu + isimleri (matbaaya iki ZIP) + paylasimli onizleme.
+ */
+
+export type KarekodTaraf = { es: string; kisaKod: string; ad: string };
+export type Karekodlarim = { es: string; benim: KarekodTaraf; esin: KarekodTaraf };
+
+export async function karekodlarim(): Promise<Karekodlarim | null> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/davetiye-karekodum", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as Karekodlarim;
+  } catch {
+    return null;
+  }
+}
+
+export type Onizleme = {
+  zemin: string | null;
+  olcek: number;
+  posX: number;
+  posY: number;
+  sonDuzenleyen: string | null;
+  guncellenme: string | null;
+};
+
+export async function onizlemeGetir(): Promise<Onizleme | null> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/davetiye-onizleme", { credentials: "include" });
+    if (!y.ok) return null;
+    return (await y.json()) as Onizleme;
+  } catch {
+    return null;
+  }
+}
+
+export async function onizlemeKaydet(g: { zemin: string; olcek: number; posX: number; posY: number }): Promise<Onizleme | null> {
+  try {
+    const y = await fetch("/api/etkinlik/aktif/davetiye-onizleme", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Zemin: g.zemin, Olcek: g.olcek, PosX: g.posX, PosY: g.posY }),
+    });
+    if (!y.ok) return null;
+    return (await y.json()) as Onizleme;
+  } catch {
+    return null;
+  }
+}
