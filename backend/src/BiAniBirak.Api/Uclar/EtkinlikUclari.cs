@@ -685,6 +685,15 @@ public static class EtkinlikUclari
         katki.OnayZamani = simdi;
         katki.UpdatedAt = simdi;
 
+        // RED = COP KUTUSUNA TASI (SuperUclari.KatkiKaldir + Notlar deseniyle birebir).
+        // Cop = SilindiMi. 30 gun sayaci = SilinmeZamani. Geri al bunlari temizler.
+        if (yeniDurum == "red")
+        {
+            katki.SilindiMi = true;
+            katki.SilinmeZamani = simdi;
+            katki.SilenKullaniciId = kullaniciId;
+        }
+
         db.DenetimGunlukleri.Add(new DenetimGunlugu
         {
             Id = Guid.NewGuid(),

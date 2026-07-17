@@ -44,6 +44,7 @@ builder.Services.AddHostedService<HatirlatmaGorevi>();
 // ODEME SURE GOREVI: bekleyen odemenin gecerliligi dolunca "suresi_doldu"ya ceker.
 // Olu kayitlar birikmesin, cift eski fiyatla odemeye kalkmasin.
 builder.Services.AddHostedService<OdemeSureGorevi>();
+builder.Services.AddHostedService<CopTemizlemeGorevi>();
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
 
@@ -170,6 +171,7 @@ app.GorselUclariniEkle();
 app.DavetiyeKarekodumUclariniEkle(); // Davetiye karekodu: ciftin kendi kisa kodu + /d/{kod} cozumleme
 app.OdemeUclariniEkle();         // Odeme: durum, MSS/On Bilgilendirme, baslat, "havalemi yaptim"
 app.SuperOdemeUclariniEkle();    // Super: odeme onayla/reddet, IBAN+fiyat ayarlari
+app.CopUclariniEkle();           // Cop kutusu: reddedilen dilekler, geri al, kalici sil
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new
