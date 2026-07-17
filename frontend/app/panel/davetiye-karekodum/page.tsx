@@ -39,9 +39,10 @@ function asciiAd(s: string): string {
 }
 
 // premium isaretci (Lucide "pointer") - el emojisi yerine markaya uygun.
-function Isaretci({ anim }: { anim: string }) {
+// renk/golge disaridan verilir ki hem acik hem koyu zeminde HER ZAMAN gorunur olsun.
+function Isaretci({ anim, renk, golge }: { anim: string; renk: string; golge: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={`karekod-ipucu h-8 w-8 ${anim}`} fill="none" stroke="#f4ebda" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 24 24" className={`h-8 w-8 ${anim}`} style={{ filter: `drop-shadow(0 1px 2.5px ${golge})` }} fill="none" stroke={renk} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 14a8 8 0 0 1-8 8" />
       <path d="M18 11v-1a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
       <path d="M14 10V9a2 2 0 0 0-2-2 2 2 0 0 0-2 2v1" />
@@ -134,16 +135,16 @@ export default function DavetiyeKarekodumSayfasi() {
       const o = await onizlemeGetir();
       if (!o || !o.guncellenme) return;
       if (o.guncellenme > benimSurumRef.current) {
+        // KIMDEN gelirse gelsin uygula (ayni hesap coklu cihaz da senkron olsun).
+        uzaktanRef.current = true;
+        if (o.zemin) setZemin(o.zemin);
+        if (o.olcek) setOlcek(o.olcek);
+        setPos({ x: o.posX, y: o.posY });
+        benimSurumRef.current = o.guncellenme;
+        // "esiniz duzenliyor" yalniz KARSI es duzenlediyse.
         if (o.sonDuzenleyen && o.sonDuzenleyen !== rolRef.current) {
-          uzaktanRef.current = true;
-          if (o.zemin) setZemin(o.zemin);
-          if (o.olcek) setOlcek(o.olcek);
-          setPos({ x: o.posX, y: o.posY });
-          benimSurumRef.current = o.guncellenme;
           setEsDuzenliyor(true);
           setTimeout(() => setEsDuzenliyor(false), 3500);
-        } else {
-          benimSurumRef.current = o.guncellenme; // kendi echo
         }
       }
     }, 3000);
@@ -274,7 +275,7 @@ export default function DavetiyeKarekodumSayfasi() {
         {/* ---- Yonerge (iki yana yasli) ---- */}
         <p className="max-w-3xl text-justify font-govde text-sm leading-relaxed text-ikincil">
           Bu menüyü kullanarak davetiyenize ekleyeceğiniz karekodlarınızı (eşinizin ve kendinizinkini) tek
-          seferde doğrudan matbaacınız ile paylaşın. Aşağıdaki <span className="font-medium text-murekkep">“Karekodumu Doğrudan Matbaacıya Gönder”</span> düğmesi;
+          seferde doğrudan matbaacınız ile paylaşın. Aşağıdaki <span className="font-medium text-murekkep">“Karekodlarımızı Basım için Doğrudan Matbaacıya Gönder”</span> düğmesi;
           matbaacınızın kullandığı programa uygun olarak tercih edeceği biçimi seçebilmesi için karekodları
           SVG, PNG, PDF, JPG ve WEBP formatlarının tümünü içerecek şekilde iki ayrı ZIP olarak göndermenizi sağlar.
         </p>
@@ -347,10 +348,10 @@ export default function DavetiyeKarekodumSayfasi() {
                 </div>
               )}
 
-              {/* ipucu: surukle (dokununca kaybolur) */}
+              {/* ipucu: surukle (dokununca kaybolur) - zemine gore gorunur */}
               {ipucu.suruk && lockupHtml && (
                 <div className="pointer-events-none absolute z-20 flex flex-col items-center" style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -50%)" }}>
-                  <Isaretci anim="ipucu-suruk" />
+                  <Isaretci anim="ipucu-suruk" renk={koyu ? "#f4ebda" : "#2c2119"} golge={koyu ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.8)"} />
                   <IpucuBalon etiket="sürükle" />
                 </div>
               )}
@@ -397,8 +398,8 @@ export default function DavetiyeKarekodumSayfasi() {
                   </span>
                 </label>
                 {ipucu.renk && (
-                  <div className="pointer-events-none absolute -right-1 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center">
-                    <Isaretci anim="ipucu-dokun" />
+                  <div className="pointer-events-none absolute left-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center">
+                    <Isaretci anim="ipucu-dokun" renk="#6e2438" golge="rgba(255,255,255,0.85)" />
                     <IpucuBalon etiket="renk seç" />
                   </div>
                 )}
@@ -414,8 +415,8 @@ export default function DavetiyeKarekodumSayfasi() {
               <div className="relative">
                 <input type="range" min={16} max={56} value={olcek} onChange={(e) => { setOlcek(Number(e.target.value)); ipucuKapat("boyut"); }} className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-ayrac accent-sarap" />
                 {ipucu.boyut && (
-                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-[130%] flex-col items-center">
-                    <Isaretci anim="ipucu-kaydir" />
+                  <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 flex -translate-x-1/2 flex-col items-center">
+                    <Isaretci anim="ipucu-kaydir" renk="#6e2438" golge="rgba(255,255,255,0.85)" />
                     <IpucuBalon etiket="boyutlandır" />
                   </div>
                 )}
@@ -428,7 +429,7 @@ export default function DavetiyeKarekodumSayfasi() {
                 <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
                   <path d="M4 12l16-8-6 16-3-6-7-2Z" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
                 </svg>
-                {gonderiliyor ? "Hazırlanıyor…" : "Karekodumu Doğrudan Matbaacıya Gönder (tüm formatlar · ZIP)"}
+                {gonderiliyor ? "Hazırlanıyor…" : "Karekodlarımızı Basım için Doğrudan Matbaacıya Gönder (tüm formatlar · 2 Ayrı ZIP Dosyası)"}
               </button>
               <button onClick={sifirla} className="rounded-full border border-ayrac px-5 py-2 font-govde text-xs font-medium text-ikincil transition-colors hover:bg-yuzeyKoyu">
                 Önizlemeyi sıfırla

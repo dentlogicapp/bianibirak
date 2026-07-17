@@ -74,7 +74,9 @@ export async function tumFormatlarZipBlob(
   const zip = new JSZip();
   for (const f of FORMATLAR) {
     const blob = await formatBlob(secenek, f.kod);
-    zip.file(`${dosyaAdi}.${f.kod}`, blob);
+    // Matbaaya yonlendirici: yalniz WEBP "(onerilen)" etiketiyle (seffaf + kucuk + net).
+    const ek = f.kod === "webp" ? " (önerilen)" : "";
+    zip.file(`${dosyaAdi}${ek}.${f.kod}`, blob);
   }
   const paket = await zip.generateAsync({ type: "blob" });
   return { blob: paket, ad: dosyaAdi };
