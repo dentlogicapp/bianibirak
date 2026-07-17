@@ -101,22 +101,6 @@ export default function YonetimSayfasi() {
             </>
           }
         />
-        <AracButonu
-          href="/panel"
-          baslik="Etkinliklerim"
-          aciklama="Yeni etkinlik oluştur, aralarında geçiş yap"
-          ikon={
-            <>
-              <path
-                d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
-                stroke="currentColor"
-                strokeWidth={1.6}
-                fill="none"
-              />
-              <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-            </>
-          }
-        />
       </div>
 
       {/* + Esini Ekle bari (planlama "Yeni Kullanici" bari) */}
