@@ -7,6 +7,8 @@ import { api, defteriIndir, type Katki, type Kurasyon, type KurasyonOgesi } from
 import { AppShell } from "@/components/site/AppShell";
 import { DefterOnizleme } from "@/components/site/DefterOnizleme";
 import { BoyutSecimi, type Boyut } from "@/components/site/BoyutSecimi";
+import OdemeAkisi from "@/components/site/OdemeAkisi";
+import { odemeDurumu, type OdemeDurum } from "@/lib/api";
 import { DefterKarti } from "@/components/site/DefterKarti";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DilekInceleme } from "@/components/site/DilekInceleme";
@@ -93,6 +95,36 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   // BOYUT SECIMI: indirmeden once sorulur. Sonradan telafisi olmayan bir karar -
   // yanlis boyutta indirilen defter matbaada buyutulunce fotograflar seyrelir.
   const [boyutAcik, setBoyutAcik] = useState(false);
+
+  /* ===================== KURAL A - ODEME ONCE, DURUSTLUK SONRA =====================
+   *
+   * Musa'nin kesin talimati:
+   *   "Indirme butonu ONCELIKLE satin alma islemi icin calisan, satin alma SONRASI
+   *    ise boyut secimi vb. uyari ekranlarini gosterdikten sonra indirme
+   *    gerceklestiren bir buton olarak kurgulansin. Boylelikle durustlugumuz satin
+   *    alma islemlerini cekimserlige ve satis yapamamaya cevirmesin!"
+   *
+   * AKIS:
+   *   [Indir] -> odeme yapilmamissa -> ODEME AKISI -> (onaylandi) -> BOYUT SECIMI -> indirme
+   *   [Indir] -> odeme yapilmissa   ->                                BOYUT SECIMI -> indirme
+   *
+   * Boyut secimi ekranindaki DPI uyarilari, "telafisi yok" notu, baski ayarlari
+   * rehberi - hepsi odeme SONRASI gorunur. Odeme oncesi tek anlatilan: NE ALDIGI.
+   */
+  const [odemeAcik, setOdemeAcik] = useState(false);
+  const [odeme, setOdeme] = useState<OdemeDurum | null>(null);
+
+  // Acilista odeme durumunu cek: baski ayarlari notu (odeme sonrasi gorunur)
+  // dogru kararla cizilsin, buton bosuna beklemesin.
+  useEffect(() => {
+    let iptal = false;
+    void odemeDurumu().then((d) => {
+      if (!iptal) setOdeme(d);
+    });
+    return () => {
+      iptal = true;
+    };
+  }, []);
   const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
 
   const degisti =
@@ -161,11 +193,50 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     const c = await defteriIndir(boyut);
     setUretiliyor(null);
     if (!c.ok) {
+      // 402 ODEME_GEREKLI: paywall devrede. Boyut modalini kapat, odeme akisini ac.
+      // (Normalde buraya dusmez - buton zaten once odemeyi sorar - ama iki es ayni
+      //  anda calisiyorsa ya da odeme suresi dolduysa bu yol devreye girer.)
+      if ("odemeGerekli" in c && c.odemeGerekli) {
+        setBoyutAcik(false);
+        setOdemeAcik(true);
+        return;
+      }
       toast.error(c.mesaj);
       return;
     }
     setBoyutAcik(false);
     toast.success("Baskıya hazır defterin indirildi.");
+  }
+
+  /* INDIRME BUTONUNUN BEYNI - KURAL A burada yasar.
+   *
+   * Buton, boyut modalini DOGRUDAN acmaz. Once sorar: bu defterin odemesi yapildi mi?
+   *   - Yapilmadiysa -> odeme akisi (sozlesme -> havale -> bekleme)
+   *   - Yapildiysa   -> boyut secimi (uyarilar, DPI, baski rehberi)
+   *
+   * Odeme sistemi kapaliysa (Aktif=false) odemeGerekli=false doner ve dogrudan
+   * boyut secimine gecilir - acil durum kolu, ciftin mirasi rehin kalmaz.
+   */
+  async function indirmeyeBasla() {
+    setUretiliyor("baski");
+    const d = await odemeDurumu();
+    setUretiliyor(null);
+
+    setOdeme(d);
+
+    // Durum alinamadiysa (ag hatasi) boyut secimini ac - backend zaten 402 ile korur.
+    // Kullaniciyi bos bir hata ekraninda birakmaktansa akisi ilerletmek daha iyidir.
+    if (!d) {
+      setBoyutAcik(true);
+      return;
+    }
+
+    if (!d.odemeGerekli || d.odendi) {
+      setBoyutAcik(true);
+      return;
+    }
+
+    setOdemeAcik(true);
   }
 
   async function mirasiTamamla() {
@@ -537,7 +608,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
               dikkati uzerine cekmeli. Yanip sonme YOK (ucuz durur, gozu yorar);
               yavas gecen parilti + nefes alan halka VAR - devlerin yontemi. */}
           <button
-            onClick={() => setBoyutAcik(true)}
+            onClick={() => void indirmeyeBasla()}
             disabled={uretiliyor !== null || dahilOgeler.length === 0}
             className="premium-vurgu flex w-full max-w-md min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
           >
@@ -572,6 +643,12 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             TEKNIK GERCEK: PDF, yazici diyalogunun kagit boyutunu ZORLAYAMAZ. PDF
             spec'inde boyle bir tercih yoktur (PrintScaling var, ama Firefox onu bile
             dikkate almiyor). Dolayisiyla tek dogru yol: kullaniciyi BILGILENDIRMEK. */}
+        {/* KURAL A: bu not ODEME SONRASI gorunur.
+            Odemeden once "yazici ayarlarini soyle yap, olceklendirmeyi boyle birak"
+            demek, henuz satin almamis birine ONUN DEGIL BIZIM isimizi anlatmaktir -
+            ve gozunde urunu "ugrasilmasi gereken bir sey"e cevirir.
+            Odedikten sonra ayni not, ona dogru sonucu aldiran bir rehberdir. */}
+        {(odeme === null || !odeme.odemeGerekli || odeme.odendi) && (
         <div className="mx-auto mt-4 max-w-md rounded-2xl border border-yaldiz/30 bg-parsomen/60 p-4">
           <p className="flex items-start gap-2.5">
             <span className="mt-0.5 shrink-0 text-yaldiz" aria-hidden>
@@ -592,8 +669,24 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </span>
           </p>
         </div>
+        )}
 
-        {/* BOYUT SECIMI - indirmeden onceki son karar */}
+        {/* ODEME AKISI - KURAL A: butonun ilk durgai.
+            Onaylandiginda boyut secimi acilir (odendi callback'i). */}
+        <OdemeAkisi
+          acik={odemeAcik}
+          kapat={() => setOdemeAcik(false)}
+          odendi={() => {
+            setOdemeAcik(false);
+            setOdeme((o) => (o ? { ...o, odendi: true } : o));
+            // ODEME SONRASI: simdi durustluk zamani. Boyut secimi, DPI gostergeleri,
+            // "telafisi yok" uyarisi - hepsi BURADA acilir, oncesinde degil.
+            setBoyutAcik(true);
+          }}
+        />
+
+        {/* BOYUT SECIMI - odeme SONRASI. Uyarilar ve DPI tablosu burada.
+            (KURAL A: odeme oncesi hicbir teknik kusur anlatilmaz.) */}
         <BoyutSecimi
           acik={boyutAcik}
           onKapat={() => setBoyutAcik(false)}

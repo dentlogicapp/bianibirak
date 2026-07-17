@@ -72,16 +72,16 @@ function GirisIcerik() {
     }
 
     // Akilli yonlendirme: etkinlik yoksa olusturma, TEK etkinlik varsa dogrudan defter,
-    // birden fazla varsa secim ekrani (/panel).
+    // birden fazla varsa secim ekrani (/etkinliklerim).
     const liste = await api.etkinliklerim();
     setYukleniyor(false);
     if (liste.ok && liste.veri.length === 1) {
       const tek = liste.veri[0];
       await api.etkinlikAktifYap(tek.id);
-      router.push("/panel/etkinlik");
+      router.push("/gelen-dilekler");
       return;
     }
-    router.push("/panel");
+    router.push("/etkinliklerim");
   }
 
   return (

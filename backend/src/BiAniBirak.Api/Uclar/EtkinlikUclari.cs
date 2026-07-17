@@ -718,7 +718,7 @@ public static class EtkinlikUclari
                 _ = push.GonderAsync(digerUye.KullaniciId,
                     "Ortak deftere bir anı eklendi",
                     $"{katki.DavetliAd} tarafından bırakılan bir dilek onaylandı ve ortak defterinize eklendi.",
-                    url: $"/panel/etkinlik?focus={katki.Id}", etkinlikId: etkinlikId);
+                    url: $"/gelen-dilekler?focus={katki.Id}", etkinlikId: etkinlikId);
             }
         }
 

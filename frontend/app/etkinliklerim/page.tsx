@@ -87,7 +87,7 @@ function EtkinlikListesi({
     setSecilenId(e.id);
     const cevap = await api.etkinlikAktifYap(e.id);
     setSecilenId(null);
-    if (cevap.ok) router.push("/panel/etkinlik");
+    if (cevap.ok) router.push("/gelen-dilekler");
   }
 
   async function sil(e: Etkinlik) {

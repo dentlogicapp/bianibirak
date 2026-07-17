@@ -215,7 +215,7 @@ public static class DavetUclari
             _ = push.GonderAsync(kurucu.KullaniciId,
                 "Eşin deftere katıldı",
                 $"{kullanici.Ad}, ortak anı defterinize katıldı. Artık kendi bağlantısından gelen dilekleri kendisi onaylayacak.",
-                url: "/panel/etkinlik", etkinlikId: davet.EtkinlikId);
+                url: "/gelen-dilekler", etkinlikId: davet.EtkinlikId);
         }
 
         // YENI ESE HOSGELDIN: sureci o da bilmeli. Ikinci es de ayni sorumlulugu

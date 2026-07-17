@@ -260,7 +260,7 @@ public static class OdemeUclari
                 sid,
                 "Yeni ödeme bekliyor",
                 $"{ciftAd} - {odeme.Tutar:N0} {odeme.ParaBirimi} - {odeme.ReferansKodu}",
-                url: "/panel/super",
+                url: "/super-panel",
                 etkinlikId: null,
                 // SESSIZ SAATE TABI: gece 03:00'te para bildirimi Musa'yi uyandirmasin.
                 // Cift zaten bekliyor; sabah onaylanmasi yeterli.

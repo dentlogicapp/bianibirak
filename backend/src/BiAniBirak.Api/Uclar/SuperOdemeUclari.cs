@@ -196,7 +196,7 @@ public static class SuperOdemeUclari
                 uid,
                 "Ödemen onaylandı",
                 "Defterin indirmeye hazır. İndir, yedekle - 37. günde kalıcı olarak silinecek.",
-                url: "/panel/kurasyon",
+                url: "/baskiya-hazir-defter",
                 etkinlikId: odeme.EtkinlikId,
                 // SESSIZ SAATE TABI DEGIL.
                 //

@@ -150,7 +150,7 @@ public class PushGonderici
     private static string BildirimTipi(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return "sistem";
-        if (url.Contains("/panel/etkinlik")) return "katki";
+        if (url.Contains("/gelen-dilekler")) return "katki";
         return "sistem";
     }
 

@@ -6,7 +6,7 @@ import { FilmSeridi } from "@/components/site/FilmSeridi";
 // DAVETLI KARSILAMA - davetlinin bagLantiyi actiginda gordugu ILK sey.
 //
 // TEK DOGRULUK KAYNAGI: hem gercek davetli ekrani (/k/{token}) hem panel'deki
-// canli onizleme (/panel/duzenle) BU bilesenden beslenir. Onceki surumde
+// canli onizleme (/ayarlar/etkinlik) BU bilesenden beslenir. Onceki surumde
 // onizleme, gercek ekrani "taklit eden" ayri bir dizgiydi - film seridi yoktu,
 // tipografi farkliydi. Cift, gonderdigi linkin nasil gorunecegini YANLIS
 // biliyordu. Iki dizgi kacinilmaz olarak ayrisir; tek bilesen ayrisamaz.

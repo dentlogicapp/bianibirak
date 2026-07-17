@@ -16,18 +16,18 @@ import { useSwOdakDinleyici } from "@/lib/odak";
 type Sayfa = { baslik: string; ebeveyn: string | null };
 
 const HIYERARSI: Record<string, Sayfa> = {
-  "/panel/etkinlik": { baslik: "Gelen Dilekler", ebeveyn: null }, // kok
-  "/panel/paylasim": { baslik: "Dilek Bağlantısını Paylaş", ebeveyn: "/panel/etkinlik" },
-  "/panel/davetiye-karekodum": { baslik: "Davetiyene QR Kodu Ekle", ebeveyn: "/panel/etkinlik" },
-  "/panel/cop": { baslik: "Çöp Kutusu", ebeveyn: "/panel/etkinlik" },
-  "/panel/yonetim": { baslik: "Ayarlar", ebeveyn: "/panel/etkinlik" },
-  "/panel/kurasyon": { baslik: "Baskıya Hazır Defter", ebeveyn: "/panel/etkinlik" },
-  "/panel/fotograflar": { baslik: "Fotoğraflar", ebeveyn: "/panel/etkinlik" },
-  "/panel/duzenle": { baslik: "Etkinlik & Görünüm", ebeveyn: "/panel/yonetim" },
-  "/panel/denetim": { baslik: "Denetim Günlüğü", ebeveyn: "/panel/yonetim" },
-  "/panel/es-ekle": { baslik: "Eşini Ekle", ebeveyn: "/panel/yonetim" },
-  "/panel": { baslik: "Etkinliklerim", ebeveyn: "/panel/yonetim" },
-  "/panel/super": { baslik: "Süper Panel", ebeveyn: "/panel/etkinlik" },
+  "/gelen-dilekler": { baslik: "Gelen Dilekler", ebeveyn: null }, // kok
+  "/dilek-baglantisi": { baslik: "Dilek Bağlantısını Paylaş", ebeveyn: "/gelen-dilekler" },
+  "/davetiye-karekodu": { baslik: "Davetiyene QR Kodu Ekle", ebeveyn: "/gelen-dilekler" },
+  "/cop-kutusu": { baslik: "Çöp Kutusu", ebeveyn: "/gelen-dilekler" },
+  "/ayarlar": { baslik: "Ayarlar", ebeveyn: "/gelen-dilekler" },
+  "/baskiya-hazir-defter": { baslik: "Baskıya Hazır Defter", ebeveyn: "/gelen-dilekler" },
+  "/fotograflar": { baslik: "Fotoğraflar", ebeveyn: "/gelen-dilekler" },
+  "/ayarlar/etkinlik": { baslik: "Etkinlik & Görünüm", ebeveyn: "/ayarlar" },
+  "/ayarlar/denetim": { baslik: "Denetim Günlüğü", ebeveyn: "/ayarlar" },
+  "/ayarlar/es-ekle": { baslik: "Eşini Ekle", ebeveyn: "/ayarlar" },
+  "/etkinliklerim": { baslik: "Etkinliklerim", ebeveyn: "/ayarlar" },
+  "/super-panel": { baslik: "Süper Panel", ebeveyn: "/gelen-dilekler" },
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -61,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Sistem/tarayici geri hareketi de EBEVEYN hiyerarsisini izlesin:
   // gecmis bossa (dogrudan link ile gelinmisse) ebeveyne dus.
   function geri() {
-    const hedef = sayfa?.ebeveyn ?? "/panel/etkinlik";
+    const hedef = sayfa?.ebeveyn ?? "/gelen-dilekler";
     router.push(hedef);
   }
 
@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }`}
         >
           {kokte ? (
-            <Link href="/panel/etkinlik" aria-label="Gelen Dilekler" className="min-w-0">
+            <Link href="/gelen-dilekler" aria-label="Gelen Dilekler" className="min-w-0">
               <span
                 className={`block transition-all duration-200 ${
                   kayan ? "scale-90 origin-left" : ""

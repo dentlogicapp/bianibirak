@@ -53,7 +53,7 @@ export default function DavetSayfasi() {
     }
     toast.success("Defterinize katıldın.");
     // JWT yenilendi (aktif etkinlik ayarlandi) - dogrudan deftere
-    window.location.href = "/panel/etkinlik";
+    window.location.href = "/gelen-dilekler";
   }
 
   if (durum === "yukleniyor") {

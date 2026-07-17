@@ -27,7 +27,7 @@ export function GoruntulemeBandi() {
       return;
     }
     // JWT yenilendi - tam yenileme (claim'ler tazelensin)
-    window.location.href = "/panel/super";
+    window.location.href = "/super-panel";
   }
 
   return (

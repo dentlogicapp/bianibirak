@@ -49,7 +49,7 @@ export default function PaylasimSayfasi() {
         <div className="rounded-3xl border border-ayrac bg-yuzey p-10 text-center">
           <p className="font-govde text-sm text-ikincil">Aktif bir etkinlik seçili değil.</p>
           <button
-            onClick={() => router.push("/panel")}
+            onClick={() => router.push("/etkinliklerim")}
             className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
           >
             Etkinliklerime git

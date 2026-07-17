@@ -55,7 +55,7 @@ public static class HosgeldinBildirimi
             govde,
             // Paylasim ekranindaki zaman cizelgesine goturur ve oraya SCROLL + HIGHLIGHT
             // yapar - dilek bildiriminde kanitlanmis desen.
-            url: "/panel/paylasim?odak=cizelge",
+            url: "/dilek-baglantisi?odak=cizelge",
             etkinlikId: etkinlikId,
             // Hayati bilgilendirme: sessiz saate tabi degil. Zaten kayit aninda
             // kullanici uyaniktir.

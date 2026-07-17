@@ -108,7 +108,7 @@ public sealed class CopTemizlemeGorevi : BackgroundService
                 Tip = "cop_uyari",
                 Baslik = "Cop kutunuzdaki bir dilek yakinda silinecek",
                 Mesaj = $"{katki.DavetliAd} tarafindan birakilan reddedilmis bir dilek birkac gun icinde kalici olarak silinecek. Geri almak icin cop kutunuza bakin.",
-                Url = "/panel/cop",
+                Url = "/cop-kutusu",
                 OkunduMu = false,
                 CreatedAt = simdi,
             });

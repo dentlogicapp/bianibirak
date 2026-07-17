@@ -147,7 +147,7 @@ public sealed class ImhaGorevi : BackgroundService
                 kid,
                 baslik,
                 govde,
-                url: "/panel/kurasyon",
+                url: "/baskiya-hazir-defter",
                 etkinlikId: e.Id,
                 sessizSaateTabi: true,
                 ct: ct);

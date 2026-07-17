@@ -16,13 +16,15 @@ import { AppShell } from "@/components/site/AppShell";
 import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
 import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
+import OdemelerSekmesi from "@/components/site/OdemelerSekmesi";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
-type Sekme = "defterler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
+type Sekme = "defterler" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "defterler", etiket: "Defterler" },
+  { kod: "odemeler", etiket: "Ödemeler" },
   { kod: "olcum", etiket: "Ölçüm" },
   { kod: "kullanicilar", etiket: "Kullanıcılar" },
   { kod: "cop", etiket: "Çöp Kutusu" },
@@ -102,6 +104,7 @@ export default function SuperPanelSayfasi() {
 
       <div className="mt-6">
         {sekme === "defterler" && <DefterlerSekmesi />}
+        {sekme === "odemeler" && <OdemelerSekmesi />}
         {sekme === "olcum" && <OlcumSekmesi />}
         {sekme === "kullanicilar" && <KullanicilarSekmesi />}
         {sekme === "cop" && <CopSekmesi />}
@@ -195,7 +198,7 @@ function DefterlerSekmesi() {
       return;
     }
     // JWT yenilendi - tam yenileme ile deftere gec
-    window.location.href = "/panel/etkinlik";
+    window.location.href = "/gelen-dilekler";
   }
 
   async function dondur(d: SuperDefter) {
@@ -797,6 +800,11 @@ function eylemMetni(eylem: string): string {
   const sozluk: Record<string, string> = {
     KATKI_BIRAKILDI: "bir dilek bıraktı",
     KATKI_ONAYLANDI: "bir dileği onayladı",
+    ODEME_BASLATILDI: "ödeme başlattı",
+    ODEME_BILDIRILDI: "havale bildirimi yaptı",
+    ODEME_ONAYLANDI: "ödemesi onaylandı",
+    ODEME_REDDEDILDI: "ödemesi reddedildi",
+    ODEME_AYARI_GUNCELLENDI: "ödeme ayarlarını güncelledi",
     KATKI_REDDEDILDI: "bir dileği reddetti",
     ETKINLIK_OLUSTURULDU: "yeni defter oluşturdu",
     ETKINLIK_GUNCELLENDI: "defteri güncelledi",

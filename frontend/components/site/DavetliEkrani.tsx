@@ -34,7 +34,7 @@ import {
 // sonra form yoktu, sonra tipografi kaydi). Iki ayri dizgi tutmak, kacinilmaz olarak
 // YALAN SOYLEYEN bir onizleme uretir.
 //
-// Cozum: TEK bilesen. Gercek sayfa (/k/{token}) ve panel onizlemesi (/panel/duzenle)
+// Cozum: TEK bilesen. Gercek sayfa (/k/{token}) ve panel onizlemesi (/ayarlar/etkinlik)
 // ayni koddan cizilir. Ayrismak icin ikinci bir kod YOK.
 //
 // (iframe ile gercek sayfayi gostermeyi de denedik; paylasimli sunucunun

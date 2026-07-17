@@ -73,6 +73,9 @@ function eylemEtiketi(eylem: string): string {
   const harita: Record<string, string> = {
     KATKI_BIRAKILDI: "Bir davetli dilek bıraktı",
     KATKI_ONAYLANDI: "Bir dilek onaylandı",
+    ODEME_BASLATILDI: "Ödeme başlatıldı",
+    ODEME_BILDIRILDI: "Havale bildirimi yapıldı",
+    ODEME_ONAYLANDI: "Ödemeniz onaylandı",
     KATKI_REDDEDILDI: "Bir dilek reddedildi",
     ETKINLIK_OLUSTURULDU: "Etkinlik oluşturuldu",
     ETKINLIK_GUNCELLENDI: "Etkinlik güncellendi",

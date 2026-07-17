@@ -197,7 +197,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
         {
             await push.GonderAsync(
                 kid, baslik, govde,
-                url: "/panel/kurasyon",
+                url: "/baskiya-hazir-defter",
                 etkinlikId: etkinlikId,
                 // HAYATI UYARI: sessiz saate TABI DEGIL. "Rahatsiz etmeyin" ayari,
                 // geri donusu olmayan bir kaybi engellemenin onune gecemez.

@@ -18,7 +18,7 @@ public class Bildirim
     public string Baslik { get; set; } = string.Empty;
     public string Mesaj { get; set; } = string.Empty;
 
-    // Tiklayinca gidilecek uygulama ici yol (/panel/etkinlik gibi)
+    // Tiklayinca gidilecek uygulama ici yol (/gelen-dilekler gibi)
     public string? Url { get; set; }
 
     public bool OkunduMu { get; set; }

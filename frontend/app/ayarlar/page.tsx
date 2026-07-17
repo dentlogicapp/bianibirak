@@ -49,7 +49,7 @@ export default function YonetimSayfasi() {
         <div className="rounded-3xl border border-ayrac bg-yuzey p-10 text-center">
           <p className="font-govde text-sm text-ikincil">Aktif bir etkinlik seçili değil.</p>
           <button
-            onClick={() => router.push("/panel")}
+            onClick={() => router.push("/etkinliklerim")}
             className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
           >
             Etkinliklerime git
@@ -76,7 +76,7 @@ export default function YonetimSayfasi() {
       {/* Yonetim araclari (planlama: buton izgarasi) */}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <AracButonu
-          href="/panel/duzenle"
+          href="/ayarlar/etkinlik"
           baslik="Etkinlik & Görünüm"
           aciklama="İsimler, tarih, davetli ekranı, sayaç"
           ikon={
@@ -91,7 +91,7 @@ export default function YonetimSayfasi() {
           }
         />
         <AracButonu
-          href="/panel/denetim"
+          href="/ayarlar/denetim"
           baslik="Denetim Günlüğü"
           aciklama="Defterde yapılan tüm işlemler"
           ikon={
@@ -106,7 +106,7 @@ export default function YonetimSayfasi() {
       {/* + Esini Ekle bari (planlama "Yeni Kullanici" bari) */}
       {!esKatildi && (
         <Link
-          href="/panel/es-ekle"
+          href="/ayarlar/es-ekle"
           className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-sarap px-6 py-3.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>

@@ -86,7 +86,7 @@ export function UserMenu() {
     setGecis(true);
     api.etkinlikAktifYap(id).then((c) => {
       if (c.ok) {
-        window.location.href = "/panel/etkinlik";
+        window.location.href = "/gelen-dilekler";
       } else {
         setGecis(false);
       }
@@ -98,9 +98,9 @@ export function UserMenu() {
 
     // TEK TIK, SIFIR SURTUNME: navigasyon SENKRON ve ONCE.
     // Ag istegi (durum kontrolu) tiklama anina KOYULMAZ - hedef rota zaten sabit
-    // (/panel/etkinlik). Dilegin durumu (onayli/red/yok) defter sayfasinda islenir.
+    // (/gelen-dilekler). Dilegin durumu (onayli/red/yok) defter sayfasinda islenir.
     const eslesme = b.url.match(/focus=([0-9a-fA-F-]{36})/);
-    const hedef = eslesme ? `/panel/etkinlik?focus=${eslesme[1]}` : b.url;
+    const hedef = eslesme ? `/gelen-dilekler?focus=${eslesme[1]}` : b.url;
     router.push(hedef);
 
     // Navigasyondan SONRA: menuyu kapat + okundu isaretle (ates-et-unut).
@@ -192,7 +192,7 @@ export function UserMenu() {
               Profilim
             </MenuDugme>
 
-            <MenuLink href="/panel/fotograflar" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/fotograflar" onClick={() => setAcik(false)} ikon={
               <>
                 <path d="M4 7a2 2 0 0 1 2-2h2l1.5-2h5L16 5h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
                 <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth={1.6} fill="none" />
@@ -201,13 +201,13 @@ export function UserMenu() {
               Fotoğraflar
             </MenuLink>
 
-            <MenuLink href="/panel/yonetim" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/ayarlar" onClick={() => setAcik(false)} ikon={
               <path d="M12 3.5 5 6.2v5c0 4.2 2.9 8.1 7 9.3 4.1-1.2 7-5.1 7-9.3v-5L12 3.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
             }>
               Ayarlar
             </MenuLink>
 
-            <MenuLink href="/panel/cop" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/cop-kutusu" onClick={() => setAcik(false)} ikon={
               <path d="M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M6.5 7l.7 12a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-12" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             }>
               Çöp Kutusu
@@ -215,7 +215,7 @@ export function UserMenu() {
 
             {kullanici.super_admin && (
               <Link
-                href="/panel/super"
+                href="/super-panel"
                 onClick={() => setAcik(false)}
                 className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm font-medium text-yaldiz transition-colors hover:bg-yuzeyKoyu"
               >
@@ -229,7 +229,7 @@ export function UserMenu() {
 
           {/* Bolum B - Defter yollari */}
           <div className="border-b border-ayrac p-1.5">
-            <MenuLink href="/panel/etkinlik" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/gelen-dilekler" onClick={() => setAcik(false)} ikon={
               <>
                 <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
                 <path d="M8 8h6M8 11h6" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
@@ -238,7 +238,7 @@ export function UserMenu() {
               Gelen Dilekler
             </MenuLink>
 
-            <MenuLink href="/panel/paylasim" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/dilek-baglantisi" onClick={() => setAcik(false)} ikon={
               <>
                 <circle cx="18" cy="5" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
                 <circle cx="6" cy="12" r="2.3" stroke="currentColor" strokeWidth={1.6} fill="none" />
@@ -249,7 +249,7 @@ export function UserMenu() {
               Dilek Bağlantısını Paylaş
             </MenuLink>
 
-            <MenuLink href="/panel/davetiye-karekodum" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/davetiye-karekodu" onClick={() => setAcik(false)} ikon={
               <>
                 <rect x="4" y="4" width="6" height="6" rx="1" stroke="currentColor" strokeWidth={1.6} fill="none" />
                 <rect x="14" y="4" width="6" height="6" rx="1" stroke="currentColor" strokeWidth={1.6} fill="none" />
@@ -260,7 +260,7 @@ export function UserMenu() {
               Davetiyene QR Kodu Ekle
             </MenuLink>
 
-            <MenuLink href="/panel/kurasyon" onClick={() => setAcik(false)} ikon={
+            <MenuLink href="/baskiya-hazir-defter" onClick={() => setAcik(false)} ikon={
               <>
                 <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
                 <path d="m11 9 1 2.2 2.2 1-2.2 1L11 15.4 10 13.2 7.8 12.2 10 11.2 11 9Z" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" fill="none" />
@@ -292,7 +292,7 @@ export function UserMenu() {
                   </button>
                 ))}
               <Link
-                href="/panel"
+                href="/etkinliklerim"
                 onClick={() => setAcik(false)}
                 className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-xs text-ikincil transition-colors hover:bg-yuzeyKoyu"
               >

@@ -7,7 +7,7 @@ import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
 export default function SifreSifirlaSayfasi() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 py-16 text-center">
-      <Link href="/panel" aria-label="Panele dön">
+      <Link href="/etkinliklerim" aria-label="Panele dön">
         <MarkaKilidi varyant="wordmark" boyut="orta" />
       </Link>
       <div className="mt-10 w-full rounded-3xl border border-ayrac bg-yuzey p-8">
@@ -17,7 +17,7 @@ export default function SifreSifirlaSayfasi() {
           bizimle iletişime geçebilirsin.
         </p>
         <Link
-          href="/panel"
+          href="/etkinliklerim"
           className="mt-6 inline-block rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
         >
           Panele dön
