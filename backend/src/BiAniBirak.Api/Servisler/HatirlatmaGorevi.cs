@@ -202,7 +202,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
     private static async Task GonderAsync(
         BiAniBirakDbContext db, PushGonderici push,
-        Guid etkinlikId, string ciftAdi, (string Baslik, string Govde) metin,
+        Guid etkinlikId, string ciftAdi, (string Baslik, string Govde, string PushGovde) metin,
         Guid anahtar, object gunluk, CancellationToken ct)
     {
         var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
@@ -220,7 +220,10 @@ public sealed class HatirlatmaGorevi : BackgroundService
                 etkinlikId: etkinlikId,
                 // HAYATI UYARI: sessiz saate TABI DEGIL.
                 sessizSaateTabi: false,
-                ct: ct);
+                ct: ct,
+                // PUSH KISA GIDER: kilit ekraninda uzun hukuki cumle kesilir ve
+                // uyari ciddiyetini kaybeder. Tam metin uygulama ici bildirimde durur.
+                pushGovde: metin.PushGovde);
         }
 
         db.DenetimGunlukleri.Add(new DenetimGunlugu
@@ -242,30 +245,32 @@ public sealed class HatirlatmaGorevi : BackgroundService
     // Ton merdiveni: ilk gunlerde bilgilendirici, ortada hatirlatici, sona dogru
     // uyarici. Ilk gunden "SILINECEK!" diye bagirmak cifti korkutur ve bildirimlerimizi
     // KAPATTIRIR - sonra gercekten kritik an geldiginde duymaz.
-    private static (string Baslik, string Govde) GunMetni(int kalanGun, string ciftAdi)
+    private static (string Baslik, string Govde, string PushGovde) GunMetni(int kalanGun, string ciftAdi)
     {
         var baslik = $"Anı defterinizin kalıcı olarak silinmesine {kalanGun} gün kaldı";
+
+        var pushKisa = $"Kalıcı silinmeye {kalanGun} gün kaldı.";
 
         if (kalanGun > 15)
             return (baslik,
                 $"{ciftAdi}, davetlileriniz anılarını bırakıyor. Defterinizi dilediğiniz an "
                 + $"düzenleyebilirsiniz. Dilek toplama {Sabitler.ToplamaGun}. günde kapanır; "
-                + $"eserinizi indirmek için toplam {Sabitler.ToplamGun} gününüz var.");
+                + $"eserinizi indirmek için toplam {Sabitler.ToplamGun} gününüz var.", pushKisa);
 
         if (kalanGun > 10)
             return (baslik,
                 $"{ciftAdi}, defteriniz büyüyor. Hazır olduğunda baskıya hazır PDF'inizi "
-                + "indirip güvenli bir yere kaydedin - bu miras kâğıtta kalıcıdır, sunucuda değil.");
+                + "indirip güvenli bir yere kaydedin - bu miras kâğıtta kalıcıdır, sunucuda değil.", pushKisa);
 
         if (kalanGun > 6)
             return (baslik,
                 $"{ciftAdi}, süre ilerliyor. Defterinizi henüz indirmediyseniz şimdi indirin; "
-                + "beklemek için bir sebep yok, dilekler eklendikçe yeniden indirebilirsiniz.");
+                + "beklemek için bir sebep yok, dilekler eklendikçe yeniden indirebilirsiniz.", pushKisa);
 
         return (baslik,
             $"{ciftAdi}, {kalanGun} gün sonra defteriniz ve tüm içeriği (dilekler, fotoğraflar) "
             + "kalıcı olarak silinecek ve hiçbir şekilde geri getirilemeyecek. Lütfen eserinizi "
-            + "indirin ve yedekleyin.");
+            + "indirin ve yedekleyin.", pushKisa);
     }
 
     // ---- FAZ 2 METNI: son 5 gun, SAAT bazli ----
@@ -273,7 +278,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
     // Burada sure GUN degil SAAT olarak soylenir. "3 gun" ertelenebilir; "72 saat"
     // ertelenemez. Metin ayrica NEREDEN silinecegini acikca yazar (uygulama +
     // veritabani) ve geri donusun IMKANSIZ oldugunu tekrar eder - belirsizlik birakmaz.
-    private static (string Baslik, string Govde) SaatMetni(int saat, string ciftAdi)
+    private static (string Baslik, string Govde, string PushGovde) SaatMetni(int saat, string ciftAdi)
     {
         var ortak =
             "Bu süre sonunda anı defteriniz uygulamanızdan ve veritabanımızdan kalıcı olarak "
@@ -285,23 +290,27 @@ public sealed class HatirlatmaGorevi : BackgroundService
                 "Dilek toplama kapandı · Kalıcı silinmesine 120 saat kaldı",
                 $"{ciftAdi}, davetli girişleri sona erdi ve defteriniz tamamlandı. "
                 + $"Kalıcı silinmesine kalan süre 120 saattir. {ortak} "
-                + "Şimdi yapmanız gereken tek şey: baskıya hazır defterinizi indirin.");
+                + "Şimdi yapmanız gereken tek şey: baskıya hazır defterinizi indirin.",
+                "Dilek toplama kapandı. Kalıcı silinmeye 120 saat kaldı - defterinizi indirin.");
 
         if (saat >= 24)
             return (
                 $"Kalıcı silinmesine {saat} saat kaldı",
                 $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre {saat} saattir. "
-                + $"{ortak} Eserinizi indirip güvenli bir yere kaydedin.");
+                + $"{ortak} Eserinizi indirip güvenli bir yere kaydedin.",
+                $"Kalıcı silinmeye {saat} saat kaldı. Defteriniz sonra geri getirilemez.");
 
         if (saat == 12)
             return (
                 "SON 12 SAAT",
                 $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre 12 saattir. "
-                + $"{ortak} Bu, eserinizi kurtarmak için son fırsatlarınızdan biridir.");
+                + $"{ortak} Bu, eserinizi kurtarmak için son fırsatlarınızdan biridir.",
+                "SON 12 SAAT. Defteriniz kalıcı olarak silinecek - şimdi indirin.");
 
         return (
             "SON 3 SAAT · Defteriniz siliniyor",
             $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre yalnızca 3 saattir. "
-            + $"{ortak} Şimdi indirmezseniz bu defter bir daha var olmayacak.");
+            + $"{ortak} Şimdi indirmezseniz bu defter bir daha var olmayacak.",
+            "SON 3 SAAT. Defteriniz siliniyor - şimdi indirmezseniz bir daha var olmayacak.");
     }
 }

@@ -107,7 +107,10 @@ function LinkKarti({ esAdi, token }: { esAdi: string; token: string }) {
   }
 
   async function paylas() {
-    const metin = `${esAdi} olarak anı defterimize bir dilek bırakır mısın?`;
+    // Metin ES ADI ile baslamaz: baglanti zaten o esin baglantisidir ve mesaji
+    // gonderen de odur. "X olarak..." ifadesi ucuncu bir kisi konusuyormus gibi
+    // duruyor ve davetliyi sasirtiyordu.
+    const metin = "Anı defterimize bir dilek bırakır mısın?";
     if (navigator.share) {
       try {
         await navigator.share({ title: "Anı Defteri", text: metin, url });

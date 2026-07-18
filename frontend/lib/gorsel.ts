@@ -1,17 +1,21 @@
 // GORSEL HAZIRLAMA (tarayicida - sunucuya buyuk dosya GITMEZ).
 //
-// NEDEN: iPhone fotografi 4032 piksel / 8 MB. Ama A5 sayfada bir foto en fazla 12 cm
-// kaplar; 300 DPI baskida bu 1417 piksel eder. Fazlasi KAGIDA GECMEZ - sadece disk ve
-// bant genisligi yakar. 1600 pikselde kesiyoruz (%13 pay): baski kalitesi BIREBIR ayni,
-// dosya ~10 kat kucuk, yukleme ~10 kat hizli.
+// NEDEN BU SINIR VAR: telefon fotografi 4000+ piksel / 8-12 MB olabilir. Tamami
+// gonderilirse dugun salonunda 4G ile yukleme 20-30 saniye surer ve davetli vazgecer -
+// dilek hic gelmez. Defterin PDF'i de kullanilamaz boyuta sisirir (matbaa dosyayi
+// acamaz, cift indiremez).
+//
+// 3200 piksel: fotograf defterde ve baskida telefon galerisindeki netligine cok yakin
+// gorunur, en buyuk kagit boyunda bile yumusama olmaz; buna karsilik yukleme birkac
+// saniyede biter. Sinirin yeri, kalite ile ulasilabilirligin kesistigi noktadir.
 //
 // EXIF: canvas'a cizip yeniden kodlayinca TUM metadata dusar - GPS koordinati dahil.
 // iPhone fotografi cekildigi yerin konumunu tasir; temizlenmezse cift'in EV ADRESI
 // PDF'e gomulur. Bu bir KVKK ihlali ve gercek bir tehlike.
 
-export const AZAMI_KENAR = 1600; // baski icin fazlasiyla yeterli
+export const AZAMI_KENAR = 3200; // en buyuk kagit boyunda bile net
 export const KALITE = 0.88; // JPEG kalitesi - gorsel olarak kayipsiz sayilir
-export const TAVAN_BAYT = 2 * 1024 * 1024; // backend ile ayni
+export const TAVAN_BAYT = 6 * 1024 * 1024; // backend ile ayni (3200px q88 icin pay)
 
 export type HazirGorsel = {
   dosya: File;

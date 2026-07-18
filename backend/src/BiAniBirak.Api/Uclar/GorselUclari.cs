@@ -17,7 +17,7 @@ namespace BiAniBirak.Api.Uclar;
 //
 // GUVENLIK:
 //  - Magic byte dogrulamasi (uzanti yalan soyleyebilir).
-//  - Tavan 2 MB (istemci 1600px/q88 gonderir; EXIF canvas ile zaten silinir).
+//  - Tavan 6 MB (istemci 3200px/q88 gonderir; EXIF canvas ile zaten silinir).
 //  - Servis ucu PUBLIC ama anahtar tahmin edilemez (guid) + tenant dizini.
 public static class GorselUclari
 {

@@ -9,7 +9,9 @@ namespace BiAniBirak.Api.Servisler;
 //  - Anahtar tenant-kapsamlidir: {EtkinlikId}/{Guid}.jpg -> etkinlikler arasi sizinti yok.
 //  - Yalnizca JPEG/PNG/WebP kabul edilir; MAGIC BYTE ile dogrulanir (uzanti YALAN soyleyebilir).
 //  - Dosya adi ASLA kullanicidan gelmez; sunucu uretir.
-//  - Boyut tavani: sikistirma sonrasi 2 MB (istemci 1600px/q88 gonderiyor).
+//  - Boyut tavani: sikistirma sonrasi 6 MB (istemci 3200px/q88 gonderiyor).
+//    ISTEMCI ILE BIRLIKTE DEGISIR: biri unutulursa yukleme sunucuda sessizce reddedilir
+//    ve davetli sebebini anlamaz. gorsel.ts TAVAN_BAYT ile ayni sayi olmak ZORUNDA.
 public class DepolamaServisi
 {
     private readonly string _kok;
@@ -24,7 +26,7 @@ public class DepolamaServisi
         _kok = ayar["Depolama:Kok"] ?? "/veri/medya";
         Directory.CreateDirectory(_kok);    }
 
-    public const int TavanBayt = 2 * 1024 * 1024; // 2 MB
+    public const int TavanBayt = 6 * 1024 * 1024; // 6 MB - gorsel.ts TAVAN_BAYT ile ayni
 
     // Icerik tipi + uzanti (magic byte ile dogrulanmis)
     public sealed record GorselTipi(string MimeTipi, string Uzanti);

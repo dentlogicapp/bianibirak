@@ -58,7 +58,7 @@ Kullanıcı; bildirim izni vermemesi, bildirimleri kapatması, uygulamaya girmem
 
 Dilek toplamak, defteri kurmak, düzenlemek ve defterin tamamını ekranda sayfa sayfa görmek ÜCRETSİZDİR.
 
-Ücret yalnızca baskıya hazır nüshanın (yüksek çözünürlüklü, basılabilir dosya) indirilmesi için alınır. Ekranda gösterilen önizleme, baskıya elverişli çözünürlükte değildir.
+Ücret yalnızca baskıya hazır nüshanın (basılabilir dosya) indirilmesi için alınır. Ekranda gösterilen önizleme, sayfaların düzenini görmek içindir ve baskı nüshasının yerine geçmez.
 
 Ödeme yapılmış olması, imha süresini UZATMAZ. Ödeme yapan kullanıcı da 20. günün sonuna kadar eserini indirmekle yükümlüdür.
 
@@ -246,7 +246,7 @@ BiAnıBırak
 
 2. HİZMETİN TEMEL NİTELİKLERİ
 
-Satın aldığınız hizmet: anı defterinizin BASKIYA HAZIR, yüksek çözünürlüklü (300 DPI) PDF dosyası olarak indirilmesi yetkisidir.
+Satın aldığınız hizmet: anı defterinizin BASKIYA HAZIR bir PDF dosyası olarak indirilmesi yetkisidir. Dosya, matbaada bastırılmak üzere hazırlanır ve sistemin sunabildiği en yüksek kalitede üretilir.
 
 Bu yetki:
   - Etkinliğinizin yaşam döngüsü boyunca (özel gününüzden itibaren 20 gün) geçerlidir,
@@ -299,7 +299,7 @@ ALICI: Uygulamaya kayıtlı, ödeme işlemini gerçekleştiren kullanıcı
 
 MADDE 2 - KONU
 
-İşbu sözleşmenin konusu, ALICI'nın uygulama üzerinden oluşturduğu anı defterinin, baskıya hazır yüksek çözünürlüklü (300 DPI) PDF dosyası olarak indirilmesi yetkisinin satışıdır.
+İşbu sözleşmenin konusu, ALICI'nın uygulama üzerinden oluşturduğu anı defterinin, baskıya hazır bir PDF dosyası olarak indirilmesi yetkisinin satışıdır. Dosya, sistemin sunabildiği en yüksek kalitede üretilir.
 
 MADDE 3 - SÖZLEŞME KONUSU HİZMETİN NİTELİĞİ
 

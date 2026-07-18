@@ -25,9 +25,20 @@ public class PushGonderici
 
     // Kullaniciya push gonder. sessizSaateTabi=true -> sessiz aralikta ertele.
     // etkinlikId audit + erteleme tenant izolasyonu icin.
+    // BILDIRIM METNINDE IKI AYRI HEDEF VARDIR - TEK METIN IKISINI DE IYI YAPAMAZ:
+    //
+    //   PUSH (kilit ekrani): isletim sistemi ~120 karakterden sonrasini KESER. Uzun ve
+    //   hukuki bir cumle orada yarim kalir; uyari ciddiyetini yitirir, hatta komik durur.
+    //   Push'un isi bilgilendirmek degil, UYGULAMAYA CAGIRMAKTIR.
+    //
+    //   UYGULAMA ICI (zil menusu): yer boldur, metin tam okunur. Asil mesaj buradadir.
+    //
+    // Bu yuzden pushGovde AYRI verilebilir: kisa + eyleme cagiran. Verilmezse govde
+    // kullanilir ve guvenli sinirda KIRPILIR - hicbir bildirim yarim cumleyle gitmez.
     public async Task GonderAsync(
         Guid kullaniciId, string baslik, string govde, string? url = null,
-        Guid? etkinlikId = null, bool sessizSaateTabi = true, CancellationToken ct = default)
+        Guid? etkinlikId = null, bool sessizSaateTabi = true, CancellationToken ct = default,
+        string? pushGovde = null)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
@@ -47,6 +58,9 @@ public class PushGonderici
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync(ct);
+
+        // PUSH METNI: verildiyse kisa surum, verilmediyse govdenin guvenli kirpigi.
+        var bildirimGovde = PushMetni(pushGovde ?? govde);
 
         var pub = _config["Vapid:PublicKey"];
         var priv = _config["Vapid:PrivateKey"];
@@ -74,7 +88,7 @@ public class PushGonderici
                     EtkinlikId = etkinlikId,
                     KullaniciId = kullaniciId,
                     Baslik = baslik,
-                    Govde = govde,
+                    Govde = bildirimGovde,
                     Url = url,
                     CreatedAt = DateTimeOffset.UtcNow,
                 });
@@ -92,7 +106,7 @@ public class PushGonderici
         var payload = JsonSerializer.Serialize(new
         {
             title = baslik,
-            body = govde,
+            body = bildirimGovde,
             data = new { url },
         });
 
@@ -162,5 +176,35 @@ public class PushGonderici
         if (bas == bit) return false;
         if (bas < bit) return simdi >= bas && simdi < bit;   // ayni gun
         return simdi >= bas || simdi < bit;                  // gece yarisi gecisi
+    }
+
+    // PUSH METNI - guvenli uzunluk + eyleme cagri.
+    //
+    // Isletim sistemleri kilit ekraninda ~120 karakterden sonrasini keser (cihaza gore
+    // degisir; en dar olana gore davraniriz). Kesme, CUMLE ORTASINDA olursa bildirim
+    // hem anlamsiz hem ciddiyetsiz gorunur - ozellikle "defteriniz silinecek" gibi bir
+    // uyaride bu kabul edilemez.
+    //
+    // Bu yuzden: sinira yaklasan metin SON TAM KELIMEDE kesilir, uc nokta konur ve
+    // uygulamaya cagiran sabit bir kuyruk eklenir. Tam metin zaten uygulama ici
+    // bildirimde durur - push yalnizca kapiyi calar.
+    private const int PushSinir = 120;
+    private const string PushCagri = " Hemen göz atmak için tıkla!";
+
+    private static string PushMetni(string metin)
+    {
+        var t = (metin ?? string.Empty).Trim();
+        if (t.Length <= PushSinir) return t;
+
+        // Cagri kuyruguna yer birakarak kes.
+        var kesme = PushSinir - PushCagri.Length;
+        if (kesme < 40) kesme = 40;
+        var parca = t.Substring(0, Math.Min(kesme, t.Length));
+
+        // Son TAM kelimede kes - yarim kelime birakma.
+        var bosluk = parca.LastIndexOf(' ');
+        if (bosluk > 30) parca = parca.Substring(0, bosluk);
+
+        return parca.TrimEnd(' ', ',', ';', ':', '.', '-') + "..." + PushCagri;
     }
 }

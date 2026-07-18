@@ -40,7 +40,7 @@ const BOYUTLAR: {
   ad: string;
   olcu: string;
   aciklama: string;
-  dpi: number;
+  netlik: "en-yuksek" | "yuksek";
   onerilen?: boolean;
 }[] = [
   {
@@ -48,26 +48,26 @@ const BOYUTLAR: {
     ad: "A5",
     olcu: "148 × 210 mm",
     aciklama: "Roman ölçüsü. Elde tutması rahat, küçük ve mahrem.",
-    dpi: 430,
+    netlik: "en-yuksek",
   },
   {
     kod: "a4",
     ad: "A4",
     olcu: "210 × 297 mm",
     aciklama: "Albüm ölçüsü. Fotoğraflar nefes alır, yazı rahat okunur.",
-    dpi: 303,
+    netlik: "en-yuksek",
     onerilen: true,
   },
   {
     kod: "a3",
     ad: "A3",
     olcu: "297 × 420 mm",
-    aciklama: "Anıt ölçüsü. Gösterişli ama fotoğraflar seyrelir.",
-    dpi: 214,
+    aciklama: "Anıt ölçüsü. Gösterişli; en büyük boy.",
+    netlik: "yuksek",
   },
 ];
 
-const BASKI_STANDARDI = 300;
+
 
 export function BoyutSecimi({
   acik,
@@ -168,23 +168,23 @@ export function BoyutSecimi({
                     {b.aciklama}
                   </span>
 
-                  {/* DURUST COZUNURLUK: cift ne aldigini gormeli. */}
+                  {/* NETLIK - NITEL.
+                      Sayisal bir standart (DPI) YAZILMAZ: bir taahhut sayisi vermek,
+                      kaynak fotografin kalitesinden bagimsiz olarak bizi hukuken
+                      baglar. Cift'e dogru olan bilgi zaten sudur: bu boyda fotograflar
+                      ne kadar net gorunur. Kaynak fotograf zayifsa hicbir sayi onu
+                      kurtarmaz - o yuzden vaat degil, BEKLENTI yazariz. */}
                   <span className="mt-1 flex items-center gap-1.5">
                     <span
                       className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        b.dpi >= BASKI_STANDARDI ? "bg-yaldiz" : "bg-sarap"
+                        b.netlik === "en-yuksek" ? "bg-yaldiz" : "bg-yaldiz/60"
                       }`}
                       aria-hidden
                     />
-                    <span
-                      className={`font-govde text-[0.62rem] tabular-nums ${
-                        b.dpi >= BASKI_STANDARDI ? "text-ikincil" : "text-sarap"
-                      }`}
-                    >
-                      Fotoğraflar {b.dpi} DPI
-                      {b.dpi >= BASKI_STANDARDI
-                        ? " · baskı standardının üstünde"
-                        : " · standardın altında, yumuşar"}
+                    <span className="font-govde text-[0.62rem] text-ikincil">
+                      {b.netlik === "en-yuksek"
+                        ? "Fotoğraflar en yüksek netlikte - telefon galerindeki gibi"
+                        : "Fotoğraflar yüksek netlikte; çok büyük boy olduğu için yakından bakıldığında yumuşama görülebilir"}
                     </span>
                   </span>
                 </span>
