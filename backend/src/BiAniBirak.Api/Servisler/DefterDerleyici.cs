@@ -62,8 +62,21 @@ public static class DefterDerleyici
         var (veri, hata) = await EserAsync(etkinlikId, db, depo, icerikKoku);
         if (hata != null) return (null, hata);
 
-        var pdf = BaskiServisi.DefterUret(veri!.Eser, boyut);
-        return (new Sonuc(pdf, veri.Kurasyon, veri.DilekSayisi), null);
+        // SAVUNMA KATMANI (onizleme ile ayni): duzen sigdirilamazsa 500 yerine
+        // anlamli hata. Onizleme ve indirme AYNI belgeden uretildigi icin ikisi
+        // de ayni korumaya sahip olmalidir - biri patlarken digeri calisamaz.
+        byte[] pdf;
+        try
+        {
+            pdf = BaskiServisi.DefterUret(veri!.Eser, boyut);
+        }
+        catch (QuestPDF.Drawing.Exceptions.DocumentLayoutException)
+        {
+            return (null, new Hata("DUZEN_HATASI",
+                "Defter sayfalara sigdirilamadi. Cok uzun bir dilek ya da cok buyuk bir gorsel olabilir."));
+        }
+
+        return (new Sonuc(pdf, veri!.Kurasyon, veri.DilekSayisi), null);
     }
 
     private sealed record EserVeri(

@@ -760,7 +760,7 @@ public static class SuperTeshisUclari
             id, db, depo, ortam.ContentRootPath);
 
         if (hata != null)
-            return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);
+            return Hata(hata.Kod is "DILEK_YOK" or "DUZEN_HATASI" ? 400 : 404, hata.Kod, hata.Mesaj);
 
         // Adli iz: yonetici bir ciftin defterini GORDU. Bu kayit silinemez.
         db.DenetimGunlukleri.Add(new Entities.DenetimGunlugu

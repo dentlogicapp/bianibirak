@@ -464,11 +464,66 @@ public static class BaskiServisi
                 foreach (var d in dilekler)
                 {
                     // Her dilek BOLUNMEZ (ShowEntire): sayfa ortasindan kesilmez.
-                    sutun.Item().PaddingBottom(16).ShowEntire()
-                        .Element(c => DilekKarti(c, d, eser));
+                    //
+                    // ISTISNA - UZUN DILEK: bir kart tek sayfaya SIGMIYORSA ShowEntire
+                    // QuestPDF'i DocumentLayoutException ile patlatir ve TUM defter coker
+                    // (onizleme + PDF indirme birlikte olur). Mesaj 5000 karaktere kadar
+                    // serbest oldugu icin bu kacinilmazdir. Sigmayan kart, kaliteyi
+                    // korumak yerine SAYFALARA BOLUNUR: defter coksun degil, aksin.
+                    var oge = sutun.Item().PaddingBottom(16);
+                    if (KartSigarMi(d))
+                        oge = oge.ShowEntire();
+                    oge.Element(c => DilekKarti(c, d, eser));
                 }
             }
         });
+    }
+
+    // ---- KART SIGAR MI? (uzun dilek korumasi) ----
+    //
+    // ShowEntire() yalniz SIGAN kartlara uygulanir. Sigmayan karta uygulanirsa
+    // QuestPDF "conflicting size constraints" firlatir ve defter hic uretilemez.
+    // Burada kartin yuksekligi TAHMIN edilir; tahmin kaba ama GUVENLI TARAFA
+    // egiktir (%86 esigi): supheli durumda kart bolunur, defter yine uretilir.
+    //
+    // Olcu birimi = A5 tasarim puntosu (Scale=1). Buyuk boylarda her sey ayni
+    // katsayiyla olceklendigi icin oran degismez - tek hesap her boyda gecerlidir.
+
+    // A5 icerik yuksekligi: 210mm - 18mm ust - 16mm alt = 176mm; altbilgi ~26pt.
+    private const float SayfaIcerikYuksekligi = 176f * 72f / 25.4f - 26f;
+
+    private static bool KartSigarMi(Dilek d)
+    {
+        var yukseklik = 0f;
+        var satirGenislik = 320f; // fotografsiz: tam icerik genisligi
+
+        if (d.Foto != null)
+        {
+            var yon = YonBul(d.FotoGenislik, d.FotoYukseklik);
+            var (azamiG, azamiY) = yon switch
+            {
+                Yon.Dikey => (198f, 232f),
+                Yon.Kare => (216f, 216f),
+                _ => (268f, 182f),
+            };
+            var (_, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, azamiG, azamiY);
+            yukseklik += fy + 3.5f * 2 + 13f; // foto + mat + altindaki bosluk
+            yukseklik += 13f * 2;             // kart ic dolgusu
+            satirGenislik = 294f;             // dolgu kadar dar
+        }
+
+        // Metin: 10.5 punto, 1.72 satir araligi -> satir yuksekligi ~18.1pt.
+        // Ortalama karakter genisligi ~5pt (serif, 10.5 punto).
+        var karakterSatir = Math.Max(20f, satirGenislik / 5.0f);
+        var satirlar = 0;
+        foreach (var parca in (d.Mesaj ?? string.Empty).Replace("\r\n", "\n").Split('\n'))
+            satirlar += Math.Max(1, (int)Math.Ceiling(parca.Length / karakterSatir));
+        yukseklik += satirlar * 18.1f;
+
+        yukseklik += 54f; // imza blogu: ayrac + ad + iliski + tarih
+        yukseklik += 16f; // kartlar arasi bosluk
+
+        return yukseklik <= SayfaIcerikYuksekligi * 0.86f;
     }
 
     // DILEK KARTI - kapali birim.

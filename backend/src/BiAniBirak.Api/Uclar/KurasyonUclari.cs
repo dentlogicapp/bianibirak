@@ -96,7 +96,7 @@ public static class KurasyonUclari
 
         if (derlemeHatasi != null)
             return Hata(
-                derlemeHatasi.Kod == "DILEK_YOK" ? 400 : 404,
+                derlemeHatasi.Kod is "DILEK_YOK" or "DUZEN_HATASI" ? 400 : 404,
                 derlemeHatasi.Kod,
                 derlemeHatasi.Kod == "KURASYON_BULUNAMADI"
                     ? "Önce kürasyon stüdyosunu aç."
@@ -157,7 +157,7 @@ public static class KurasyonUclari
             etkinlikId, db, depo, ortam.ContentRootPath);
 
         if (hata != null)
-            return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);
+            return Hata(hata.Kod is "DILEK_YOK" or "DUZEN_HATASI" ? 400 : 404, hata.Kod, hata.Mesaj);
 
         return Results.Json(new
         {
@@ -186,7 +186,7 @@ public static class KurasyonUclari
             etkinlikId, db, depo, ortam.ContentRootPath);
 
         if (hata != null)
-            return Hata(hata.Kod == "DILEK_YOK" ? 400 : 404, hata.Kod, hata.Mesaj);
+            return Hata(hata.Kod is "DILEK_YOK" or "DUZEN_HATASI" ? 400 : 404, hata.Kod, hata.Mesaj);
 
         if (sayfa < 0 || sayfa >= sayfalar!.Count)
             return Hata(404, "SAYFA_BULUNAMADI", "Sayfa bulunamadı.");

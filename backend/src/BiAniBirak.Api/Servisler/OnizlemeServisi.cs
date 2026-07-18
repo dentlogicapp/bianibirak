@@ -153,7 +153,20 @@ public static class OnizlemeServisi
                 RasterDpi = OnizlemeDpi,
             };
 
-            var sayfalar = belge!.GenerateImages(ayar).ToList();
+            // SAVUNMA KATMANI: duzen tahmini yanilirsa (cok uzun dilek, asiri buyuk
+            // gorsel) QuestPDF DocumentLayoutException firlatir. Yakalanmazsa istek
+            // 500 doner ve kullanici "Bir hata olustu" gorur - teshis imkansiz.
+            // Yakalayip ANLAMLI hata kodu donuyoruz.
+            List<byte[]> sayfalar;
+            try
+            {
+                sayfalar = belge!.GenerateImages(ayar).ToList();
+            }
+            catch (QuestPDF.Drawing.Exceptions.DocumentLayoutException)
+            {
+                return (null, new DefterDerleyici.Hata("DUZEN_HATASI",
+                    "Defter sayfalara sigdirilamadi. Cok uzun bir dilek ya da cok buyuk bir gorsel olabilir."));
+            }
 
             lock (_bellek)
             {
