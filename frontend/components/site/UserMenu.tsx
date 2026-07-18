@@ -7,10 +7,12 @@ import { api, type Kullanici, type Bildirim, type Etkinlik } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
 
-// Avatar menusu: bolumlu dropdown.
-// A) Hesap & araclar: Profilim, Fotograflar, Ayarlar, Cop Kutusu, Super Panel
-// B) Defter yollari: Gelen Dilekler, Dilek Baglantisi, Davetiye QR, Baskiya Hazir Defter
-// C) Etkinlik switcher (2+), Tema, Bildirimler, Cikis.
+// Avatar menusu: bolumlu dropdown (Planlama Defteri tenant deseninin defter karsiligi).
+// A) Baslik: isim + mail + ACIK DEFTER (baglam her zaman gorunur)
+// B) DIGER DEFTERLERIN (2+ defter varsa; acik olan haric) - tiklayinca ANINDA gecis
+// C) Hesap & araclar: Profilim, Fotograflar, Ayarlar, Cop Kutusu, Super Panel
+// D) Defter yollari: Gelen Dilekler, Dilek Baglantisi, Davetiye QR, Baskiya Hazir Defter
+// E) Tema, Bildirimler, Cikis.
 export function UserMenu() {
   const router = useRouter();
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
@@ -21,6 +23,10 @@ export function UserMenu() {
   const [okunmamis, setOkunmamis] = useState(0);
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
   const [aktifId, setAktifId] = useState<string | null>(null);
+
+  // Turetilmis: acik defter ve digerleri. Tek kaynak - iki ayri filtre tutulmaz.
+  const aktifEtkinlik = etkinlikler.find((e) => e.id === aktifId) ?? null;
+  const digerEtkinlikler = etkinlikler.filter((e) => e.id !== aktifId);
   const [gecis, setGecis] = useState(false);
   const [tema, temaTersle] = useTema();
   const kutuRef = useRef<HTMLDivElement>(null);
@@ -182,16 +188,75 @@ export function UserMenu() {
 
       {acik && (
         <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-xl">
-          {/* Kullanici basligi (isim + mail) */}
-          <div className="flex items-center gap-3 border-b border-ayrac px-4 py-3.5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sarap font-display text-base font-medium text-parsomen">
-              {basHarf}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-govde text-sm font-medium text-murekkep">{kullanici.ad}</p>
-              <p className="truncate font-govde text-xs text-ikincil">{kullanici.email}</p>
+          {/* Kullanici basligi (isim + mail + ICINDE BULUNULAN DEFTER) */}
+          <div className="border-b border-ayrac px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sarap font-display text-base font-medium text-parsomen">
+                {basHarf}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-govde text-sm font-medium text-murekkep">{kullanici.ad}</p>
+                <p className="truncate font-govde text-xs text-ikincil">{kullanici.email}</p>
+              </div>
             </div>
+
+            {/* ICINDE BULUNULAN DEFTER - "neredeyim?" sorusu menuyu acar acmaz yanitlanir.
+                Cok defterli kullanicida yanlis deftere islem yapmanin tek panzehiri
+                baglami HER ZAMAN gorunur kilmaktir. */}
+            {aktifEtkinlik && (
+              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-yuzeyKoyu px-3 py-2">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yaldiz" aria-hidden />
+                <div className="min-w-0">
+                  <p className="font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                    Açık defter
+                  </p>
+                  <p className="truncate font-govde text-xs font-medium text-murekkep">
+                    {aktifEtkinlik.es1_ad} &amp; {aktifEtkinlik.es2_ad} - {turKisa(aktifEtkinlik.tur)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* DIGER DEFTERLER - yalniz 2+ defter varsa; icinde bulunulan HARIC.
+              Konum bilincli: baglamin (acik defter) HEMEN ALTINDA. Tiklayinca gecis
+              kendiliginden yapilir, ara sayfa yok. */}
+          {digerEtkinlikler.length > 0 && (
+            <div className="border-b border-ayrac p-1.5">
+              <p className="px-3 pb-1 pt-1 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                Diğer defterlerin
+              </p>
+              {digerEtkinlikler.map((e) => (
+                <button
+                  key={e.id}
+                  disabled={gecis}
+                  onClick={() => etkinlikDegistir(e.id)}
+                  className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+                    <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                    <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                  </svg>
+                  <span className="min-w-0 flex-1 truncate">
+                    {e.es1_ad} &amp; {e.es2_ad} - {turKisa(e.tur)}
+                  </span>
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-ikincil" aria-hidden>
+                    <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                </button>
+              ))}
+              <Link
+                href="/etkinliklerim"
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-xs text-ikincil transition-colors hover:bg-yuzeyKoyu"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                </svg>
+                Tüm defterlerim
+              </Link>
+            </div>
+          )}
 
           {/* Bolum A - Hesap & araclar: Profilim, Fotograflar, Ayarlar, Cop Kutusu, Super Panel */}
           <div className="border-b border-ayrac p-1.5">
@@ -284,40 +349,6 @@ export function UserMenu() {
               Baskıya Hazır Defter
             </MenuLink>
           </div>
-
-          {/* Etkinlik switcher (yalniz 2+ etkinlik) */}
-          {etkinlikler.length >= 2 && (
-            <div className="border-b border-ayrac p-1.5">
-              {etkinlikler
-                .filter((e) => e.id !== aktifId)
-                .map((e) => (
-                  <button
-                    key={e.id}
-                    disabled={gecis}
-                    onClick={() => etkinlikDegistir(e.id)}
-                    className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
-                      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                      <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-                    </svg>
-                    <span className="min-w-0 flex-1 truncate">
-                      {e.es1_ad} &amp; {e.es2_ad} - {turKisa(e.tur)}
-                    </span>
-                  </button>
-                ))}
-              <Link
-                href="/etkinliklerim"
-                onClick={() => setAcik(false)}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-xs text-ikincil transition-colors hover:bg-yuzeyKoyu"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-                </svg>
-                Tüm etkinliklerim
-              </Link>
-            </div>
-          )}
 
           {/* Tema */}
           <div className="border-b border-ayrac p-1.5">

@@ -99,7 +99,7 @@ Kullanıcı, hesap oluşturarak işbu Kullanım Koşulları'nı okuduğunu, anla
 
     public const string KvkkEsMetni = @"KVKK Aydınlatma Metni (Hesap Sahibi)
 
-Veri Sorumlusu: BiAnıBırak (Musa Deveci - Konya)
+Veri Sorumlusu: www.bianibirak.com
 
 1. İŞLENEN KİŞİSEL VERİLER
 
@@ -150,7 +150,7 @@ Verileriniz, hizmetin sunulması için gerekli olan altyapı sağlayıcıları d
     // kullanilsin mi?" Kisa, net, tek amac. KVKK'nin istedigi de budur.
     public const string KvkkDavetliMetni = @"KVKK Aydınlatma Metni (Davetli)
 
-Veri Sorumlusu: BiAnıBırak (Musa Deveci - Konya)
+Veri Sorumlusu: www.bianibirak.com
 
 1. HANGİ VERİLERİNİZ İŞLENİYOR
 
