@@ -65,6 +65,7 @@ function DefterIcerik() {
 
   // Bildirimden gelen dilek yerel listelerde var mi? Yoksa durumunu cek + toast.
   const odakIslendi = useRef<string | null>(null);
+  const yenilendi = useRef(false); // bayat liste tazelemesi: tek sefer
   useEffect(() => {
     if (!odakId || durum !== "hazir") return;
     if (odakIslendi.current === odakId) return; // ayni odak icin tek kez
@@ -104,9 +105,27 @@ function DefterIcerik() {
         toast.error(
           "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor."
         );
-      } else {
-        toast.error("Ulaşmaya çalıştığın dilek bu defterde görüntülenemiyor.");
+        return;
       }
+
+      // BAYAT LISTE - KENDINI ONARIR.
+      //
+      // Dilek BU defterde ve gorunur durumda (beklemede/onayli) ama yerel listede yok:
+      // bildirim geldiginde sayfa zaten aciksa liste o andan eskidir. Onceden bu durum
+      // son "else"e dusup "goruntulenemiyor" diyordu - kullaniciya YALAN. Dogrusu:
+      // listeyi tazele, dilek yerine otursun. Tek sefer denenir (dongu olmaz).
+      if (!yenilendi.current) {
+        yenilendi.current = true;
+        odakIslendi.current = null; // tazelemeden sonra odak yeniden degerlendirilsin
+        void (async () => {
+          const [k, d] = await Promise.all([api.katkiKuyruk(), api.katkiDefter()]);
+          if (k.ok) setKuyruk(k.veri);
+          if (d.ok) setDefter(d.veri);
+        })();
+        return;
+      }
+
+      toast.error("Ulaşmaya çalıştığın dilek bu defterde görüntülenemiyor.");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [odakId, durum, kuyruk.length, defter.length]);
