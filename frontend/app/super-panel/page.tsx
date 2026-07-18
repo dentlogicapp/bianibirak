@@ -15,6 +15,7 @@ import {
 import { AppShell } from "@/components/site/AppShell";
 import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
+import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
 import OdemelerSekmesi from "@/components/site/OdemelerSekmesi";
 
@@ -175,7 +176,9 @@ function DefterlerSekmesi() {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islenen, setIslenen] = useState<string | null>(null);
   const [silHedef, setSilHedef] = useState<SuperDefter | null>(null);
-  const [teyit, setTeyit] = useState("");
+  // ONAY HEDEFLERI - geri alinabilir eylemler de artik ETKISINI anlatarak sorar.
+  const [dondurHedef, setDondurHedef] = useState<SuperDefter | null>(null);
+  const [copHedef, setCopHedef] = useState<SuperDefter | null>(null);
 
   const cek = useCallback(async () => {
     setYukleniyor(true);
@@ -227,14 +230,16 @@ function DefterlerSekmesi() {
 
   async function kaliciSil() {
     if (!silHedef) return;
-    const c = await api.superDefterKaliciSil(silHedef.id, teyit);
+    // Teyit metni ARTIK bilesende dogrulaniyor (kullanici birebir yazmadan buton
+    // acilmiyor). Backend yine de kendi kontrolunu yapar - defense in depth.
+    const c = await api.superDefterKaliciSil(
+      silHedef.id, `${silHedef.es1_ad} & ${silHedef.es2_ad}`);
     if (!c.ok) {
       toast.error(c.mesaj);
       return;
     }
     toast.success("Defter kalıcı olarak silindi.");
     setSilHedef(null);
-    setTeyit("");
     void cek();
   }
 
@@ -320,24 +325,21 @@ function DefterlerSekmesi() {
                   Görüntüle
                 </button>
                 <button
-                  onClick={() => dondur(d)}
+                  onClick={() => setDondurHedef(d)}
                   disabled={islenen === d.id}
                   className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
                 >
                   {d.donduruldu ? "Çöz" : "Dondur"}
                 </button>
                 <button
-                  onClick={() => copeAt(d)}
+                  onClick={() => setCopHedef(d)}
                   disabled={islenen === d.id}
                   className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
                 >
                   Çöpe at
                 </button>
                 <button
-                  onClick={() => {
-                    setSilHedef(d);
-                    setTeyit("");
-                  }}
+                  onClick={() => setSilHedef(d)}
                   disabled={islenen === d.id || !d.silindi_mi}
                   title={d.silindi_mi ? "" : "Önce çöpe atılmalı"}
                   className="rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-40"
@@ -355,51 +357,77 @@ function DefterlerSekmesi() {
         <DefterDetayModal defterId={detayId} onKapat={() => setDetayId(null)} />
       )}
 
-      {/* Kalici silme onayi - cift adi teyidi */}
-      {silHedef && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setSilHedef(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-3xl border border-sarap/40 bg-yuzey p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="font-display text-lg text-sarap">Kalıcı sil - geri alınamaz</p>
-            <p className="metin-yasli mt-3 font-govde text-sm leading-relaxed text-ikincil">
-              Bu defter ve ona ait tüm dilekler, bağlantılar, üyelikler veritabanından kalıcı
-              olarak silinecek. Denetim kayıtları adli iz olarak korunur.
-            </p>
-            <p className="mt-4 font-govde text-xs text-ikincil">
-              Onaylamak için tam olarak şunu yaz:
-            </p>
-            <p className="mt-1 rounded-lg border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep">
-              {silHedef.es1_ad} &amp; {silHedef.es2_ad}
-            </p>
-            <input
-              value={teyit}
-              onChange={(e) => setTeyit(e.target.value)}
-              placeholder="Buraya yaz..."
-              className="mt-3 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
-            />
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={kaliciSil}
-                disabled={teyit !== `${silHedef.es1_ad} & ${silHedef.es2_ad}`}
-                className="flex-1 rounded-full bg-sarap px-5 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-40"
-              >
-                Kalıcı sil
-              </button>
-              <button
-                onClick={() => setSilHedef(null)}
-                className="rounded-full border border-ayrac px-5 py-3 font-govde text-sm text-ikincil transition-colors hover:border-murekkep"
-              >
-                Vazgeç
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* DONDUR / COZ - geri alinabilir ama ETKISI buyuk: cift yazamaz, indiremez. */}
+      <TehlikeliEylem
+        acik={dondurHedef !== null}
+        siddet={dondurHedef?.donduruldu ? "bilgi" : "uyari"}
+        baslik={
+          dondurHedef?.donduruldu
+            ? `Dondurmayı çöz: ${dondurHedef?.es1_ad} & ${dondurHedef?.es2_ad}`
+            : `Defteri dondur: ${dondurHedef?.es1_ad} & ${dondurHedef?.es2_ad}`
+        }
+        etkilenen="Çift ve tüm davetliler"
+        etkiler={
+          dondurHedef?.donduruldu
+            ? [
+                "Defter yeniden yazılabilir hale gelir.",
+                "Davetliler tekrar dilek bırakabilir.",
+                "Çift baskıya hazır nüshayı indirebilir.",
+                "Her iki eşe bildirim gönderilir.",
+              ]
+            : [
+                "Defter SALT OKUNUR olur - çift görüntüler ama hiçbir değişiklik yapamaz.",
+                "Davetliler dilek bırakamaz; bağlantıya girenler kapalı uyarısı görür.",
+                "Baskıya hazır nüsha İNDİRİLEMEZ.",
+                "Çiftin ekranında donduruldu bandı görünür ve her iki eşe bildirim gider.",
+                "Geri sayım hatırlatmaları durur; imha takvimi DEĞİŞMEZ.",
+              ]
+        }
+        geriDonus="Aynı düğmeden çözülebilir; hiçbir veri kaybolmaz."
+        onayEtiket={dondurHedef?.donduruldu ? "Dondurmayı çöz" : "Defteri dondur"}
+        yukleniyor={islenen === dondurHedef?.id}
+        onOnay={() => { const d = dondurHedef; if (d) { void dondur(d); } setDondurHedef(null); }}
+        onKapat={() => setDondurHedef(null)}
+      />
+
+      {/* COPE AT - geri alinabilir (cop kutusu), ama cift icin defter KAYBOLUR. */}
+      <TehlikeliEylem
+        acik={copHedef !== null}
+        siddet="uyari"
+        baslik={`Çöp kutusuna taşı: ${copHedef?.es1_ad} & ${copHedef?.es2_ad}`}
+        etkilenen="Çift ve tüm davetliler"
+        etkiler={[
+          "Defter çiftin hesabından kaybolur - panelde artık görünmez.",
+          "Davetli bağlantıları çalışmaz.",
+          "Veriler SİLİNMEZ; çöp kutusunda bekler.",
+        ]}
+        geriDonus="Çöp Kutusu sekmesinden geri alınabilir. Veri kaybı olmaz."
+        onayEtiket="Çöp kutusuna taşı"
+        yukleniyor={islenen === copHedef?.id}
+        onOnay={() => { const d = copHedef; if (d) { void copeAt(d); } setCopHedef(null); }}
+        onKapat={() => setCopHedef(null)}
+      />
+
+      {/* KALICI SIL - GERI ALINAMAZ. Ayni bilesen, en yuksek siddet.
+          Onceden burada AYRI bir modal vardi; iki farkli onay tasarimi, iki farkli
+          dikkat seviyesi uretiyordu. Tek bilesen = tek dil = ogrenilmis guven. */}
+      <TehlikeliEylem
+        acik={silHedef !== null}
+        siddet="kritik"
+        baslik={`Kalıcı sil: ${silHedef?.es1_ad} & ${silHedef?.es2_ad}`}
+        etkilenen="Çift, davetliler ve tüm defter içeriği"
+        etkiler={[
+          "Defter, dilekler, fotoğraflar, bağlantılar ve üyelikler veritabanından silinir.",
+          "Yüklenen tüm medya dosyaları diskten silinir.",
+          "Çift bir daha bu deftere erişemez; kurtarma yolu yoktur.",
+          "Denetim kayıtları adli iz olarak korunur (kişisel veri içermez).",
+        ]}
+        geriDonus={null}
+        teyitMetni={silHedef ? `${silHedef.es1_ad} & ${silHedef.es2_ad}` : undefined}
+        onayEtiket="Kalıcı olarak sil"
+        onOnay={() => { void kaliciSil(); }}
+        onKapat={() => setSilHedef(null)}
+      />
     </div>
   );
 }
