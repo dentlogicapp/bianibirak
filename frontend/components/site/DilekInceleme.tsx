@@ -75,7 +75,7 @@ export function DilekInceleme({
       aria-modal="true"
     >
       {/* KAGIT YUZEYI - panelden farkli bir katman oldugu bir bakista anlasilir */}
-      <div className="flex h-full w-full flex-col overflow-hidden bg-parsomen shadow-[0_0_80px_rgba(33,26,23,0.5)] sm:m-auto sm:h-[94vh] sm:max-w-5xl sm:rounded-3xl">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-parsomen shadow-[0_0_80px_rgba(33,26,23,0.5)] sm:m-auto sm:h-[94dvh] sm:max-w-5xl sm:rounded-3xl">
         {/* Yaldiz ust serit - "yeni bir sayfadasin" */}
         <div className="h-1 shrink-0 bg-gradient-to-r from-yaldiz/30 via-yaldiz to-yaldiz/30" aria-hidden />
 
@@ -123,7 +123,10 @@ export function DilekInceleme({
               Defterde böyle görünecek
             </p>
 
-            <div className="mx-auto mt-3 max-w-md overflow-hidden rounded-lg bg-[#fdf9f0] px-4 py-5 shadow-[0_10px_36px_rgba(33,26,23,0.18)]">
+            {/* UZUN DILEK: kagit, pencerenin altina TASMAZ. Sigan kisim standart
+                boyutta gorunur; kalani kagidin KENDI kaydirmasiyla okunur
+                (overscroll-contain: kagit biterken sayfa ziplamaz). */}
+            <div className="mx-auto mt-3 max-h-[52vh] max-w-md overflow-y-auto overscroll-contain rounded-lg bg-[#fdf9f0] px-4 py-5 shadow-[0_10px_36px_rgba(33,26,23,0.18)] sm:max-h-[58vh] lg:max-h-none lg:overflow-visible">
               <DefterKarti
                 ad={katki.davetli_ad}
                 iliski={katki.davetli_iliski}

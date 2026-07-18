@@ -33,13 +33,14 @@ export function DefterOnizleme() {
   const [sayfa, setSayfa] = useState(0);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [hata, setHata] = useState("");
+  const [hataKodu, setHataKodu] = useState("");
   const [tamEkran, setTamEkran] = useState(false);
 
   useEffect(() => {
     void (async () => {
       const c = await onizlemeBilgi();
       if (c.ok) setBilgi(c.veri);
-      else setHata(c.mesaj);
+      else { setHata(c.mesaj); setHataKodu(c.hata); }
       setYukleniyor(false);
     })();
   }, []);
@@ -72,14 +73,24 @@ export function DefterOnizleme() {
   }
 
   if (hata || !bilgi) {
+    // DURUSTLUK: ipucu satiri ARTIK KOSULLU. Onceden her hatada "en az bir dilek
+    // eklemeniz gerekir" yaziyordu; 500/402 gibi ilgisiz hatalarda kullaniciyi
+    // yanlis yere yonlendiriyordu (teshis kaybi).
+    const dilekYok = hataKodu === "DILEK_YOK";
     return (
       <div className="rounded-3xl border border-dashed border-ayrac bg-parsomen px-6 py-12 text-center">
         <p className="font-govde text-sm text-ikincil">
           {hata || "Önizleme hazırlanamadı."}
         </p>
-        <p className="mt-1.5 font-govde text-xs text-ikincil">
-          Esere en az bir dilek eklemeniz gerekir.
-        </p>
+        {dilekYok ? (
+          <p className="mt-1.5 font-govde text-xs text-ikincil">
+            Esere en az bir dilek eklemeniz gerekir.
+          </p>
+        ) : (
+          <p className="mt-1.5 font-govde text-xs text-ikincil">
+            Sorun sürerse sayfayı yenile; devam ederse bize bildir.
+          </p>
+        )}
       </div>
     );
   }
