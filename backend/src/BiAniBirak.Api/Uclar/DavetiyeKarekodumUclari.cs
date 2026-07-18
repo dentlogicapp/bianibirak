@@ -148,6 +148,10 @@ public static class DavetiyeKarekodumUclari
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadı.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId, ct))
+            return DondurmaGuard.Reddet();
+
         // basit dogrulama / sinirlama
         var zemin = (girdi.Zemin ?? "#525151").Trim();
         if (!System.Text.RegularExpressions.Regex.IsMatch(zemin, "^#[0-9A-Fa-f]{6}$"))

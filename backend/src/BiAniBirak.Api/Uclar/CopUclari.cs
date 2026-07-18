@@ -105,6 +105,10 @@ public static class CopUclari
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         var katki = await db.Katkilar.FirstOrDefaultAsync(k => k.Id == katkiId && k.EtkinlikId == etkinlikId);
         if (katki == null) return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");
         if (katki.KaynakEs != rol) return Hata(403, "ERISIM_YOK", "Bu dilek sizin cop kutunuzda degil.");
@@ -147,6 +151,10 @@ public static class CopUclari
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         var katki = await db.Katkilar.FirstOrDefaultAsync(k => k.Id == katkiId && k.EtkinlikId == etkinlikId);
         if (katki == null) return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");
@@ -193,6 +201,10 @@ public static class CopUclari
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         var katki = await db.Katkilar.FirstOrDefaultAsync(k => k.Id == katkiId && k.EtkinlikId == etkinlikId);
         if (katki == null) return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadi.");

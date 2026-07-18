@@ -54,6 +54,8 @@ export type Etkinlik = {
   indirme_gun: number; // 7
   toplam_gun: number; // 37
   imha_edildi: boolean;
+  // Super admin defteri dondurdu: salt okunur (yazim ve indirme kapali).
+  donduruldu: boolean;
 
   durum: string;
   rol: string | null;
@@ -461,7 +463,6 @@ export const api = {
     tema: string;
     karsilamaMetni: string;
     promptMetni: string;
-    kapanisPencereGun: number;
     sayacAktif: boolean;
     sayacAktifCumle: string;
     sayacBittiCumle: string;
@@ -473,7 +474,6 @@ export const api = {
         Tema: v.tema ?? null,
         KarsilamaMetni: v.karsilamaMetni ?? null,
         PromptMetni: v.promptMetni ?? null,
-        KapanisPencereGun: v.kapanisPencereGun ?? null,
         SayacAktif: v.sayacAktif ?? null,
         SayacAktifCumle: v.sayacAktifCumle ?? null,
         SayacBittiCumle: v.sayacBittiCumle ?? null,

@@ -9,6 +9,7 @@ import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
 import { GoruntulemeBandi } from "@/components/site/GoruntulemeBandi";
 import { OnayKapisi } from "@/components/site/OnayKapisi";
 import { useSwOdakDinleyici } from "@/lib/odak";
+import { api } from "@/lib/api";
 
 // Uygulama kabugu: TEK navigasyon noktasi = avatar menusu + baglamsal ust bar.
 // Kok sayfada wordmark, alt sayfalarda "< Baslik" (geri = EBEVEYN sayfa, tarayici
@@ -31,6 +32,21 @@ const HIYERARSI: Record<string, Sayfa> = {
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // DONDURULMUS DEFTER BANDI - her sayfada gorunur.
+  //
+  // Onceden super admin defteri dondurunca cift HICBIR SEY gormuyordu: davetliler
+  // sessizce reddediliyor, cift "uygulama bozuldu" saniyordu. Bir yaptirim,
+  // uygulandigi kisiye ANLATILMADIKCA yaptirim degil, arizadir.
+  const [donduruldu, setDonduruldu] = useState(false);
+
+  useEffect(() => {
+    let iptal = false;
+    void api.etkinlikAktif().then((c) => {
+      if (!iptal && c.ok) setDonduruldu(Boolean(c.veri.donduruldu));
+    });
+    return () => { iptal = true; };
+  }, []);
+
   const yol = usePathname();
 
   // ONAY KAPISI - eksik onay varsa panele girilemez.
@@ -123,6 +139,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         key={yol}
         className="sayfa-girisi mx-auto max-w-icerik px-5 pb-16 pt-6 sm:px-6"
       >
+        {donduruldu && (
+          <div className="mb-5 flex items-start gap-3 rounded-2xl border border-sarap/40 bg-sarap/10 px-5 py-4">
+            <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 text-sarap" aria-hidden>
+              <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth={1.7} fill="none" />
+              <path d="M8 10V7.5a4 4 0 0 1 8 0V10" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" fill="none" />
+            </svg>
+            <div className="min-w-0">
+              <p className="font-govde text-sm font-medium text-murekkep">
+                Defteriniz geçici olarak donduruldu
+              </p>
+              <p className="metin-yasli mt-1 font-govde text-xs leading-relaxed text-ikincil">
+                Defterinizi görüntüleyebilirsiniz; ancak bu süre boyunca değişiklik
+                yapılamaz, yeni dilek alınamaz ve baskıya hazır nüsha indirilemez.
+                Sebebini öğrenmek ve çözmek için bizimle iletişime geçin.
+              </p>
+            </div>
+          </div>
+        )}
         {children}
       </main>
 

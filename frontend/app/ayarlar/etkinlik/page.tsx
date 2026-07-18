@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, type Etkinlik, type EtkinlikAyar } from "@/lib/api";
-import { VARSAYILAN } from "@/lib/varsayilan";
 import { AppShell } from "@/components/site/AppShell";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DavetliOnizleme } from "@/components/site/DavetliOnizleme";
@@ -108,7 +107,6 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
   // --- Davetli ekrani alanlari ---
   const [karsilama, setKarsilama] = useState(ilkAyar.karsilama_metni ?? "");
   const [prompt, setPrompt] = useState(ilkAyar.prompt_metni ?? "");
-  const [gun, setGun] = useState(String(ilkAyar.kapanis_pencere_gun));
 
   // --- Sayac alanlari ---
   const [sayacAktif, setSayacAktif] = useState(ilkAyar.sayac_aktif);
@@ -142,21 +140,18 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
   const ayarDegisti =
     karsilama !== (ilkAyar.karsilama_metni ?? "") ||
     prompt !== (ilkAyar.prompt_metni ?? "") ||
-    gun !== String(ilkAyar.kapanis_pencere_gun) ||
     sayacAktif !== ilkAyar.sayac_aktif ||
     sayacAktifCumle !== (ilkAyar.sayac_aktif_cumle ?? "") ||
     sayacBittiCumle !== (ilkAyar.sayac_bitti_cumle ?? "");
 
   async function ayarKaydet(): Promise<boolean> {
-    const g = parseInt(gun, 10);
-    if (isNaN(g) || g < VARSAYILAN.minKapanisPencereGun || g > VARSAYILAN.maxKapanisPencereGun) {
-      toast.error(`Kapanış penceresi en az ${VARSAYILAN.minKapanisPencereGun} gün olmalı.`);
-      return false;
-    }
+    // KAPANIS PENCERESI ARTIK AYAR DEGIL - KANON.
+    // Toplama HER defterde ozel gun + Sabitler.ToplamaGun'dur; kullanici
+    // degistiremez. Eskiden burada duzenlenebilir bir alan vardi ama backend
+    // girdiyi zaten yok sayip kanonu yaziyordu: ekran YALAN SOYLUYORDU.
     const c = await api.etkinlikAyarGuncelle({
       karsilamaMetni: karsilama,
       promptMetni: prompt,
-      kapanisPencereGun: g,
       sayacAktif,
       sayacAktifCumle,
       sayacBittiCumle,
@@ -174,7 +169,7 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
     etkinlikKaydet
   );
   const ayarDurum = useOtoKaydet(
-    JSON.stringify({ karsilama, prompt, gun, sayacAktif, sayacAktifCumle, sayacBittiCumle }),
+    JSON.stringify({ karsilama, prompt, sayacAktif, sayacAktifCumle, sayacBittiCumle }),
     ayarDegisti,
     ayarKaydet
   );
@@ -278,20 +273,6 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
                   onChange={(e) => setPrompt(e.target.value)}
                   className={girdiSinif}
                 />
-              </Alan>
-              <Alan etiket="Kapanış penceresi (gün)">
-                <input
-                  type="number"
-                  min={VARSAYILAN.minKapanisPencereGun}
-                  max={VARSAYILAN.maxKapanisPencereGun}
-                  value={gun}
-                  onChange={(e) => setGun(e.target.value)}
-                  className={girdiSinif + " w-40"}
-                />
-                <p className="mt-2 font-govde text-xs text-ikincil">
-                  Etkinlik tarihinden sonra bu kadar gün dilek toplanır. Minimum{" "}
-                  {VARSAYILAN.minKapanisPencereGun} gün.
-                </p>
               </Alan>
             </div>
           )}

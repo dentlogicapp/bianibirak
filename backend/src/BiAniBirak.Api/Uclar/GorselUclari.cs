@@ -95,6 +95,10 @@ public static class GorselUclari
         var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         if (dosya == null || dosya.Length == 0)
             return Hata(400, "DOGRULAMA_HATASI", "Bir görsel seçmelisin.");
         if (dosya.Length > DepolamaServisi.TavanBayt)
@@ -173,6 +177,10 @@ public static class GorselUclari
         var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         var gorsel = await db.EtkinlikGorselleri
             .FirstOrDefaultAsync(g => g.Id == id && g.EtkinlikId == etkinlikId);
         if (gorsel == null)
@@ -207,6 +215,10 @@ public static class GorselUclari
         var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         if (istek.Idler == null || istek.Idler.Length == 0)
             return Hata(400, "DOGRULAMA_HATASI", "Sıralama listesi boş.");
 
@@ -231,6 +243,10 @@ public static class GorselUclari
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
         var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         var gorsel = await db.EtkinlikGorselleri
             .FirstOrDefaultAsync(g => g.Id == id && g.EtkinlikId == etkinlikId);

@@ -57,6 +57,12 @@ public static class KurasyonUclari
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
+        // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
+        // kullanicidan saklamak degil.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         var etkinlik = await db.Etkinlikler.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == etkinlikId && !e.SilindiMi);
         if (etkinlik == null)
@@ -407,6 +413,12 @@ public static class KurasyonUclari
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
+        // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
+        // kullanicidan saklamak degil.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         var kurasyon = await db.Kurasyonlar.FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
         if (kurasyon == null)
             return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
@@ -452,6 +464,12 @@ public static class KurasyonUclari
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
+        // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
+        // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
+        // kullanicidan saklamak degil.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
+
         var kurasyon = await db.Kurasyonlar.AsNoTracking()
             .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
         if (kurasyon == null)
@@ -480,6 +498,12 @@ public static class KurasyonUclari
         var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
+        // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
+        // kullanicidan saklamak degil.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         var kurasyon = await db.Kurasyonlar.AsNoTracking()
             .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
@@ -512,6 +536,12 @@ public static class KurasyonUclari
         var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
+        // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
+        // kullanicidan saklamak degil.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         var kurasyon = await db.Kurasyonlar.FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
         if (kurasyon == null)

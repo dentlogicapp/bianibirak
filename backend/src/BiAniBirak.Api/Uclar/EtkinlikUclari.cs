@@ -88,6 +88,10 @@ public static class EtkinlikUclari
             indirme_gun = Sabitler.IndirmeGun,
             toplam_gun = Sabitler.ToplamGun,
             imha_edildi = e.ImhaEdildi,
+            // DONDURULDU - cift bunu GORMELI. Onceden super admin dondurunca cift
+            // hicbir fark hissetmiyordu; davetliler sessizce reddediliyor, cift
+            // "bende bir sorun yok" saniyordu.
+            donduruldu = e.Donduruldu,
 
             durum = e.Durum,
             rol,
@@ -495,7 +499,6 @@ public static class EtkinlikUclari
                 istek.Tema,
                 istek.KarsilamaMetni,
                 istek.PromptMetni,
-                istek.KapanisPencereGun,
             }),
             CreatedAt = ayar.UpdatedAt,
         });
@@ -698,6 +701,10 @@ public static class EtkinlikUclari
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        // DONDURULMUS DEFTER SALT OKUNUR - moderasyon da bir yazimdir.
+        if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
+            return DondurmaGuard.Reddet();
 
         // Tenant + KaynakEs sahiplik: sadece kendi kuyrugundaki bekleyen katki.
         var katki = await db.Katkilar

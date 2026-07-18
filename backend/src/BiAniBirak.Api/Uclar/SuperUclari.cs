@@ -310,8 +310,14 @@ public static class SuperUclari
         return Results.Json(new { ok = true, aktif_etkinlik_id = kendiUyelik?.EtkinlikId });
     }
 
-    // Dondur / coz: dondurulmus defterde DAVETLI YAZIMI reddedilir (cift okuyabilir).
-    private static async Task<IResult> Dondur(Guid id, HttpContext ctx, BiAniBirakDbContext db)
+    // DONDUR / COZ - dondurulmus defter SALT OKUNURDUR (bkz. DondurmaGuard):
+    // cift gorebilir ama hicbir yazim yapamaz ve BASKI NUSHASINI INDIREMEZ; davetli
+    // yazimlari zaten kapalidir.
+    //
+    // CIFTE HABER VERILIR: sessiz dondurma, kullanicinin "uygulama bozuldu" sanmasina
+    // yol acar; destek yuku ve guven kaybi uretir. Neyin neden olduguni SOYLERIZ.
+    private static async Task<IResult> Dondur(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, PushGonderici push)
     {
         var (ok, kullanici) = await SuperAdminMi(ctx, db);
         if (!ok || kullanici == null)
@@ -327,6 +333,30 @@ public static class SuperUclari
         await Denetim(db, id, kullanici.Id,
             defter.Donduruldu ? "DEFTER_DONDURULDU" : "DEFTER_COZULDU",
             "etkinlikler", id, new { donduruldu = defter.Donduruldu });
+
+        // Her iki ese de bildir - defter ortaktir.
+        var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
+            .Where(u => u.EtkinlikId == id).Select(u => u.KullaniciId).ToListAsync();
+
+        var baslik = defter.Donduruldu
+            ? "Defteriniz geçici olarak donduruldu"
+            : "Defteriniz yeniden açıldı";
+        var govde = defter.Donduruldu
+            ? "Anı defteriniz geçici olarak donduruldu. Bu süre boyunca defteriniz "
+              + "görüntülenebilir ancak değişiklik yapılamaz, yeni dilek alınamaz ve "
+              + "baskıya hazır nüsha indirilemez. Sebebini öğrenmek ve çözmek için "
+              + "bizimle iletişime geçin."
+            : "Anı defteriniz yeniden açıldı. Dilek toplama, düzenleme ve indirme "
+              + "işlemlerinize kaldığınız yerden devam edebilirsiniz.";
+        var pushKisa = defter.Donduruldu
+            ? "Defteriniz geçici olarak donduruldu - değişiklik ve indirme kapalı."
+            : "Defteriniz yeniden açıldı - kaldığınız yerden devam edebilirsiniz.";
+
+        foreach (var kid in uyeler)
+        {
+            await push.GonderAsync(kid, baslik, govde, "/gelen-dilekler", id,
+                sessizSaateTabi: false, pushGovde: pushKisa);
+        }
 
         return Results.Json(new { ok = true, donduruldu = defter.Donduruldu });
     }
