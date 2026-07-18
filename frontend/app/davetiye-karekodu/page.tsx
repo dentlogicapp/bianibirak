@@ -277,7 +277,10 @@ export default function DavetiyeKarekodumSayfasi() {
           Bu menüyü kullanarak davetiyenize ekleyeceğiniz karekodlarınızı (eşinizin ve kendinizinkini) tek
           seferde doğrudan matbaacınız ile paylaşın. Aşağıdaki <span className="font-medium text-murekkep">“Karekodlarımızı Basım için Doğrudan Matbaacıya Gönder”</span> düğmesi;
           matbaacınızın kullandığı programa uygun olarak tercih edeceği biçimi seçebilmesi için karekodları
-          SVG, PNG, PDF, JPG ve WEBP formatlarının tümünü içerecek şekilde iki ayrı ZIP olarak göndermenizi sağlar.
+          iki ayrı ZIP olarak göndermenizi sağlar. Her ZIP içinde <span className="font-medium text-murekkep">MATBAA</span> klasörü
+          (PDF, EPS, SVG — sonsuz büyütmede bozulmayan vektör, şeffaf zemin) ve{" "}
+          <span className="font-medium text-murekkep">DİJİTAL</span> klasörü (PNG, WEBP, JPG — paylaşım için) ayrı ayrı bulunur;
+          hangisinin baskıya verileceğini anlatan bir kılavuz da paketin içindedir.
         </p>
 
         {/* ---- Yanip sonen uyari (iki yana yasli) ---- */}

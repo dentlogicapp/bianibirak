@@ -146,14 +146,22 @@ export function lockupSvg(secenek: LockupSecenek): string {
   const qrX0 = tileX + D.tilePad;
   const qrY0 = m.tileTop + D.tilePad;
 
+  // MATBAA: moduller YATAY BIRLESTIRILIR (run-length). Her modulu ayri dikdortgen
+  // yazmak yuzlerce nesne uretir; CorelDRAW/Illustrator bunu agir isler ve kenarlarda
+  // dikis izi gosterebilir. Ardisik koyu moduller TEK dikdortgene indirilir - kaplanan
+  // alan BIREBIR aynidir (karekod okunurlugu degismez), nesne sayisi ~5 kat duser.
   let modulRects = "";
   for (let rr = 0; rr < qr.boyut; rr++) {
-    for (let cc = 0; cc < qr.boyut; cc++) {
-      if (!qr.dolu(rr, cc)) continue;
+    let cc = 0;
+    while (cc < qr.boyut) {
+      if (!qr.dolu(rr, cc)) { cc++; continue; }
+      let uzunluk = 1;
+      while (cc + uzunluk < qr.boyut && qr.dolu(rr, cc + uzunluk)) uzunluk++;
       const x = qrX0 + cc * modul;
       const y = qrY0 + rr * modul;
       // +0.5 taban ortusme (hairline bosluk onleme)
-      modulRects += `<rect x="${r2(x)}" y="${r2(y)}" width="${r2(modul + 0.5)}" height="${r2(modul + 0.5)}" fill="${QR_KOYU}"/>`;
+      modulRects += `<rect x="${r2(x)}" y="${r2(y)}" width="${r2(uzunluk * modul + 0.5)}" height="${r2(modul + 0.5)}" fill="${QR_KOYU}"/>`;
+      cc += uzunluk;
     }
   }
 
@@ -318,3 +326,188 @@ function hexA(hex: string, alfa: number): string {
   const b = parseInt(h.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alfa})`;
 }
+
+// ============================ EPS (MATBAA) ============================
+//
+// NEDEN EPS: matbaanin kullandigi CorelDRAW/Illustrator icin EPS, PDF ile birlikte
+// endustri teslim formatidir. CDR (CorelDRAW'in kendi formati) KAPALI ve belgesiz
+// bir formattir - tarayicida uretilemez; ama CorelDRAW, EPS ve PDF'i kendi belgesi
+// gibi acar ve duzenler. Yani "matbaa dilinde" cikti = EPS + vektor PDF.
+//
+// Bu uretici SVG'yi PARSE ETMEZ; ayni metrik/qr/renk kaynagindan cizer. Boylece
+// SVG - PDF - EPS uclusu geometrik olarak BIREBIR aynidir; birinde duzeltilen bir
+// olcu digerlerinde otomatik dogru olur.
+//
+// SIFIR BOZUNMA: her sey egri ve dikdortgen (yol) olarak yazilir - piksel YOK.
+// Sonsuz buyutmede keskin kalir.
+//
+// ZEMIN: sayfa zemini BOYANMAZ (seffaf). Tek beyaz yuzey, karekodun altindaki
+// puldur - o SUS DEGIL, ZORUNLULUKTUR: karekod okuyucular koyu modulun etrafinda
+// acik "sessiz alan" arar. Kaldirirsak renkli davetiye uzerinde karekod okunmaz.
+
+const EPS_PT = 0.75; // 1 SVG kullanici birimi (96 DPI px) = 0.75 punto
+
+function epsRenk(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return `${r3(r)} ${r3(g)} ${r3(b)} setrgbcolor`;
+}
+
+// SVG yol verisi -> PostScript yolu. Kaynak veriler MUTLAK M/L/H/V/Q/Z kullanir
+// (Fraunces glif outline'lari + slogan outline'i). Q (karesel) egri, PostScript'in
+// anladigi kubik egriye cevrilir - sekil BIREBIR korunur.
+function epsYol(d: string): string {
+  const parcalar = d.match(/[A-Za-z]|-?\d*\.?\d+(?:e[-+]?\d+)?/g) ?? [];
+  const cikti: string[] = [];
+  let komut = "";
+  let cx = 0, cy = 0, bx = 0, by = 0;
+  let i = 0;
+  const sayi = () => parseFloat(parcalar[i++]);
+
+  while (i < parcalar.length) {
+    const p = parcalar[i];
+    if (/^[A-Za-z]$/.test(p)) {
+      komut = p.toUpperCase();
+      i++;
+      if (komut === "Z") { cikti.push("closepath"); cx = bx; cy = by; }
+      continue;
+    }
+    if (komut === "M") {
+      const x = sayi(), y = sayi();
+      cikti.push(`${r3(x)} ${r3(y)} moveto`);
+      cx = x; cy = y; bx = x; by = y;
+      komut = "L"; // SVG kurali: M'den sonraki cift'ler lineto'dur
+    } else if (komut === "L") {
+      const x = sayi(), y = sayi();
+      cikti.push(`${r3(x)} ${r3(y)} lineto`); cx = x; cy = y;
+    } else if (komut === "H") {
+      const x = sayi();
+      cikti.push(`${r3(x)} ${r3(cy)} lineto`); cx = x;
+    } else if (komut === "V") {
+      const y = sayi();
+      cikti.push(`${r3(cx)} ${r3(y)} lineto`); cy = y;
+    } else if (komut === "Q") {
+      const qx = sayi(), qy = sayi(), x = sayi(), y = sayi();
+      const c1x = cx + (2 / 3) * (qx - cx), c1y = cy + (2 / 3) * (qy - cy);
+      const c2x = x + (2 / 3) * (qx - x), c2y = y + (2 / 3) * (qy - y);
+      cikti.push(`${r3(c1x)} ${r3(c1y)} ${r3(c2x)} ${r3(c2y)} ${r3(x)} ${r3(y)} curveto`);
+      cx = x; cy = y;
+    } else {
+      i++; // taninmayan veri: guvenli atla (sonsuz dongu olmaz)
+    }
+  }
+  return cikti.join("\n");
+}
+
+// Yuvarlak kose dikdortgen (karekod pulu) - bezier ile.
+function epsYuvarlakDik(x: number, y: number, w: number, h: number, r: number): string {
+  const k = r * 0.5523;
+  return [
+    `${r3(x + r)} ${r3(y)} moveto`,
+    `${r3(x + w - r)} ${r3(y)} lineto`,
+    `${r3(x + w - r + k)} ${r3(y)} ${r3(x + w)} ${r3(y + r - k)} ${r3(x + w)} ${r3(y + r)} curveto`,
+    `${r3(x + w)} ${r3(y + h - r)} lineto`,
+    `${r3(x + w)} ${r3(y + h - r + k)} ${r3(x + w - r + k)} ${r3(y + h)} ${r3(x + w - r)} ${r3(y + h)} curveto`,
+    `${r3(x + r)} ${r3(y + h)} lineto`,
+    `${r3(x + r - k)} ${r3(y + h)} ${r3(x)} ${r3(y + h - r + k)} ${r3(x)} ${r3(y + h - r)} curveto`,
+    `${r3(x)} ${r3(y + r)} lineto`,
+    `${r3(x)} ${r3(y + r - k)} ${r3(x + r - k)} ${r3(y)} ${r3(x + r)} ${r3(y)} curveto`,
+    "closepath fill",
+  ].join("\n");
+}
+
+export function lockupEps(secenek: LockupSecenek): string {
+  const renk = TEMA[secenek.tema];
+  const m = metrik(secenek);
+  const qr = qrMatris(secenek.link);
+
+  const wPt = m.w * EPS_PT;
+  const hPt = m.h * EPS_PT;
+
+  const wmOlcek = D.wmW / WM_TOPLAM_G;
+  const wmX0 = m.cx - D.wmW / 2;
+  const wmYd = m.wmTop + WM_Y_ORIGIN * wmOlcek;
+
+  const sOlcek = D.tagSize / SLOGAN_UPEM;
+  const sGenislik = SLOGAN_TOPLAM * sOlcek;
+  const sX0 = m.cx - sGenislik / 2;
+  const sYb = m.tagTop + D.tagSize;
+
+  const tile = m.tile;
+  const tileX = m.cx - tile / 2;
+  const modul = D.qrSize / qr.boyut;
+  const qrX0 = tileX + D.tilePad;
+  const qrY0 = m.tileTop + D.tilePad;
+
+  const s: string[] = [];
+  s.push("%!PS-Adobe-3.0 EPSF-3.0");
+  s.push(`%%BoundingBox: 0 0 ${Math.ceil(wPt)} ${Math.ceil(hPt)}`);
+  s.push(`%%HiResBoundingBox: 0 0 ${r2(wPt)} ${r2(hPt)}`);
+  s.push(`%%Creator: ${MARKA.yasalAd}`);
+  s.push(`%%Title: ${MARKA.yasalAd} - ${MARKA.tagline}`);
+  s.push("%%LanguageLevel: 2");
+  s.push("%%Pages: 1");
+  s.push("%%EndComments");
+  s.push("%%Page: 1 1");
+  s.push("gsave");
+  // SVG (ust-sol, y asagi) -> PostScript (alt-sol, y yukari) + px->punto
+  s.push(`[${EPS_PT} 0 0 ${-EPS_PT} 0 ${r2(hPt)}] concat`);
+
+  // 1) WORDMARK - uc glif, birlesik uzayda
+  s.push("gsave");
+  s.push(`[${r4(wmOlcek)} 0 0 ${r4(wmOlcek)} ${r2(wmX0)} ${r2(wmYd)}] concat`);
+  s.push(epsRenk(renk.bi));
+  s.push("newpath"); s.push(epsYol(WORDMARK.bi.d)); s.push("fill");
+  s.push("gsave"); s.push(`[1 0 0 1 ${WM_ANI_X} 0] concat`);
+  s.push(epsRenk(renk.ani));
+  s.push("newpath"); s.push(epsYol(WORDMARK.ani.d)); s.push("fill");
+  s.push("grestore");
+  s.push("gsave"); s.push(`[1 0 0 1 ${WM_BIRAK_X} 0] concat`);
+  s.push(epsRenk(renk.bi));
+  s.push("newpath"); s.push(epsYol(WORDMARK.birak.d)); s.push("fill");
+  s.push("grestore");
+  s.push("grestore");
+
+  // 2) SLOGAN - outline (font bagimsiz)
+  s.push("gsave");
+  s.push(`[${r4(sOlcek)} 0 0 ${r4(-sOlcek)} ${r2(sX0)} ${r2(sYb)}] concat`);
+  s.push(epsRenk(renk.tag));
+  s.push("newpath"); s.push(epsYol(SLOGAN_PATH)); s.push("fill");
+  s.push("grestore");
+
+  // 3) YALDIZ CIZGI
+  // PostScript'te ALFA YOKTUR: SVG'deki uclari sonen gradyan burada DUZ renk olur.
+  // Bilincli tercih - matbaada saydamlik tasiyan gradyan zaten guvenilmezdir
+  // (RIP'te bant/leke uretir). Ince bir yaldiz cizgide fark gozle secilmez.
+  s.push(epsRenk(renk.cizgi));
+  s.push(`${r2(m.cx - D.cizgiW / 2)} ${r2(m.cizgiTop)} ${r2(D.cizgiW)} ${r2(D.cizgiH)} rectfill`);
+
+  // 4) KAREKOD PULU (beyaz, yuvarlak kose) - OKUNURLUK ICIN ZORUNLU
+  s.push(epsRenk(QR_BEYAZ));
+  s.push("newpath");
+  s.push(epsYuvarlakDik(tileX, m.tileTop, tile, tile, D.tileYuvarlak));
+
+  // 5) KAREKOD MODULLERI - yatay birlestirilmis (az nesne, dikissiz)
+  s.push(epsRenk(QR_KOYU));
+  for (let rr = 0; rr < qr.boyut; rr++) {
+    let cc = 0;
+    while (cc < qr.boyut) {
+      if (!qr.dolu(rr, cc)) { cc++; continue; }
+      let uzunluk = 1;
+      while (cc + uzunluk < qr.boyut && qr.dolu(rr, cc + uzunluk)) uzunluk++;
+      const x = qrX0 + cc * modul;
+      const y = qrY0 + rr * modul;
+      s.push(`${r2(x)} ${r2(y)} ${r2(uzunluk * modul + 0.5)} ${r2(modul + 0.5)} rectfill`);
+      cc += uzunluk;
+    }
+  }
+
+  s.push("grestore");
+  s.push("showpage");
+  s.push("%%EOF");
+  return s.join("\n");
+}
+
+function r3(n: number) { return Math.round(n * 1000) / 1000; }
