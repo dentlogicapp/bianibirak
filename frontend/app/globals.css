@@ -42,7 +42,11 @@ html.dark {
   }
   body {
     @apply bg-parsomen text-murekkep font-govde antialiased;
-    font-feature-settings: "kern", "liga";
+    /* TURKCE TIPOGRAFI: ortak baglar (fi, ff, fl, ffi) KAPALI.
+       Fraunces'in "fi" bagi i'nin NOKTASINI yutar; Turkce'de i/i ayrimi anlamlidir
+       ("fiyat", "tarif", "sertifika" -> noktasiz gorunur = yanlis). Kerning kalir. */
+    font-feature-settings: "kern";
+    font-variant-ligatures: no-common-ligatures;
     transition: background-color 220ms ease, color 220ms ease;
   }
   ::selection {

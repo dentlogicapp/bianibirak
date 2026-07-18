@@ -382,7 +382,14 @@ export const api = {
   kayit: (v: { ad: string; email: string; sifre: string; onaylar: string[] }) =>
     istek<Kullanici>("/api/kayit", {
       method: "POST",
-      body: JSON.stringify({ Ad: v.ad, Email: v.email, Sifre: v.sifre }),
+      // Onaylar SUNUCUYA GIDER: backend zorunlu metin anahtarlarini burada bekler.
+      // Gonderilmezse Onaylar=null olur ve kayit ONAY_ZORUNLU (400) ile reddedilir.
+      body: JSON.stringify({
+        Ad: v.ad,
+        Email: v.email,
+        Sifre: v.sifre,
+        Onaylar: v.onaylar,
+      }),
     }),
   giris: (v: { email: string; sifre: string }) =>
     istek<Kullanici>("/api/giris", {
@@ -491,12 +498,15 @@ export const api = {
       `/api/k/${encodeURIComponent(token)}`,
       {
         method: "POST",
+        // Riza SUNUCUYA GIDER: gonderilmezse Riza=false olur ve dilek
+        // RIZA_ZORUNLU (400) ile reddedilir.
         body: JSON.stringify({
           DavetliAd: v.davetliAd,
           DavetliEmail: v.davetliEmail,
           DavetliTelefon: v.davetliTelefon,
           DavetliIliski: v.davetliIliski,
           Mesaj: v.mesaj,
+          Riza: v.riza,
         }),
       }
     ),
