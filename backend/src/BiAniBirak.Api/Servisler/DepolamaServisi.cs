@@ -14,11 +14,15 @@ public class DepolamaServisi
 {
     private readonly string _kok;
 
+    // Medya kok dizini - DiskGozcusu bu yolun bagli oldugu diski olcer.
+    // Ileride medya ayri bir Hetzner Volume'e tasinirsa gozcu OTOMATIK dogru diski
+    // izler; ikinci bir ayar/kopya yol tanimlanmaz (tek dogruluk kaynagi).
+    public string Kok => _kok;
+
     public DepolamaServisi(IConfiguration ayar)
     {
         _kok = ayar["Depolama:Kok"] ?? "/veri/medya";
-        Directory.CreateDirectory(_kok);
-    }
+        Directory.CreateDirectory(_kok);    }
 
     public const int TavanBayt = 2 * 1024 * 1024; // 2 MB
 

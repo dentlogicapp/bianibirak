@@ -45,6 +45,7 @@ builder.Services.AddHostedService<HatirlatmaGorevi>();
 // Olu kayitlar birikmesin, cift eski fiyatla odemeye kalkmasin.
 builder.Services.AddHostedService<OdemeSureGorevi>();
 builder.Services.AddHostedService<CopTemizlemeGorevi>();
+builder.Services.AddHostedService<DiskGozcusu>();   // disk %75/85/92 esiklerinde super admin uyarisi
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
 
