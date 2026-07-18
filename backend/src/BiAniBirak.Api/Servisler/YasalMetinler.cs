@@ -30,8 +30,10 @@ Hizmet SÜRELİDİR. Kalıcı bir arşiv, bulut depolama veya yedekleme hizmeti 
 
 Her defter için, defterin kurulum tarihinden bağımsız olarak, aşağıdaki süreler kesin olarak uygulanır:
 
-  a) Özel gün (etkinlik tarihi) + 30 gün: Davetli girişleri kapanır. Yeni dilek eklenemez.
-  b) Özel gün + 37 gün: Defter ve defterle ilgili TÜM VERİLER kalıcı olarak imha edilir.
+  a) Özel gün (etkinlik tarihi) + 15 gün: Davetli girişleri kapanır. Yeni dilek eklenemez.
+  b) Özel gün + 20 gün: Defter ve defterle ilgili TÜM VERİLER kalıcı olarak imha edilir.
+
+Defterin düzenlenmesi (kürasyon) ve baskıya hazır nüshanın indirilmesi, kurulumdan imhaya kadar HER AN mümkündür; kapanan tek şey davetli girişleridir.
 
 İMHA GERİ ALINAMAZ. İmha edilen veriler hiçbir şekilde, hiçbir gerekçeyle geri getirilemez. Bu bir tercih değil, teknik bir gerçektir: veriler sunucudan ve yedeklerden silinir.
 
@@ -43,9 +45,10 @@ Anı defterinin baskıya hazır nüshasını indirmek, TAMAMEN KULLANICININ SORU
 
 BiAnıBırak, kullanıcıyı bu konuda defalarca uyarır:
   - Kayıt/kurulum anında süreci anlatan bir bildirim gönderilir.
-  - Özel günden sonraki 2, 10, 15, 20, 25 ve 30. günlerde hatırlatma gönderilir.
-  - Son 7 gün boyunca HER GÜN hatırlatma gönderilir.
-  - İmhaya 14 gün ve 3 gün kala ayrıca uyarı gönderilir.
+  - Özel günden sonraki 1. günden 14. güne kadar HER GÜN hatırlatma gönderilir; her bildirimde kalıcı silinmeye kaç gün kaldığı açıkça yazılır.
+  - Son 5 günde uyarılar SAAT bazına geçer: imhaya 120, 96, 72, 48, 24, 12 ve 3 saat kala ayrı ayrı uyarı gönderilir.
+  - Uyarılar defterin her iki üyesine (her iki eşe) birden gönderilir.
+  - İmha gerçekleştiğinde, işlemin tamamlandığını bildiren bir kapanış bildirimi gönderilir.
 
 Bu uyarılara rağmen eserini indirmeyen kullanıcı, imha sonrası herhangi bir hak talebinde bulunamaz. Uyarıların gönderildiği, sistem kayıtlarında (denetim günlüğü) tutulur.
 
@@ -57,7 +60,7 @@ Dilek toplamak, defteri kurmak, düzenlemek ve defterin tamamını ekranda sayfa
 
 Ücret yalnızca baskıya hazır nüshanın (yüksek çözünürlüklü, basılabilir dosya) indirilmesi için alınır. Ekranda gösterilen önizleme, baskıya elverişli çözünürlükte değildir.
 
-Ödeme yapılmış olması, imha süresini UZATMAZ. Ödeme yapan kullanıcı da 37. günün sonuna kadar eserini indirmekle yükümlüdür.
+Ödeme yapılmış olması, imha süresini UZATMAZ. Ödeme yapan kullanıcı da 20. günün sonuna kadar eserini indirmekle yükümlüdür.
 
 Ödeme yapıp eserini indirmeyen kullanıcının verileri, süre sonunda diğer tüm defterlerle aynı şekilde imha edilir. Bu durumda:
   - İmha edilmiş veri geri getirilemez (teknik imkansızlık).
@@ -112,7 +115,7 @@ Hukuki sebep: sözleşmenin kurulması ve ifası (KVKK m.5/2-c) ile açık rıza
 
 3. SAKLAMA SÜRESİ VE İMHA - KRİTİK
 
-Veriler, etkinlik tarihinden itibaren en fazla 37 gün saklanır. Bu sürenin sonunda:
+Veriler, etkinlik tarihinden itibaren en fazla 20 gün saklanır. Bu sürenin sonunda:
   - Tüm dilekler, fotoğraflar, iletişim bilgileri ve ilgili kayıtlar KALICI OLARAK İMHA EDİLİR.
   - İmha geri alınamaz; imha edilen veri hiçbir şekilde geri getirilemez.
   - Yalnızca ""bir defter vardı ve şu tarihte imha edildi"" bilgisi (kişisel veri içermeyen) hukuki kanıt olarak saklanır.
@@ -171,7 +174,7 @@ Diğer davetliler dileğinizi göremez. Siz de başkalarının dileklerini göre
 
 4. NE KADAR SAKLANIYOR
 
-Verileriniz, etkinlik tarihinden itibaren en fazla 37 gün saklanır. Bu sürenin sonunda dileğiniz, fotoğrafınız ve iletişim bilginiz KALICI OLARAK SİLİNİR.
+Verileriniz, etkinlik tarihinden itibaren en fazla 20 gün saklanır. Bu sürenin sonunda dileğiniz, fotoğrafınız ve iletişim bilginiz KALICI OLARAK SİLİNİR.
 
 Çift, defteri bu süre içinde indirir ve basar; bastırdığı kitapta dileğiniz yer alır. Sunucularımızda ise hiçbir iz kalmaz.
 
@@ -187,7 +190,7 @@ BiAnıBırak, en mahrem aile hatıralarınızı emanet ettiğiniz bir yerdir. Bu
 
 1. VERİ SAKLAMA - EN ÖNEMLİ İLKEMİZ
 
-Verilerinizi sonsuza dek saklamıyoruz. Etkinlik tarihinizden 37 gün sonra defteriniz ve içindeki her şey kalıcı olarak imha edilir.
+Verilerinizi sonsuza dek saklamıyoruz. Etkinlik tarihinizden 20 gün sonra defteriniz ve içindeki her şey kalıcı olarak imha edilir.
 
 Bu bir eksiklik değil, bilinçli bir duruştur. 40 davetlinizin telefon numarasını yıllarca saklamak için hiçbir meşru sebebimiz yok. Mirasınız kâğıtta yaşamalı, sunucumuzda değil.
 
@@ -246,7 +249,7 @@ BiAnıBırak
 Satın aldığınız hizmet: anı defterinizin BASKIYA HAZIR, yüksek çözünürlüklü (300 DPI) PDF dosyası olarak indirilmesi yetkisidir.
 
 Bu yetki:
-  - Etkinliğinizin yaşam döngüsü boyunca (özel gününüzden itibaren 37 gün) geçerlidir,
+  - Etkinliğinizin yaşam döngüsü boyunca (özel gününüzden itibaren 20 gün) geçerlidir,
   - Sınırsız sayıda indirme hakkı verir (defteriniz doldukça yeniden indirebilirsiniz),
   - A5, A4 veya A3 boyutlarında indirme imkânı sunar,
   - BİR KEREYE MAHSUS ödenir; abonelik değildir, otomatik yenilenmez.
@@ -277,7 +280,7 @@ Mesafeli Sözleşmeler Yönetmeliği'nin 15/1-ğ maddesi uyarınca, ELEKTRONİK 
 
 7. SAKLAMA VE İMHA - ÖNEMLİ
 
-Defteriniz, etkinlik tarihinizden 37 gün sonra KALICI OLARAK İMHA EDİLİR. Bu süre ödeme yapmanızla UZAMAZ.
+Defteriniz, etkinlik tarihinizden 20 gün sonra KALICI OLARAK İMHA EDİLİR. Bu süre ödeme yapmanızla UZAMAZ.
 
 İmha sonrası defterinizin yeniden oluşturulması TEKNİK OLARAK İMKÂNSIZDIR. Veriler geri getirilemez; bu, bir hizmet kusuru değil, gizlilik taahhüdümüzün gereğidir.
 
@@ -302,7 +305,7 @@ MADDE 3 - SÖZLEŞME KONUSU HİZMETİN NİTELİĞİ
 
 Hizmet DİJİTALDİR ve elektronik ortamda ANINDA ifa edilir. Fiziksel teslimat yoktur.
 
-İndirme yetkisi, etkinlik tarihinden itibaren 37 günlük yaşam döngüsü boyunca geçerlidir ve sınırsız sayıda kullanılabilir.
+İndirme yetkisi, etkinlik tarihinden itibaren 20 günlük yaşam döngüsü boyunca geçerlidir ve sınırsız sayıda kullanılabilir.
 
 MADDE 4 - ÖDEME
 
@@ -324,7 +327,7 @@ Hizmet, ödemenin onaylanmasıyla anında ifa edildiğinden ALICI'nın cayma hak
 
 MADDE 7 - SAKLAMA SÜRESİ VE İMHA
 
-Defter ve içindeki tüm veriler, etkinlik tarihinden 37 gün sonra KALICI OLARAK İMHA EDİLİR.
+Defter ve içindeki tüm veriler, etkinlik tarihinden 20 gün sonra KALICI OLARAK İMHA EDİLİR.
 
 Ödeme yapılmış olması bu süreyi UZATMAZ. İmha sonrası verilerin geri getirilmesi teknik olarak imkânsızdır.
 
@@ -428,7 +431,55 @@ ALICI, ödeme işlemini onaylamakla işbu sözleşmenin tüm maddelerini okuduğ
         //
         // Bu blok, yururlukteki her metnin arsivde karsiligi OLMASINI garanti eder.
         // Idempotent: hash zaten arsivdeyse dokunmaz.
+        // ---- REVIZYON GECISI ----
+        // Yururlukteki metin, koddaki KANONIK metinden farkliysa metin REVIZE
+        // edilmistir: eski surum arsivlenir, yenisi damgalanir (yeni hash + surum).
+        //
+        // NEDEN ZORUNLU: seed yalniz EKSIK metni ekler. Bu gecis olmasaydi kodda
+        // duzeltilen bir yasal metin canliya HIC GECMEZDI - mevzuat degisse bile
+        // kullanicilar eski metni onaylamis gorunurdu. Sessiz uyumsuzluk.
+        //
+        // YAN ETKI BILINCLIDIR: hash degistigi icin EksikOnaylarAsync bu metni
+        // "onaylanmamis" sayar ve kullanicidan YENIDEN ONAY ister. Saklama suresi
+        // gibi esasli bir degisiklikte dogru olan budur - eski onay, yeni sozlesmeyi
+        // kapsamaz.
+        await RevizyonGecisiAsync(db, ct);
+
         await ArsiviOnarAsync(db, ct);
+    }
+
+    // Koddaki kanonik metinler - revizyon karsilastirmasinin TEK kaynagi.
+    private static readonly (string Anahtar, string Baslik, string Icerik)[] Kanonik =
+    {
+        ("kvkk_aydinlatma",   "KVKK Aydınlatma Metni",             KvkkEsMetni),
+        ("kullanim_kosullari","Kullanım Koşulları",                KullanimKosullariMetni),
+        ("gizlilik",          "Gizlilik Politikası",               GizlilikMetni),
+        ("kvkk_davetli",      "KVKK Aydınlatma Metni (Davetli)",   KvkkDavetliMetni),
+        ("on_bilgilendirme",  "Ön Bilgilendirme Formu",            OnBilgilendirmeMetni),
+        ("mesafeli_satis",    "Mesafeli Satış Sözleşmesi",         MesafeliSatisMetni),
+    };
+
+    private static async Task RevizyonGecisiAsync(BiAniBirakDbContext db, CancellationToken ct)
+    {
+        var metinler = await db.SistemMetinleri.ToListAsync(ct);
+        var revize = 0;
+
+        foreach (var (anahtar, baslik, icerik) in Kanonik)
+        {
+            var mevcut = metinler.FirstOrDefault(m => m.Anahtar == anahtar);
+            if (mevcut == null) continue;              // yeni metin - ekleme yolu halleder
+            if (mevcut.Icerik == icerik) continue;     // degismemis
+
+            // SIRA ONEMLI: once fotograf, sonra degistir, sonra arsivle+damgala.
+            var eski = OnayServisi.AnlikAl(mevcut);
+            mevcut.Icerik = icerik;
+            mevcut.Baslik = baslik;
+            mevcut.YururlukTarihi = DateTimeOffset.UtcNow;
+            OnayServisi.ArsivleVeDamgala(db, mevcut, eski, guncelleyen: null);
+            revize++;
+        }
+
+        if (revize > 0) await db.SaveChangesAsync(ct);
     }
 
     // Yururlukteki metinlerin arsivde karsiligi var mi? Yoksa ekle.
