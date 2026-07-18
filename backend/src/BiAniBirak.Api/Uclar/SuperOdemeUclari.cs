@@ -195,7 +195,7 @@ public static class SuperOdemeUclari
             await push.GonderAsync(
                 uid,
                 "Ödemen onaylandı",
-                "Defterin indirmeye hazır. İndir, yedekle - 37. günde kalıcı olarak silinecek.",
+                $"Defterin indirmeye hazır. İndir, yedekle - {Sabitler.ToplamGun}. günde kalıcı olarak silinecek.",
                 url: "/baskiya-hazir-defter",
                 etkinlikId: odeme.EtkinlikId,
                 // SESSIZ SAATE TABI DEGIL.

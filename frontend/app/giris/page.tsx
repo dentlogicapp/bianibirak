@@ -195,7 +195,7 @@ function GirisIcerik() {
                 </Link>
                 &apos;nı okudum ve kabul ediyorum. Defterimin{" "}
                 <span className="font-medium text-murekkep">
-                  özel günümden 37 gün sonra kalıcı olarak silineceğini
+                  özel günümden 20 gün sonra kalıcı olarak silineceğini
                 </span>{" "}
                 ve eserimi bu süre içinde indirmenin benim sorumluluğumda olduğunu
                 anlıyorum.

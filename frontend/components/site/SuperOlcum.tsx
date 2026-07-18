@@ -163,7 +163,7 @@ export function OlcumSekmesi() {
         {veri.imha_yaklasan.length > 0 && (
           <div className="mt-5">
             <p className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
-              14 gün içinde imha edilecekler
+              İndirme penceresindeki defterler (yakında imha)
             </p>
             <div className="mt-2 space-y-1.5">
               {veri.imha_yaklasan.map((d) => (

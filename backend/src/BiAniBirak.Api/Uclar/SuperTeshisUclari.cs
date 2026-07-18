@@ -342,7 +342,10 @@ public static class SuperTeshisUclari
                 d.Es2Ad,
                 ImhaTarihi = d.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
             })
-            .Where(x => x.ImhaTarihi > simdi && x.ImhaTarihi <= simdi.AddDays(14))
+            // ESIK = INDIRME PENCERESI (Sabitler.IndirmeGun). 20 gunluk dongude sabit
+            // "14 gun" neredeyse TUM aktif defterleri listeye doldururdu; uyari degeri
+            // kalmazdi. Kanona baglandi: pencere degisirse burasi kendiliginden dogru olur.
+            .Where(x => x.ImhaTarihi > simdi && x.ImhaTarihi <= simdi.AddDays(Sabitler.IndirmeGun))
             .OrderBy(x => x.ImhaTarihi)
             .Take(20)
             .Select(x => new
