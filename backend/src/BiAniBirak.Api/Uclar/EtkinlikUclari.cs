@@ -517,8 +517,36 @@ public static class EtkinlikUclari
 
         var katki = await db.Katkilar.AsNoTracking()
             .FirstOrDefaultAsync(k => k.Id == id && k.EtkinlikId == etkinlikId);
+
+        // BASKA DEFTERDE OLABILIR: bildirim (uygulama ici ya da push) baska bir
+        // etkinlige aitse istemci hala eski defterdedir. Dilegi kullanicinin UYE
+        // OLDUGU defterler icinde ararız ve hangi deftere ait oldugunu doneriz;
+        // istemci o deftere gecip odagi acar. Uyelik disina ASLA bakilmaz - tenant
+        // izolasyonu korunur.
         if (katki == null)
-            return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadı.");
+        {
+            var uyeEtkinlikler = db.EtkinlikUyelikleri.AsNoTracking()
+                .Where(u => u.KullaniciId == kullaniciId)
+                .Select(u => u.EtkinlikId);
+
+            var baskaDefterde = await db.Katkilar.AsNoTracking()
+                .FirstOrDefaultAsync(k => k.Id == id && uyeEtkinlikler.Contains(k.EtkinlikId));
+
+            if (baskaDefterde == null)
+                return Hata(404, "KATKI_BULUNAMADI", "Dilek bulunamadı.");
+
+            return Results.Json(new
+            {
+                id = baskaDefterde.Id,
+                durum = baskaDefterde.Durum,
+                kaynak_es = baskaDefterde.KaynakEs,
+                davetli_ad = baskaDefterde.DavetliAd,
+                benim_kuyrugumda = false,
+                // Istemci sinyali: bu dilek BASKA defterde - once oraya gec.
+                etkinlik_id = baskaDefterde.EtkinlikId,
+                baska_defterde = true,
+            });
+        }
 
         return Results.Json(new
         {
@@ -528,6 +556,8 @@ public static class EtkinlikUclari
             davetli_ad = katki.DavetliAd,
             // Bu dilek benim kuyrugumda mi (beklemede + benim tarafim)?
             benim_kuyrugumda = katki.Durum == "beklemede" && katki.KaynakEs == rol,
+            etkinlik_id = katki.EtkinlikId,
+            baska_defterde = false,
         });
     }
 

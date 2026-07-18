@@ -91,9 +91,10 @@ export function DefterKarti({
   return (
     <div
       className={
-        fotoVar
-          ? "border border-[#e8dcc4] bg-[#fffdf8] px-[13px] py-[13px] text-center"
-          : "py-1 text-center"
+        // HER DILEK KENDI KARTINDA (PDF ile birebir): fotografsiz dilek de
+        // defter zemininden cerceveyle ayrilir - iki dilek nerede biter nerede
+        // baslar, okuyan DUSUNMEZ, gorur.
+        "border border-[#e8dcc4] bg-[#fffdf8] px-[13px] py-[13px] text-center"
       }
     >
       {fotoVar && olcu && (

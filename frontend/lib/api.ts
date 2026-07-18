@@ -122,6 +122,8 @@ export type Bildirim = {
   baslik: string;
   mesaj: string;
   url: string | null;
+  // Bildirim hangi deftere ait - tiklamada once o deftere gecilir.
+  etkinlik_id: string | null;
   okundu_mu: boolean;
   created_at: string;
 };
@@ -521,6 +523,9 @@ export const api = {
       kaynak_es: string;
       davetli_ad: string;
       benim_kuyrugumda: boolean;
+      // Dilek baska bir defterde ise: hangi defter + sinyal.
+      etkinlik_id: string | null;
+      baska_defterde: boolean;
     }>(`/api/etkinlik/aktif/katki/${id}`),
   // ---- SUPER PANEL ----
   superOzet: () => istek<SuperOzet>("/api/super/ozet"),

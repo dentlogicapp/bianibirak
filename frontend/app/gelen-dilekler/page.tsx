@@ -89,6 +89,17 @@ function DefterIcerik() {
         toast.error("Ulaşmaya çalıştığın dileğe erişilemiyor - kaldırılmış olabilir.");
         return;
       }
+      // BASKA DEFTERDE: push bildirimi (servis calisani) defter degistirmeden acar.
+      // Burada otomatik gecis yapilir - kullanici "bulunamadi" ile karsilasmaz,
+      // dogru deftere goturulur. Tenant izolasyonu backend'de dogrulanmistir:
+      // yalniz UYE oldugu defterler doner.
+      if (c.veri.baska_defterde && c.veri.etkinlik_id) {
+        toast.success("Bu dilek başka defterinde - oraya geçiliyor...");
+        void api.etkinlikAktifYap(c.veri.etkinlik_id).then(() => {
+          window.location.href = `/gelen-dilekler?focus=${odakId}`;
+        });
+        return;
+      }
       if (c.veri.durum === "red") {
         toast.error(
           "Ulaşmaya çalıştığın dilek reddedilmiş. Ortak deftere eklenmedi ve görüntülenemiyor."

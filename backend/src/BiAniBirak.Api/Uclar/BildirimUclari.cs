@@ -54,6 +54,10 @@ public static class BildirimUclari
                 baslik = b.Baslik,
                 mesaj = b.Mesaj,
                 url = b.Url,
+                // Bildirim HANGI deftere ait: istemci tiklamada once o deftere gecer.
+                // Yoksa cok defterli kullanicida hedef sayfa yanlis kuyruga bakar ve
+                // "dilege erisilemiyor" der - bildirim yalan soylemis olur.
+                etkinlik_id = b.EtkinlikId,
                 okundu_mu = b.OkunduMu,
                 created_at = b.CreatedAt,
             }),

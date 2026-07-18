@@ -101,15 +101,30 @@ export function UserMenu() {
     // (/gelen-dilekler). Dilegin durumu (onayli/red/yok) defter sayfasinda islenir.
     const eslesme = b.url.match(/focus=([0-9a-fA-F-]{36})/);
     const hedef = eslesme ? `/gelen-dilekler?focus=${eslesme[1]}` : b.url;
-    router.push(hedef);
 
-    // Navigasyondan SONRA: menuyu kapat + okundu isaretle (ates-et-unut).
+    // Okundu isareti her iki yolda da (ates-et-unut).
     setAcik(false);
     if (!b.okundu_mu) {
       setBildirimler((o) => o.map((x) => (x.id === b.id ? { ...x, okundu_mu: true } : x)));
       setOkunmamis((s) => Math.max(0, s - 1));
       void api.bildirimOkundu(b.id);
     }
+
+    // BILDIRIM BASKA DEFTERE AITSE ONCE O DEFTERE GEC.
+    // Yoksa hedef sayfa AKTIF defterin kuyruguna bakar, dilek orada olmadigi icin
+    // "erisilemiyor" der - bildirim yalan soylemis olur. Cok defterli kullanicida
+    // bu kacinilmazdi. Gecis sonrasi TAM YENILEME: yeni JWT (aktif_etkinlik_id)
+    // ile acilsin, aksi halde sayfa eski tenant baglamini tasir.
+    if (b.etkinlik_id && aktifId && b.etkinlik_id !== aktifId) {
+      if (gecis) return;
+      setGecis(true);
+      void api.etkinlikAktifYap(b.etkinlik_id).then(() => {
+        window.location.href = hedef;
+      });
+      return;
+    }
+
+    router.push(hedef);
   }
 
   async function bildirimSil(id: string) {

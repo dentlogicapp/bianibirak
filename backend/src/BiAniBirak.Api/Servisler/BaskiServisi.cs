@@ -508,9 +508,11 @@ public static class BaskiServisi
             };
             var (_, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, azamiG, azamiY);
             yukseklik += fy + 3.5f * 2 + 13f; // foto + mat + altindaki bosluk
-            yukseklik += 13f * 2;             // kart ic dolgusu
-            satirGenislik = 294f;             // dolgu kadar dar
         }
+
+        // Kart ic dolgusu artik HER kartta var (fotografsiz dilek de cerceveli).
+        yukseklik += 13f * 2;
+        satirGenislik = 294f;
 
         // Metin: 10.5 punto, 1.72 satir araligi -> satir yuksekligi ~18.1pt.
         // Ortalama karakter genisligi ~5pt (serif, 10.5 punto).
@@ -535,9 +537,13 @@ public static class BaskiServisi
         var italik = eser.Tema == "zarif";
         var fotoVar = d.Foto != null;
 
-        var govde = fotoVar
-            ? kap.Background(KartYuzey).Border(0.6f).BorderColor(KartHat).Padding(13)
-            : kap.PaddingVertical(4);
+        // HER DILEK KENDI KARTINDA - fotografli ya da fotografsiz fark etmez.
+        //
+        // Onceden yalniz fotografli dilek cerceveliydi; fotografsizlar sayfada serbest
+        // akiyordu. Sonuc: iki dilek nerede biter nerede baslar okurken cozulmuyordu,
+        // ve iki farkli gorsel dil ayni sayfada yan yana duruyordu. Kart, dilegi
+        // defter zemininden AYIRAN birimdir - bu ayrim fotografa bagli olamaz.
+        var govde = kap.Background(KartYuzey).Border(0.6f).BorderColor(KartHat).Padding(13);
 
         govde.Column(kart =>
         {
