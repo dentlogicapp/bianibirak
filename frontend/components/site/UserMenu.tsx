@@ -223,7 +223,20 @@ export function UserMenu() {
               kendiliginden yapilir, ara sayfa yok. */}
           {digerEtkinlikler.length > 0 && (
             <div className="border-b border-ayrac p-1.5">
-              <p className="px-3 pb-1 pt-1 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+              {/* YENI DEFTER - liste basinda. Cok defterli kullanicida "yeni ac"
+                  eylemi, mevcut defterler arasinda KAYBOLMAMALI: en ust sirada durur. */}
+              <Link
+                href="/etkinliklerim?yeni=1"
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm font-medium text-sarap transition-colors hover:bg-sarap/10"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+                Yeni Etkinlik Defteri Aç
+              </Link>
+
+              <p className="px-3 pb-1 pt-2 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
                 Diğer defterlerin
               </p>
               {digerEtkinlikler.map((e) => (
@@ -349,6 +362,26 @@ export function UserMenu() {
               Baskıya Hazır Defter
             </MenuLink>
           </div>
+
+          {/* YENI DEFTER - TEK DEFTERLIYSE.
+              Cok defterliyse yukarida (liste basinda) zaten var; burada tekrar
+              gostermek ayni eylemi iki yere koymak olurdu. Tek defterlide switcher
+              bolumu hic olusmadigi icin eylem KAYBOLUYORDU - "Etkinliklerim" araci
+              Ayarlar'dan kaldirilinca yeni defter acmanin yolu kalmamisti. */}
+          {digerEtkinlikler.length === 0 && (
+            <div className="border-b border-ayrac p-1.5">
+              <Link
+                href="/etkinliklerim?yeni=1"
+                onClick={() => setAcik(false)}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm font-medium text-sarap transition-colors hover:bg-sarap/10"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+                Yeni Etkinlik Defteri Aç
+              </Link>
+            </div>
+          )}
 
           {/* Tema */}
           <div className="border-b border-ayrac p-1.5">

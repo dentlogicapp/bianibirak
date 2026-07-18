@@ -1,14 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
 // Zero-friction: cift yalniz isim + tarih girer; gerisi varsayilan (backend Sabitler).
 export default function PanelSayfasi() {
+  return (
+    <Suspense fallback={<AppShell><div className="flex min-h-[50vh] items-center justify-center font-govde text-sm text-ikincil">Yükleniyor...</div></AppShell>}>
+      <PanelIcerik />
+    </Suspense>
+  );
+}
+
+function PanelIcerik() {
   const router = useRouter();
+  const arama = useSearchParams();
+  // Menuden "+ Yeni Etkinlik Defteri Ac" ile gelindiginde form ACIK baslar.
+  // Kullanici bir sey aramak zorunda kalmaz: tikladigi sey neyse onu gorur.
+  const yeniIstendi = arama.get("yeni") === "1";
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir">("yukleniyor");
@@ -77,7 +89,9 @@ export default function PanelSayfasi() {
         />
       )}
 
-      {etkinlikler.length > 0 && <YeniEtkinlikBolumu onEklendi={etkinlikEklendi} />}
+      {etkinlikler.length > 0 && (
+        <YeniEtkinlikBolumu onEklendi={etkinlikEklendi} baslangictaAcik={yeniIstendi} />
+      )}
     </AppShell>
   );
 }
@@ -193,21 +207,27 @@ function AktivasyonFormu({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
 }
 
 // ---- Yeni etkinlik (mevcut liste varken) ----
-function YeniEtkinlikBolumu({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
-  const [acik, setAcik] = useState(false);
+function YeniEtkinlikBolumu({
+  onEklendi,
+  baslangictaAcik = false,
+}: {
+  onEklendi: (e: Etkinlik) => void;
+  baslangictaAcik?: boolean;
+}) {
+  const [acik, setAcik] = useState(baslangictaAcik);
   if (!acik) {
     return (
       <button
         onClick={() => setAcik(true)}
         className="mt-6 rounded-full border border-ayrac px-6 py-3 font-govde text-sm text-ikincil transition-colors hover:border-sarap hover:text-sarap"
       >
-        + Yeni etkinlik
+        + Yeni Etkinlik Defteri Aç
       </button>
     );
   }
   return (
     <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-8">
-      <h2 className="font-display text-lg text-murekkep">Yeni etkinlik</h2>
+      <h2 className="font-display text-lg text-murekkep">Yeni Etkinlik Defteri</h2>
       <EtkinlikAlanlari onEklendi={(e) => { onEklendi(e); setAcik(false); }} />
     </section>
   );
