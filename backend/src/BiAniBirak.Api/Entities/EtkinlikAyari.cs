@@ -17,7 +17,7 @@ public class EtkinlikAyari
     public string? PromptMetni { get; set; }
 
     // kapanis penceresi (gun) - varsayilan 30 (Karar 4 / Belge 05)
-    public int KapanisPencereGun { get; set; } = 30;
+    public int KapanisPencereGun { get; set; } = Sabitler.ToplamaGun;
 
     // ---- SAYAC (geri sayim) ----
     // Acik/kapali (true/false yazimi UI'da toggle olarak gosterilir).

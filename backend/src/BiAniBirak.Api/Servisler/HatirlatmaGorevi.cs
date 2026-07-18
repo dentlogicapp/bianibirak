@@ -15,25 +15,28 @@ namespace BiAniBirak.Api.Servisler;
 // sure doldu, imha edildi, KVKK'ya uyuldu. Ama cift mirasini kaybetti - ve bunu bizim
 // yuzumuzden kaybetti, cunku YETERINCE HATIRLATMADIK.
 //
-// TAKVIM (ozel gunden sonra):
-//    +2 gun   10:00   - "eserin hazirlaniyor" (ilk temas, henuz aciliyet yok)
-//   +10 gun   10:00
-//   +15 gun   19:00
-//   +20 gun   10:00
-//   +25 gun   19:00
-//   +30 gun   10:00   - TOPLAMA KAPANDI, artik yalniz 7 gunun var
-//   +31..+36  her gun (10:00/19:00 donusumlu) - SON HAFTA
-//   +37 gun   10:00   - BUGUN SON GUN
+// TAKVIM (ozel gunden sonra) - IKI FAZ:
 //
-// Sabah 10 ve aksam 19: insanin telefonuna baktigi saatler. Gece yarisi gonderilen
-// bildirim okunmaz, sadece rahatsiz eder.
+//   FAZ 1 - GUNLUK SAYIM (1..14. gun, her gun 10:00)
+//     "Anı defterinizin kalıcı olarak silinmesine N gün kaldı"
+//     Cift her gun ayni saatte, ayni cumleyle, azalan bir sayi gorur. Sayinin her gun
+//     kucullmesi, tek seferlik bir uyaridan cok daha guclu bir hatirlatmadir.
+//
+//   FAZ 2 - SON 5 GUN, SAAT BAZLI (imhaya 120/96/72/48/24/12/3 saat kala)
+//     "Kalan süre N saat"
+//     120 saat = toplamanin kapandigi an. Bu noktadan sonra ton sertlesir ve sure
+//     GUN degil SAAT olarak soylenir: "3 gun" soyut, "72 saat" somut ve acildir.
+//
+// Neden saat bazli: son pencerede kullanicinin yapmasi gereken TEK is vardir (indir).
+// Belirsiz bir "birkac gun" ifadesi erteletir; saat, ertelenemez.
 //
 // SESSIZ SAATE TABI DEGIL: bunlar hayati uyarilardir. "Rahatsiz etmeyin" ayari, geri
-// donusu olmayan bir kaybi engellemenin onune gecemez. (Zaten 10:00/19:00 makul
-// saatler - sessiz saatle cakismasi beklenmez.)
+// donusu olmayan bir kaybi engellemenin onune gecemez.
 //
-// INDIREN DURUR: eser indirilmisse hatirlatma gonderilmez. Adam isini yapti, bogmayiz.
-// (Imha uyarilari - ImhaGorevi - yine de gider: "verilerin siliniyor, yedegin var mi?")
+// INDIREN DURUR: eser indirilmisse Faz 1 hatirlatmasi gonderilmez - adam isini yapti,
+// bogmayiz. Ama FAZ 2 (son 5 gun) INDIRENE DE GIDER: indirdigi dosya bilgisayarinda
+// duruyor olabilir ama defterin SUNUCUDAN silinecegini bilmek onun hakkidir; ustelik
+// "indirdim saniyordum" hatasi geri donusu olmayan bir kayiptir.
 public sealed class HatirlatmaGorevi : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -48,36 +51,14 @@ public sealed class HatirlatmaGorevi : BackgroundService
         _log = log;
     }
 
-    // TAKVIM - (gun, saat). Tek dogruluk kaynagi: hem gorev hem UI cizelgesi buradan
-    // beslenmelidir; iki liste tutulsaydi kacinilmaz olarak ayrisirdi.
-    public static readonly (int Gun, int Saat)[] Takvim = OlusturTakvim();
+    // FAZ 1 - gunluk sayim gunleri (1 .. ToplamaGun-1). Her biri sabah 10:00.
+    // ToplamaGun'un kendisi Faz 2'nin ilk adimidir (120 saat kala = toplama kapanisi),
+    // bu yuzden burada YOKTUR - ayni gun iki bildirim gitmez.
+    public static readonly int[] GunlukGunler =
+        Enumerable.Range(1, Sabitler.ToplamaGun - 1).ToArray();
 
-    private static (int, int)[] OlusturTakvim()
-    {
-        var liste = new List<(int, int)>
-        {
-            (2, Sabitler.BildirimSabahSaat),
-            (10, Sabitler.BildirimSabahSaat),
-            (15, Sabitler.BildirimAksamSaat),
-            (20, Sabitler.BildirimSabahSaat),
-            (25, Sabitler.BildirimAksamSaat),
-            (30, Sabitler.BildirimSabahSaat),
-        };
-
-        // SON HAFTA: her gun. 30. gun sabahla bitti; 31 aksam, 32 sabah... donusumlu.
-        for (int g = Sabitler.ToplamaGun + 1; g < Sabitler.ToplamGun; g++)
-        {
-            var tek = (g - Sabitler.ToplamaGun) % 2 == 1;
-            liste.Add((g, tek ? Sabitler.BildirimAksamSaat : Sabitler.BildirimSabahSaat));
-        }
-
-        // SON GUN - HER ZAMAN SABAH. Donusum sirasi burayi aksama dusuruyordu; "bugun
-        // son gun" bildirimi aksam 19:00'da gelirse indirmeye vakit KALMAZ. Kural,
-        // kullanicinin zararina calisiyorsa kural yanlistir.
-        liste.Add((Sabitler.ToplamGun, Sabitler.BildirimSabahSaat));
-
-        return liste.ToArray();
-    }
+    // FAZ 2 - imhaya KALAN SAAT esikleri. 120 saat = tam 5 gun = toplama kapanisi.
+    public static readonly int[] SonSaatler = { 120, 96, 72, 48, 24, 12, 3 };
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -143,24 +124,51 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         foreach (var d in defterler)
         {
-            if (indirenler.Contains(d.Id)) continue;
+            // IMHA ANI - tek dogruluk kaynagi. Faz 2 esikleri bu ana gore hesaplanir.
+            var imhaAn = new DateTimeOffset(
+                d.EtkinlikTarihi.Date.AddDays(Sabitler.ToplamGun), TimeSpan.Zero);
 
-            foreach (var (gun, saat) in Takvim)
+            // ---- FAZ 1: gunluk sayim (indirene GITMEZ) ----
+            if (!indirenler.Contains(d.Id))
             {
-                // Hedef an: ozel gun + N gun, Turkiye saatiyle HH:00 -> UTC'ye cevir.
-                var hedef = d.EtkinlikTarihi.Date
-                    .AddDays(gun)
-                    .AddHours(saat - Sabitler.TurkiyeSaatFarki);
-                var hedefUtc = new DateTimeOffset(hedef, TimeSpan.Zero);
+                foreach (var gun in GunlukGunler)
+                {
+                    var hedef = d.EtkinlikTarihi.Date
+                        .AddDays(gun)
+                        .AddHours(Sabitler.BildirimSabahSaat - Sabitler.TurkiyeSaatFarki);
+                    var hedefUtc = new DateTimeOffset(hedef, TimeSpan.Zero);
 
-                if (simdi < hedefUtc) continue;         // vakti gelmedi
-                if (simdi > hedefUtc.AddHours(6)) continue; // cok gecti (sunucu kapaliymis)
+                    if (simdi < hedefUtc) continue;             // vakti gelmedi
+                    if (simdi > hedefUtc.AddHours(6)) continue; // cok gecti (sunucu kapaliymis)
 
-                // Idempotent anahtar: gun numarasi deterministik bir GUID'e gomulur.
-                var anahtar = GunAnahtari(gun);
+                    var anahtar = GunAnahtari(gun);
+                    if (gonderilmis.Contains($"{d.Id}:{anahtar}")) continue;
+
+                    var kalanGun = Sabitler.ToplamGun - gun;
+                    await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
+                        GunMetni(kalanGun, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
+                        new { gun, kalan_gun = kalanGun }, ct);
+                    gonderilen++;
+                }
+            }
+
+            // ---- FAZ 2: son 5 gun, saat bazli (INDIRENE DE GIDER) ----
+            foreach (var saat in SonSaatler)
+            {
+                var hedefUtc = imhaAn.AddHours(-saat);
+
+                if (simdi < hedefUtc) continue;
+                // Pencere: bir sonraki esige kadar (en fazla 6 saat) - kacirilmis
+                // esik gec de olsa gider, ama gecmis esikler ust uste yigilmaz.
+                if (simdi > hedefUtc.AddHours(6)) continue;
+                if (simdi >= imhaAn) continue; // imha olduysa uyarinin anlami kalmadi
+
+                var anahtar = SaatAnahtari(saat);
                 if (gonderilmis.Contains($"{d.Id}:{anahtar}")) continue;
 
-                await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}", gun, anahtar, ct);
+                await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
+                    SaatMetni(saat, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
+                    new { kalan_saat = saat }, ct);
                 gonderilen++;
             }
         }
@@ -182,25 +190,35 @@ public sealed class HatirlatmaGorevi : BackgroundService
         return new Guid(bayt);
     }
 
+    // Saat esiginden deterministik GUID. AYRI namespace (0x7B): "gun 24" ile
+    // "24 saat kala" ayni anahtari URETEMEZ - biri digerini susturamaz.
+    private static Guid SaatAnahtari(int saat)
+    {
+        var bayt = new byte[16];
+        BitConverter.GetBytes(saat).CopyTo(bayt, 0);
+        bayt[15] = 0x7B;
+        return new Guid(bayt);
+    }
+
     private static async Task GonderAsync(
         BiAniBirakDbContext db, PushGonderici push,
-        Guid etkinlikId, string ciftAdi, int gun, Guid anahtar, CancellationToken ct)
+        Guid etkinlikId, string ciftAdi, (string Baslik, string Govde) metin,
+        Guid anahtar, object gunluk, CancellationToken ct)
     {
-        var (baslik, govde) = Metin(gun, ciftAdi);
-
         var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
             .Where(u => u.EtkinlikId == etkinlikId)
             .Select(u => u.KullaniciId)
             .ToListAsync(ct);
 
+        // HER IKI ESE DE: defter ortaktir, kayip da ortaktir. Bir esin bildirimi
+        // gormemis olmasi digerini de mirassiz birakir.
         foreach (var kid in uyeler)
         {
             await push.GonderAsync(
-                kid, baslik, govde,
+                kid, metin.Baslik, metin.Govde,
                 url: "/baskiya-hazir-defter",
                 etkinlikId: etkinlikId,
-                // HAYATI UYARI: sessiz saate TABI DEGIL. "Rahatsiz etmeyin" ayari,
-                // geri donusu olmayan bir kaybi engellemenin onune gecemez.
+                // HAYATI UYARI: sessiz saate TABI DEGIL.
                 sessizSaateTabi: false,
                 ct: ct);
         }
@@ -213,49 +231,77 @@ public sealed class HatirlatmaGorevi : BackgroundService
             Eylem = "INDIRME_HATIRLATMASI",
             Varlik = "etkinlikler",
             VarlikId = anahtar,
-            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { gun }),
-            // Bu bir SISTEM eylemidir - ciftin denetim gunlugunde gorunmez.
-            // (Bildirimi zaten aldi; ayrica denetim satiri olarak gostermek gurultu.)
+            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(gunluk),
             SistemEylemi = true,
             CreatedAt = DateTimeOffset.UtcNow,
         });
     }
 
-    // Ton merdiveni: once bilgilendirme, sonra hatirlatma, en sonda ACIL.
-    // Ilk gunden "SILINECEK!" diye bagirmak, cifti korkutur ve bildirimlerimizi
-    // kapattirir - sonra gercekten kritik an geldiginde duymaz.
-    private static (string Baslik, string Govde) Metin(int gun, string ciftAdi)
+    // ---- FAZ 1 METNI: gunluk sayim ----
+    //
+    // Ton merdiveni: ilk gunlerde bilgilendirici, ortada hatirlatici, sona dogru
+    // uyarici. Ilk gunden "SILINECEK!" diye bagirmak cifti korkutur ve bildirimlerimizi
+    // KAPATTIRIR - sonra gercekten kritik an geldiginde duymaz.
+    private static (string Baslik, string Govde) GunMetni(int kalanGun, string ciftAdi)
     {
-        var kalan = Sabitler.ToplamGun - gun;
+        var baslik = $"Anı defterinizin kalıcı olarak silinmesine {kalanGun} gün kaldı";
 
-        if (gun <= 2)
-            return (
-                "Defteriniz dilekleri topluyor",
-                $"{ciftAdi}, davetlileriniz anılarını bırakıyor. Baskı Stüdyosu'ndan defterinizi "
-                + $"dilediğiniz an düzenleyebilirsiniz. Toplama {Sabitler.ToplamaGun}. günde kapanır, "
-                + $"eserinizi indirmek için {Sabitler.ToplamGun}. güne kadar süreniz var.");
+        if (kalanGun > 15)
+            return (baslik,
+                $"{ciftAdi}, davetlileriniz anılarını bırakıyor. Defterinizi dilediğiniz an "
+                + $"düzenleyebilirsiniz. Dilek toplama {Sabitler.ToplamaGun}. günde kapanır; "
+                + $"eserinizi indirmek için toplam {Sabitler.ToplamGun} gününüz var.");
 
-        if (gun < Sabitler.ToplamaGun)
-            return (
-                $"Defterinizi indirmek için {kalan} gün",
-                $"{ciftAdi}, anı defteriniz hazır olduğunda indirmeyi unutmayın. "
-                + $"{kalan} gün sonra tüm veriler kalıcı olarak silinecek ve geri getirilemeyecek.");
+        if (kalanGun > 10)
+            return (baslik,
+                $"{ciftAdi}, defteriniz büyüyor. Hazır olduğunda baskıya hazır PDF'inizi "
+                + "indirip güvenli bir yere kaydedin - bu miras kâğıtta kalıcıdır, sunucuda değil.");
 
-        if (gun == Sabitler.ToplamaGun)
-            return (
-                "Dilek toplama kapandı",
-                $"{ciftAdi}, davetli girişleri sona erdi. Defteriniz artık tamamlandı - "
-                + $"indirmek için son {Sabitler.IndirmeGun} gününüz var. Sonrasında her şey silinir.");
+        if (kalanGun > 6)
+            return (baslik,
+                $"{ciftAdi}, süre ilerliyor. Defterinizi henüz indirmediyseniz şimdi indirin; "
+                + "beklemek için bir sebep yok, dilekler eklendikçe yeniden indirebilirsiniz.");
 
-        if (kalan <= 0)
+        return (baslik,
+            $"{ciftAdi}, {kalanGun} gün sonra defteriniz ve tüm içeriği (dilekler, fotoğraflar) "
+            + "kalıcı olarak silinecek ve hiçbir şekilde geri getirilemeyecek. Lütfen eserinizi "
+            + "indirin ve yedekleyin.");
+    }
+
+    // ---- FAZ 2 METNI: son 5 gun, SAAT bazli ----
+    //
+    // Burada sure GUN degil SAAT olarak soylenir. "3 gun" ertelenebilir; "72 saat"
+    // ertelenemez. Metin ayrica NEREDEN silinecegini acikca yazar (uygulama +
+    // veritabani) ve geri donusun IMKANSIZ oldugunu tekrar eder - belirsizlik birakmaz.
+    private static (string Baslik, string Govde) SaatMetni(int saat, string ciftAdi)
+    {
+        var ortak =
+            "Bu süre sonunda anı defteriniz uygulamanızdan ve veritabanımızdan kalıcı olarak "
+            + "silinerek kaldırılacaktır. Bu kalıcı silme işleminden sonra oluşturduğunuz anı "
+            + "defterine bir daha erişilmesi mümkün olmayacaktır.";
+
+        if (saat == 120)
             return (
-                "BUGÜN SON GÜN",
-                $"{ciftAdi}, defteriniz bugün kalıcı olarak silinecek. İndirmediyseniz, "
-                + "bu son fırsatınız. Sonrasında hiçbir şekilde geri getirilemez.");
+                "Dilek toplama kapandı · Kalıcı silinmesine 120 saat kaldı",
+                $"{ciftAdi}, davetli girişleri sona erdi ve defteriniz tamamlandı. "
+                + $"Kalıcı silinmesine kalan süre 120 saattir. {ortak} "
+                + "Şimdi yapmanız gereken tek şey: baskıya hazır defterinizi indirin.");
+
+        if (saat >= 24)
+            return (
+                $"Kalıcı silinmesine {saat} saat kaldı",
+                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre {saat} saattir. "
+                + $"{ortak} Eserinizi indirip güvenli bir yere kaydedin.");
+
+        if (saat == 12)
+            return (
+                "SON 12 SAAT",
+                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre 12 saattir. "
+                + $"{ortak} Bu, eserinizi kurtarmak için son fırsatlarınızdan biridir.");
 
         return (
-            kalan == 1 ? "Son 1 gün" : $"Son {kalan} gün",
-            $"{ciftAdi}, defteriniz {kalan} gün sonra kalıcı olarak silinecek. "
-            + "Eserinizi indirip güvenli bir yere kaydedin - yedekleyin. Geri dönüşü yok.");
+            "SON 3 SAAT · Defteriniz siliniyor",
+            $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre yalnızca 3 saattir. "
+            + $"{ortak} Şimdi indirmezseniz bu defter bir daha var olmayacak.");
     }
 }

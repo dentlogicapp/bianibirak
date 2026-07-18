@@ -15,23 +15,29 @@ public static class Sabitler
     //
     //   Acilis      : defter kurulur kurulmaz (davetli girisleri hemen baslar)
     //   Ozel gun    : EtkinlikTarihi (cift belirler - tek degisken budur)
-    //   Toplama sonu: Ozel gun + 30 gun  -> yeni dilek YAZILAMAZ
-    //   Son indirme : Ozel gun + 37 gun  -> bu ana kadar eser indirilmeli
-    //   IMHA        : Ozel gun + 37 gun  -> her sey yok edilir, geri donusu YOK
+    //   Toplama sonu: Ozel gun + 15 gun  -> yeni dilek YAZILAMAZ
+    //   Son indirme : Ozel gun + 20 gun  -> bu ana kadar eser indirilmeli
+    //   IMHA        : Ozel gun + 20 gun  -> her sey yok edilir, geri donusu YOK
     //
     // Kurasyon (defter duzenleme) BASTAN SONA aciktir: kurulumdan imhaya kadar cift
     // defterini duzenleyebilir. Kapanan sey yalniz DAVETLI GIRISIDIR.
     //
-    // Bu sadelik bir urun karari: "37 gun" tek bir cumleyle anlatilabilir, her defterde
-    // ayni, herkes ayni sozu duyar. Degisken sure, guveni degil karisikligi buyutur.
+    // NEDEN 20 GUN (onceki model 37 idi):
+    // Sure kisaldi ki KALITE artabilsin. Ayni diskte fotograflari cok daha yuksek
+    // cozunurlukte (telefon galerisi kalitesinde) saklayabilmenin bedeli, veriyi daha
+    // kisa sure tutmaktir. Miras KAGITTA kalicidir - sunucuda degil. Urun sozu de bu:
+    // "bunu indir, bas, sakla; biz saklamiyoruz".
+    //
+    // Son 5 gun BILINCLI olarak toplamanin kapandigi ve uyarilarin SAAT bazina
+    // dustugu kritik penceredir - cift o pencerede tek is yapar: indirir.
 
     // Ozel gunden sonra davetli girislerinin acik kaldigi sure.
-    public const int ToplamaGun = 30;
+    public const int ToplamaGun = 15;
 
     // Toplama kapandiktan sonra eserin indirilebilecegi son sure.
-    public const int IndirmeGun = 7;
+    public const int IndirmeGun = 5;
 
-    // Ozel gunden IMHA'ya kadar toplam sure. 30 + 7 = 37.
+    // Ozel gunden IMHA'ya kadar toplam sure. 15 + 5 = 20.
     public const int ToplamGun = ToplamaGun + IndirmeGun;
 
     // ---- TUR-BAZLI VARSAYILAN ICERIK BLOKLARI ----
@@ -157,9 +163,8 @@ public static class Sabitler
     // SAKLAMA (kapanis SONRASI): toplama kapandiktan sonra eser bu kadar gun durur,
     // sonra TAM IMHA. IndirmeGun ile aynidir - iki isim, tek gercek.
     //
-    // Onceki surumde bu deger 37 idi ve "kapanis + 37" olarak sayiliyordu; yani imha
-    // ozel gunden 67 gun sonraya dusuyordu. Cizelgede yazan 37 ile kodun yaptigi 67
-    // birbirini TUTMUYORDU. Simdi tek kanon: ozel gun + 37.
+    // Tek kanon: imha = ozel gun + ToplamGun (20). Kod, cizelge ve yasal metin
+    // AYNI sayiyi soyler; ayri hesap yapan ikinci bir yer YOKTUR.
     public const int SaklamaGun = IndirmeGun;
 
     // Bildirim saatleri (Turkiye saati, UTC+3). Sabah ve aksam - insanin telefonuna

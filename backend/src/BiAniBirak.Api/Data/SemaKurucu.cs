@@ -111,7 +111,7 @@ public static class SemaKurucu
             "Tema" text NULL,
             "KarsilamaMetni" text NULL,
             "PromptMetni" text NULL,
-            "KapanisPencereGun" integer NOT NULL DEFAULT 30,
+            "KapanisPencereGun" integer NOT NULL DEFAULT 15,
             "Ayarlar" jsonb NULL,
             updated_at timestamptz NOT NULL DEFAULT now()
         );

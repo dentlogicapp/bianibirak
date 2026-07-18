@@ -7,9 +7,13 @@ namespace BiAniBirak.Api.Servisler;
 // IMHA GOREVI - defterin yasam dongusunun son halkasi.
 //
 // URUN DURUSU:
-// BiAniBirak bir MIRAS vaadi veriyor - ama SONSUZ SAKLAMA vaadi vermiyor. Kapanistan
-// SaklamaGun (37) gun sonra defter tumuyle yok edilir: dilekler, fotograflar, telefon
+// BiAniBirak bir MIRAS vaadi veriyor - ama SONSUZ SAKLAMA vaadi vermiyor. Ozel gunden
+// ToplamGun (20) gun sonra defter tumuyle yok edilir: dilekler, fotograflar, telefon
 // numaralari, e-postalar. Hicbiri kalmaz.
+//
+// Sure KISA tutuldu ki KALITE yuksek olabilsin: ayni diskte fotograflari telefon
+// galerisi kalitesinde saklamanin bedeli, veriyi daha kisa sure tutmaktir. Miras
+// KAGITTA kalicidir - sunucuda degil.
 //
 // Bu bir eksiklik degil, bir DURUS. Rakipler veriyi sonsuza dek tutar ("bir gun lazim
 // olur"); biz tutmayiz. Cift'in 40 davetlisinin telefon numarasini yillarca saklamak
@@ -77,42 +81,27 @@ public sealed class ImhaGorevi : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
         var depo = scope.ServiceProvider.GetRequiredService<DepolamaServisi>();
-        var push = scope.ServiceProvider.GetRequiredService<PushGonderici>();
 
         var simdi = DateTimeOffset.UtcNow;
 
-        // ---- 1) UYARILAR ----
-        // Imha tarihi = KapanisTarihi + SaklamaGun. Uyari esikleri buna gore.
-        var adaylar = await db.Etkinlikler
-            .Where(e => !e.ImhaEdildi && !e.SilindiMi)
-            .ToListAsync(ct);
-
-        foreach (var e in adaylar)
-        {
-            var imhaTarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun);
-            var kalanGun = (imhaTarihi - simdi).TotalDays;
-
-            if (kalanGun <= 14 && kalanGun > 3 && !e.ImhaUyari14Gonderildi)
-            {
-                await UyarAsync(db, push, e, 14, ct);
-                e.ImhaUyari14Gonderildi = true;
-            }
-            else if (kalanGun <= 3 && kalanGun > 0 && !e.ImhaUyari3Gonderildi)
-            {
-                await UyarAsync(db, push, e, 3, ct);
-                e.ImhaUyari3Gonderildi = true;
-
-                // 14 gun uyarisini kacirdiysa (defter gec olusturulmus olabilir)
-                // geriye donuk isaretle - bir daha gonderilmesin.
-                e.ImhaUyari14Gonderildi = true;
-            }
-        }
-        await db.SaveChangesAsync(ct);
+        // ---- 1) UYARILAR: ARTIK BURADA DEGIL ----
+        //
+        // Geri sayim bildirimlerinin TEK KAYNAGI HatirlatmaGorevi'dir: ozel gunden
+        // sonra HER GUN, son 5 gunde SAAT bazli. Burada ayrica 14/3 gun uyarisi
+        // gondermek AYNI olayi iki farkli sesle anlatirdi - kullanici icin gurultu,
+        // bizim icin iki ayri metin kaynagi (kacinilmaz olarak ayrisir).
+        //
+        // Bu gorevin isi artik tek: SUREYI DOLDURANI IMHA ETMEK ve imhayi bildirmek.
+        // ImhaUyari14Gonderildi / ImhaUyari3Gonderildi kolonlari SEMA'DA KALIR
+        // (gecmis kayitlarin izi silinmez), yalniz yazilmaz.
 
         // ---- 2) IMHA ----
-        var imhaliklar = adaylar
-            .Where(e => e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi)
-            .ToList();
+        // Uyari blogu kalktigi icin aday listesi ARTIK CEKILMIYOR; suresi dolani
+        // dogrudan veritabanindan sorguluyoruz (tum defterleri bellege almak yerine).
+        var imhaliklar = await db.Etkinlikler
+            .Where(e => !e.ImhaEdildi && !e.SilindiMi
+                        && e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi)
+            .ToListAsync(ct);
 
         foreach (var e in imhaliklar)
         {
@@ -121,37 +110,6 @@ public sealed class ImhaGorevi : BackgroundService
 
         if (imhaliklar.Count > 0)
             _log.LogInformation("Imha tamamlandi: {Sayi} defter.", imhaliklar.Count);
-    }
-
-    // Uyari - her iki ese de. Ton: tehdit degil, HATIRLATMA.
-    private static async Task UyarAsync(
-        BiAniBirakDbContext db, PushGonderici push, Etkinlik e, int gun, CancellationToken ct)
-    {
-        var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
-            .Where(u => u.EtkinlikId == e.Id)
-            .Select(u => u.KullaniciId)
-            .ToListAsync(ct);
-
-        var baslik = gun == 3
-            ? "Defterin 3 gün sonra silinecek"
-            : "Defterin 2 hafta sonra silinecek";
-
-        var govde = gun == 3
-            ? "Son 3 gün. Eserini indirmediysen, bu son fırsat - sonra geri getirilemez."
-            : $"Söz verdiğimiz gibi, {Sabitler.SaklamaGun} gün sonunda defterini tümüyle siliyoruz. "
-              + "Eserini indirdiysen içeriğin sende güvende demektir.";
-
-        foreach (var kid in uyeler)
-        {
-            await push.GonderAsync(
-                kid,
-                baslik,
-                govde,
-                url: "/baskiya-hazir-defter",
-                etkinlikId: e.Id,
-                sessizSaateTabi: true,
-                ct: ct);
-        }
     }
 
     // IMHA - GERI DONUSU YOK.
@@ -171,6 +129,11 @@ public sealed class ImhaGorevi : BackgroundService
         // Imha oncesi ozet - KVKK kaniti icin. KIMLIK BILGISI ICERMEZ: yalniz sayilar.
         var dilekSayisi = await db.Katkilar.CountAsync(k => k.EtkinlikId == id, ct);
         var gorselSayisi = await db.EtkinlikGorselleri.CountAsync(g => g.EtkinlikId == id, ct);
+
+        // KAPANIS BILDIRIMI ICIN: uyeler imhadan ONCE toplanir - uyelik satirlari
+        // birazdan silinecek ve kime haber verecegimizi bilemeyecegiz.
+        var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
+            .Where(u => u.EtkinlikId == id).Select(u => u.KullaniciId).ToListAsync(ct);
 
         // Kurasyon zinciri (FK sirasi: cocuktan ebeveyne)
         var kurasyonIdler = await db.Kurasyonlar
@@ -237,5 +200,38 @@ public sealed class ImhaGorevi : BackgroundService
         // DOSYALAR EN SON: DB rollback olsaydi fotograflar durmaliydi. Commit
         // basariliysa artik geri donus yok - diski de temizle.
         depo.EtkinligiSil(id);
+
+        // ---- KAPANIS BILDIRIMI ----
+        //
+        // Defter SESSIZCE kaybolmaz. Silme gerceklestiginde ciftin bunu bizden
+        // duymasi gerekir; bir gun uygulamayi acip defterin yok oldugunu gormek,
+        // uyarilarin hepsini almis olsa bile guveni yikar.
+        //
+        // EtkinlikId = NULL (Bildirim.EtkinlikId nullable): defterin tum bildirimleri
+        // az once silindi ve etkinlige bagli her kayit gidiyor. Bu bildirim ciftin
+        // HESABINA aittir, deftere degil - o yuzden ayakta kalir.
+        //
+        // Commit SONRASI gonderilir: imha basarisiz olsaydi "silindi" demek yalan olurdu.
+        foreach (var kid in uyeler)
+        {
+            db.Bildirimler.Add(new Bildirim
+            {
+                Id = Guid.NewGuid(),
+                KullaniciId = kid,
+                EtkinlikId = null,
+                Tip = "imha_tamamlandi",
+                Baslik = "Anı defteriniz kalıcı olarak silindi",
+                Mesaj =
+                    $"Söz verdiğimiz gibi, özel gününüzden {Sabitler.ToplamGun} gün sonra anı "
+                    + "defteriniz ve tüm içeriği (dilekler, fotoğraflar, iletişim bilgileri) "
+                    + "uygulamadan ve veritabanımızdan kalıcı olarak silindi. Bu işlem geri "
+                    + "alınamaz. Eserinizi indirdiyseniz mirasınız sizde güvende - o dosya "
+                    + "artık tümüyle size aittir.",
+                Url = null,
+                OkunduMu = false,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+        }
+        if (uyeler.Count > 0) await db.SaveChangesAsync(ct);
     }
 }
