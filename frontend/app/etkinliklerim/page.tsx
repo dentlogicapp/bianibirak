@@ -27,8 +27,20 @@ export default function PanelSayfasi() {
     })();
   }, [router]);
 
-  function etkinlikEklendi(e: Etkinlik) {
+  // YENI DEFTER -> ZORUNLU ES DAVET ADIMI.
+  //
+  // Defter iki kisiliktir: her esin AYRI davet baglantisi ve AYRI onay kuyrugu vardir.
+  // Es katilmazsa kendi yakinlarindan gelen dilekleri kimse onaylayamaz - o dilekler
+  // deftere HIC girmez. Bu yuzden kurulum, panele degil davet adimina cikar.
+  //
+  // Ayri bir sayfa acilmaz: /ayarlar/es-ekle ZATEN bu isi yapiyor (paralel yapi YASAK).
+  // "kurulum=1" ayni sayfayi kurulum kipine sokar; sonradan ayni sayfa "baglantiyi
+  // yeniden gonder" erisim alani olarak calismaya devam eder.
+  async function etkinlikEklendi(e: Etkinlik) {
     setEtkinlikler((onceki) => [e, ...onceki]);
+    // Yeni defteri AKTIF yap - davet adimi aktif defter uzerinden calisir.
+    const c = await api.etkinlikAktifYap(e.id);
+    if (c.ok) router.push("/ayarlar/es-ekle?kurulum=1");
   }
 
   function etkinlikSilindi(id: string) {
@@ -172,8 +184,8 @@ function AktivasyonFormu({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
     <section className="mt-8 rounded-3xl border border-ayrac bg-yuzey p-8">
       <h2 className="font-display text-lg text-murekkep">İlk etkinliğini oluştur</h2>
       <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-        Sadece iki isim ve bir tarih yeter. Karşılama metni, tema ve erişim penceresi
-        varsayılan olarak hazır gelir; dilersen sonra düzenlersin.
+        Sadece iki isim ve bir tarih yeter. Karşılama metni ve tema varsayılan olarak
+        hazır gelir; dilersen sonra düzenlersin.
       </p>
       <EtkinlikAlanlari onEklendi={onEklendi} />
     </section>
@@ -231,7 +243,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
       kurucuEs,
     });
     setYukleniyor(false);
-    if (cevap.ok) onEklendi(cevap.veri);
+    if (cevap.ok) void onEklendi(cevap.veri);
     else setHata(cevap.mesaj);
   }
 
@@ -327,7 +339,8 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
           className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap sm:w-72"
         />
         <p className="mt-2 font-govde text-xs text-ikincil">
-          Erişim penceresi varsayılan 30 gün; sonra ayarlardan değiştirebilirsin.
+          Davetli girişleri özel gününden 15 gün sonra kapanır; defterin 20. günün
+          sonunda kalıcı olarak silinir. Bu takvim her defterde aynıdır.
         </p>
       </div>
 

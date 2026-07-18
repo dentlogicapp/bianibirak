@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 import { api, type Etkinlik } from "@/lib/api";
@@ -10,7 +10,20 @@ import { AppShell } from "@/components/site/AppShell";
 // "+ Esini Ekle": paylasilabilir davet linki (mail servisi gerekmez).
 // Kurucu es link uretir, esine gonderir; es tiklayip kayit/giris yapar ve katilir.
 export default function EsEkleSayfasi() {
+  return (
+    <Suspense fallback={<AppShell><div className="flex min-h-[50vh] items-center justify-center font-govde text-sm text-ikincil">Yükleniyor...</div></AppShell>}>
+      <EsEkleIcerik />
+    </Suspense>
+  );
+}
+
+function EsEkleIcerik() {
   const router = useRouter();
+  const arama = useSearchParams();
+  // KURULUM KIPI: etkinlik yeni kuruldu ve buraya ZORUNLU adim olarak geldik.
+  // Ayni sayfa iki islevi birden gorur (paralel yapi YOK): kurulumun son adimi
+  // ve sonradan "baglantiyi yeniden gonder" erisim alani.
+  const kurulum = arama.get("kurulum") === "1";
   const [etkinlik, setEtkinlik] = useState<Etkinlik | null>(null);
   const [esKatildi, setEsKatildi] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -113,9 +126,33 @@ export default function EsEkleSayfasi() {
 
   return (
     <AppShell>
+      {kurulum && (
+        <div className="mb-5 rounded-3xl border border-sarap/30 bg-sarap/5 px-5 py-4">
+          <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-sarap">
+            Kurulumun son adımı
+          </p>
+          <p className="metin-yasli mt-1.5 font-govde text-sm leading-relaxed text-murekkep">
+            Defteriniz hazır. Şimdi eşini davet et - bu adım atlanacak bir ayrıntı değil:
+            defter <span className="font-medium">iki kişiliktir</span>. Her eşin kendi davet
+            bağlantısı ve kendi onay kuyruğu vardır; eşin katılmazsa kendi yakınlarından
+            gelen dilekleri kimse onaylayamaz ve o dilekler deftere hiç girmez.
+          </p>
+        </div>
+      )}
+
       <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
         Eşin de defterinize katılsın: kendi bağlantısından gelen dilekleri kendi onaylasın,
         bildirimlerini alsın. Aşağıdaki davet bağlantısını ona gönder.
+      </p>
+
+      {/* PARALEL ERISIM GEREKCESI - bu sayfa neden kalici olarak burada duruyor.
+          Kurulumda bir kez gonderilen bag kaybolabilir: es WhatsApp'i siler, telefonu
+          degistirir, mesaji bulamaz. O anda cift'in gidecegi tek yer burasidir. */}
+      <p className="metin-yasli mt-2 font-govde text-xs leading-relaxed text-ikincil">
+        Bu sayfa kalıcıdır: bağlantıyı sonra yeniden göndermen gerekirse (eşin mesajı
+        kaybettiyse, telefonunu değiştirdiyse ya da bağlantı elinden çıktıysa)
+        <span className="text-murekkep"> Ayarlar → Eşini Ekle</span> adımından istediğin
+        zaman buraya dönüp yeni bir bağlantı oluşturabilirsin.
       </p>
 
       {esKatildi ? (
@@ -185,6 +222,34 @@ export default function EsEkleSayfasi() {
             Bu bağlantı tek kullanımlıktır. Eşin bağlantıya tıklayıp hesabını oluşturduğunda
             (ya da mevcut hesabıyla girdiğinde) defterinize {esAdi} olarak katılır.
           </p>
+        </div>
+      )}
+      {/* KURULUM KIPI - DEVAM.
+          Buton yalniz baglanti URETILDIKTEN sonra birincil olur: adim "zorunlu"dur
+          ama tuzak degildir - baglantiyi uretmek tek tik, gondermek kullanicinin elinde.
+          Uretmeden gecmek de mumkun; o zaman uyari tonunda ve ikincil gorunur. */}
+      {kurulum && !esKatildi && (
+        <div className="mt-8 border-t border-ayrac pt-5">
+          {token ? (
+            <>
+              <button
+                onClick={() => router.push("/gelen-dilekler")}
+                className="w-full rounded-full bg-sarap px-6 py-3.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+              >
+                Bağlantıyı gönderdim, deftere geç
+              </button>
+              <p className="mt-2 text-center font-govde text-xs text-ikincil">
+                Göndermeyi unuttuysan sorun değil - bağlantı burada duruyor.
+              </p>
+            </>
+          ) : (
+            <button
+              onClick={() => router.push("/gelen-dilekler")}
+              className="w-full rounded-full border border-ayrac px-6 py-3.5 font-govde text-sm text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+            >
+              Şimdilik atla - eşimi sonra davet edeceğim
+            </button>
+          )}
         </div>
       )}
     </AppShell>
