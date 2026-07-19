@@ -65,14 +65,20 @@ export function DestekSekmesi() {
     toast.success("Yanıt gönderildi - kullanıcıya bildirim gitti.");
   }
 
-  async function kapat() {
+  // COZULDU / YENIDEN AC - geri alinabilir. Onay penceresi YOK: geri alinabilir bir
+  // islem icin onay istemek gereksiz surtunmedir; yanlislik olursa tek tikla donulur.
+  async function durumDegistir(kapat: boolean) {
     if (!secili) return;
-    const c = await api.superDestekKapat(secili);
+    const c = kapat ? await api.superDestekKapat(secili) : await api.superDestekYenidenAc(secili);
     if (!c.ok) { toast.error(c.mesaj); return; }
     const k = await api.superDestekKonusma(secili);
     if (k.ok) setKonusma(k.veri);
     void listeCek();
-    toast.success("Talep kapatıldı.");
+    toast.success(
+      kapat
+        ? "Çözüldü olarak işaretlendi. Kullanıcı yeni yazarsa ayrı bir konuşma açılır."
+        : "Konuşma yeniden açıldı."
+    );
   }
 
   return (
@@ -179,16 +185,33 @@ export function DestekSekmesi() {
                       Defteri incele
                     </a>
                   )}
-                  {konusma.durum !== "kapali" && (
+                  {konusma.durum === "kapali" ? (
                     <button
-                      onClick={kapat}
+                      onClick={() => durumDegistir(false)}
+                      className="rounded-full border border-yaldiz/50 px-3 py-1.5 font-govde text-xs text-yaldiz transition-colors hover:bg-yaldiz/10"
+                    >
+                      Yeniden aç
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => durumDegistir(true)}
+                      title="Konuşmayı arşivler. Kullanıcı yeni yazarsa ayrı bir konuşma açılır. İstediğin an geri alabilirsin."
                       className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
                     >
-                      Kapat
+                      Çözüldü
                     </button>
                   )}
                 </div>
               </div>
+
+              {konusma.durum === "kapali" && (
+                <div className="border-b border-ayrac bg-yuzeyKoyu px-5 py-2">
+                  <p className="font-govde text-[0.68rem] leading-relaxed text-ikincil">
+                    Bu konuşma çözüldü olarak işaretlendi. Kullanıcı yeni bir mesaj yazarsa
+                    ayrı bir konuşma olarak açılır. Yanıt yazmak için önce yeniden açın.
+                  </p>
+                </div>
+              )}
 
               {/* Akis */}
               <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">

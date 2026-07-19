@@ -228,7 +228,7 @@ export type SuperDefter = {
   silindi_mi: boolean;
   silinme_zamani: string | null;
   created_at: string;
-  uyeler: { ad: string; email: string; rol: string; katildi: string }[];
+  uyeler: { id: string; ad: string; email: string; rol: string; katildi: string }[];
   uye_sayisi: number;
   yetim: boolean;
   dilek_sayisi: number;
@@ -823,7 +823,19 @@ export const api = {
     istek<{ ok: boolean }>(`/api/super/sss/${id}`, { method: "DELETE" }),
 
   superDestekKapat: (id: string) =>
-    istek<{ ok: boolean }>(`/api/super/destek/${id}/kapat`, { method: "POST" }),
+    istek<{ ok: boolean; durum: string }>(`/api/super/destek/${id}/kapat`, { method: "POST" }),
+  superDestekYenidenAc: (id: string) =>
+    istek<{ ok: boolean; durum: string }>(`/api/super/destek/${id}/yeniden-ac`, { method: "POST" }),
+  superDestekBaslat: (v: { kullaniciId: string; etkinlikId?: string | null; baslik?: string; metin: string }) =>
+    istek<{ ok: boolean; talep_id: string }>("/api/super/destek/baslat", {
+      method: "POST",
+      body: JSON.stringify({
+        KullaniciId: v.kullaniciId,
+        EtkinlikId: v.etkinlikId ?? null,
+        Baslik: v.baslik ?? null,
+        Metin: v.metin,
+      }),
+    }),
 
   copeat: (id: string) =>
     istek<{ copeAtildi: boolean }>(`/api/katki/${id}/copeat`, { method: "POST" }),

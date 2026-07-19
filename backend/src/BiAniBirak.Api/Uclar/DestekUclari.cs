@@ -41,6 +41,9 @@ public static class DestekUclari
         app.MapGet("/api/super/destek/{id:guid}", SuperKonusma).RequireAuthorization();
         app.MapPost("/api/super/destek/{id:guid}/yanit", SuperYanit).RequireAuthorization();
         app.MapPost("/api/super/destek/{id:guid}/kapat", SuperKapat).RequireAuthorization();
+        app.MapPost("/api/super/destek/{id:guid}/yeniden-ac", SuperYenidenAc).RequireAuthorization();
+        // Proaktif mesaj: talep BEKLEMEDEN yoneticinin konusma baslatmasi.
+        app.MapPost("/api/super/destek/baslat", SuperKonusmaBaslat).RequireAuthorization();
     }
 
     private static bool Kimlik(HttpContext ctx, out Guid id)
@@ -393,8 +396,27 @@ public static class DestekUclari
         return Results.Ok(new { ok = true });
     }
 
+    // COZULDU OLARAK ISARETLE (eski adiyla "kapat").
+    //
+    // NE YAPAR: talebi arsivler. Tek islevsel etkisi sudur - kullanici bundan sonra
+    // yazarsa mesaji bu konusmanin altina EKLENMEZ, YENI bir talep acilir. Yani
+    // "bu konu bitti; bundan sonraki soru ayri bir konudur" demektir.
+    //
+    // NEDEN GERI ALINABILIR: yonetici yanlislikla ya da erken kapatabilir; kullanici
+    // "bir de sunu sorayim" diyebilir. Geri donusu olmayan bir islem icin onay
+    // penceresi koymak yerine, islemi GERI ALINABILIR yapmak daha iyidir - onay
+    // penceresi hatayi azaltir, geri alinabilirlik SIFIRLAR.
     private static async Task<IResult> SuperKapat(
         Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+        => await DurumDegistir(id, ctx, db, "kapali", ct);
+
+    // YENIDEN AC - kapatilan konusma tekrar canlanir; gecmis mesajlar KORUNUR.
+    private static async Task<IResult> SuperYenidenAc(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+        => await DurumDegistir(id, ctx, db, "acik", ct);
+
+    private static async Task<IResult> DurumDegistir(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, string yeniDurum, CancellationToken ct)
     {
         var (ok, _) = await SuperMi(ctx, db, ct);
         if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
@@ -402,11 +424,91 @@ public static class DestekUclari
         var talep = await db.DestekTalepleri.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (talep == null) return Hata(404, "TALEP_BULUNAMADI", "Talep bulunamadı.");
 
-        talep.Durum = "kapali";
+        talep.Durum = yeniDurum;
         talep.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { ok = true });
+        return Results.Ok(new { ok = true, durum = yeniDurum });
+    }
+
+    // PROAKTIF KONUSMA - yonetici, talep BEKLEMEDEN kullaniciya yazar.
+    //
+    // NEDEN: destek her zaman kullanicidan baslamaz. Odemesi takilan, defteri
+    // imhaya yaklasan ya da bir sorunu FARK ETTIGIMIZ kullaniciya once BIZ
+    // ulasmaliyiz. Bu, sikayeti beklemek yerine sorunu karsilamaktir.
+    //
+    // Ayni konusma altyapisini kullanir (paralel yapi YOK): kullanici icin bu, normal
+    // bir destek yazismasidir; farki yalnizca ILK MESAJI bizim yazmamizdir.
+    private static async Task<IResult> SuperKonusmaBaslat(
+        HttpContext ctx, BiAniBirakDbContext db, PushGonderici push,
+        ProaktifGirdi girdi, CancellationToken ct)
+    {
+        var (ok, yonetici) = await SuperMi(ctx, db, ct);
+        if (!ok || yonetici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var metin = (girdi.Metin ?? string.Empty).Trim();
+        if (metin.Length < 5) return Hata(400, "DOGRULAMA_HATASI", "Mesaj çok kısa.");
+        if (metin.Length > AzamiMetin) return Hata(400, "DOGRULAMA_HATASI", "Mesaj çok uzun.");
+
+        var hedef = await db.Kullanicilar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.Id == girdi.KullaniciId && k.DeletedAt == null, ct);
+        if (hedef == null) return Hata(404, "KULLANICI_BULUNAMADI", "Kullanıcı bulunamadı.");
+
+        var simdi = DateTimeOffset.UtcNow;
+
+        // Acik konusmasi varsa ONA ekle - kullaniciyi ayni anda iki yazismayla bogmayiz.
+        var talep = await db.DestekTalepleri
+            .Where(t => t.KullaniciId == hedef.Id && t.Durum != "kapali")
+            .OrderByDescending(t => t.SonMesajZamani)
+            .FirstOrDefaultAsync(ct);
+
+        if (talep == null)
+        {
+            talep = new DestekTalebi
+            {
+                Id = Guid.NewGuid(),
+                KullaniciId = hedef.Id,
+                EtkinlikId = girdi.EtkinlikId,
+                Konu = KonuTuret(metin),
+                Durum = "yanitlandi",
+                SonMesajZamani = simdi,
+                CreatedAt = simdi,
+                UpdatedAt = simdi,
+            };
+            db.DestekTalepleri.Add(talep);
+            await db.SaveChangesAsync(ct);
+        }
+
+        db.DestekMesajlari.Add(new DestekMesaji
+        {
+            Id = Guid.NewGuid(),
+            TalepId = talep.Id,
+            GonderenKullaniciId = yonetici.Id,
+            YoneticiMi = true,
+            GonderenAd = yonetici.Ad,
+            Metin = metin,
+            CreatedAt = simdi,
+        });
+
+        talep.Durum = "yanitlandi";
+        talep.SonMesajZamani = simdi;
+        talep.UpdatedAt = simdi;
+        talep.KullaniciOkunmamis += 1;
+        await db.SaveChangesAsync(ct);
+
+        // BILDIRIM BASLIGI DURUMA OZEL: "talebiniz yanitlandi" demek yalan olurdu -
+        // kullanici bir talep acmadi. Baslik yoneticinin verdigi baglami tasir.
+        var baslik = string.IsNullOrWhiteSpace(girdi.Baslik)
+            ? "BiAnıBırak'tan size bir mesaj var"
+            : girdi.Baslik!.Trim();
+
+        await push.GonderAsync(
+            hedef.Id, baslik, metin, "/gelen-dilekler?destek=1", girdi.EtkinlikId,
+            sessizSaateTabi: true, ct,
+            pushGovde: metin.Length > 90 ? metin[..90] + "..." : metin);
+
+        return Results.Ok(new { ok = true, talep_id = talep.Id });
     }
 
     // ---------------- SSS / BILGI TABANI ----------------
@@ -541,6 +643,9 @@ public static class DestekUclari
 }
 
 public record DestekGirdi(string? Metin);
+
+public record ProaktifGirdi(
+    Guid KullaniciId, Guid? EtkinlikId, string? Baslik, string? Metin);
 
 public record SssGirdi(
     Guid? Id, string? Kategori, string? AltKategori,

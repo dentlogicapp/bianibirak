@@ -229,7 +229,7 @@ public static class SuperUclari
         var uyeKayitlari = await db.EtkinlikUyelikleri.AsNoTracking()
             .Where(u => idler.Contains(u.EtkinlikId))
             .Join(db.Kullanicilar, u => u.KullaniciId, k => k.Id,
-                (u, k) => new { u.EtkinlikId, u.Rol, k.Ad, k.Email, u.CreatedAt })
+                (u, k) => new { u.EtkinlikId, u.Rol, KullaniciId = k.Id, k.Ad, k.Email, u.CreatedAt })
             .ToListAsync();
 
         var dilekSayilari = await db.Katkilar.AsNoTracking()
@@ -281,7 +281,8 @@ public static class SuperUclari
             uyeler = uyeKayitlari
                 .Where(u => u.EtkinlikId == e.Id)
                 .OrderBy(u => u.Rol)
-                .Select(u => new { ad = u.Ad, email = u.Email, rol = u.Rol, katildi = u.CreatedAt }),
+                // KullaniciId: yoneticinin bu ese DOGRUDAN mesaj gonderebilmesi icin.
+                .Select(u => new { id = u.KullaniciId, ad = u.Ad, email = u.Email, rol = u.Rol, katildi = u.CreatedAt }),
             uye_sayisi = uyeKayitlari.Count(u => u.EtkinlikId == e.Id),
             // Yetim defter: hic uyesi kalmamis (ornegin tek uye silinmis) - mudahale gerekir.
             yetim = !uyeKayitlari.Any(u => u.EtkinlikId == e.Id),

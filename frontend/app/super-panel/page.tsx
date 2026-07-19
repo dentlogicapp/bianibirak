@@ -189,6 +189,9 @@ function DefterlerSekmesi() {
   // ONAY HEDEFLERI - geri alinabilir eylemler de artik ETKISINI anlatarak sorar.
   const [dondurHedef, setDondurHedef] = useState<SuperDefter | null>(null);
   const [copHedef, setCopHedef] = useState<SuperDefter | null>(null);
+  const [mesajHedef, setMesajHedef] = useState<
+    { kullaniciId: string; ad: string; email: string; etkinlikId: string } | null
+  >(null);
 
   const cek = useCallback(async () => {
     setYukleniyor(true);
@@ -304,9 +307,21 @@ function DefterlerSekmesi() {
                   </p>
                 ) : (
                   d.uyeler.map((u) => (
-                    <p key={u.email} className="min-w-0 truncate font-govde text-xs text-ikincil">
-                      <span className="text-murekkep">{u.ad}</span> · {u.rol === "es1" ? "Birinci eş" : "İkinci eş"} · {tarihKisa(u.katildi)}
-                    </p>
+                    <div key={u.email} className="flex min-w-0 items-center justify-between gap-2">
+                      <p className="min-w-0 truncate font-govde text-xs text-ikincil">
+                        <span className="text-murekkep">{u.ad}</span> · {u.email} · {u.rol === "es1" ? "Birinci eş" : "İkinci eş"}
+                      </p>
+                      {/* PROAKTIF MESAJ - sikayeti beklemeden ulasmak.
+                          Odemesi takilan, defteri imhaya yaklasan ya da bir sorunu
+                          FARK ETTIGIMIZ kullaniciya once BIZ yazariz. */}
+                      <button
+                        onClick={() => setMesajHedef({ kullaniciId: u.id, ad: u.ad, email: u.email, etkinlikId: d.id })}
+                        title={`${u.ad} kişisine doğrudan mesaj gönder`}
+                        className="shrink-0 rounded-full border border-ayrac px-2.5 py-1 font-govde text-[0.62rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                      >
+                        Mesaj
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -417,6 +432,13 @@ function DefterlerSekmesi() {
         onOnay={() => { const d = copHedef; if (d) { void copeAt(d); } setCopHedef(null); }}
         onKapat={() => setCopHedef(null)}
       />
+
+      {mesajHedef && (
+        <ProaktifMesajModal
+          hedef={mesajHedef}
+          onKapat={() => setMesajHedef(null)}
+        />
+      )}
 
       {/* KALICI SIL - GERI ALINAMAZ. Ayni bilesen, en yuksek siddet.
           Onceden burada AYRI bir modal vardi; iki farkli onay tasarimi, iki farkli
@@ -1010,5 +1032,107 @@ function SistemNabzi({
         })}
       </div>
     </section>
+  );
+}
+
+// ---- PROAKTIF MESAJ ----
+//
+// Yonetici, destek talebi BEKLEMEDEN kullaniciya yazar. Kullanici icin bu normal bir
+// destek yazismasidir - farki yalnizca ilk mesaji bizim yazmamizdir.
+//
+// BILDIRIM BASLIGI SERBEST: "talebiniz yanitlandi" demek yalan olurdu (kullanici bir
+// talep acmadi). Baslik, mesajin baglamini tasir: "Defterinizin suresi yaklasiyor" gibi.
+function ProaktifMesajModal({
+  hedef, onKapat,
+}: {
+  hedef: { kullaniciId: string; ad: string; email: string; etkinlikId: string };
+  onKapat: () => void;
+}) {
+  const [baslik, setBaslik] = useState("");
+  const [metin, setMetin] = useState("");
+  const [gonderiliyor, setGonderiliyor] = useState(false);
+
+  const hazirBasliklar = [
+    "Defterinizin süresi yaklaşıyor",
+    "Ödemenizle ilgili bilgi",
+    "Defterinizle ilgili bir konu",
+  ];
+
+  async function gonder() {
+    setGonderiliyor(true);
+    const c = await api.superDestekBaslat({
+      kullaniciId: hedef.kullaniciId,
+      etkinlikId: hedef.etkinlikId,
+      baslik: baslik.trim() || undefined,
+      metin: metin.trim(),
+    });
+    setGonderiliyor(false);
+    if (!c.ok) { toast.error(c.mesaj); return; }
+    toast.success(`${hedef.ad} kişisine mesaj gönderildi ve bildirim düştü.`);
+    onKapat();
+  }
+
+  const girdiSinif =
+    "w-full rounded-xl border border-ayrac bg-parsomen px-4 py-2.5 font-govde text-sm text-murekkep outline-none focus:border-sarap";
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-murekkep/70 p-4 backdrop-blur-sm" onClick={onKapat}>
+      <div className="w-full max-w-md rounded-3xl border border-ayrac bg-yuzey p-6" onClick={(e) => e.stopPropagation()}>
+        <p className="font-display text-lg text-murekkep">Doğrudan mesaj gönder</p>
+        <p className="mt-1 font-govde text-xs text-ikincil">
+          {hedef.ad} · {hedef.email}
+        </p>
+        <p className="metin-yasli mt-2 font-govde text-xs leading-relaxed text-ikincil">
+          Bu mesaj kullanıcının destek ekranında normal bir yazışma olarak görünür ve
+          kendisine bildirim gider. Yanıtı Destek Talepleri sekmesine düşer.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="font-govde text-xs text-ikincil">Bildirim başlığı</label>
+            <input
+              value={baslik}
+              onChange={(e) => setBaslik(e.target.value)}
+              placeholder="BiAnıBırak'tan size bir mesaj var"
+              className={girdiSinif + " mt-1"}
+            />
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {hazirBasliklar.map((h) => (
+                <button
+                  key={h}
+                  onClick={() => setBaslik(h)}
+                  className="rounded-full border border-ayrac px-2.5 py-1 font-govde text-[0.6rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="font-govde text-xs text-ikincil">Mesaj</label>
+            <textarea
+              value={metin}
+              onChange={(e) => setMetin(e.target.value)}
+              rows={5}
+              className={girdiSinif + " mt-1 resize-none"}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button onClick={onKapat} className="rounded-full border border-ayrac px-5 py-2.5 font-govde text-sm text-ikincil transition-colors hover:bg-yuzeyKoyu">
+            Vazgeç
+          </button>
+          <button
+            onClick={gonder}
+            disabled={gonderiliyor || metin.trim().length < 5}
+            className="rounded-full bg-sarap px-6 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-40"
+          >
+            {gonderiliyor ? "Gönderiliyor..." : "Gönder ve bildir"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
