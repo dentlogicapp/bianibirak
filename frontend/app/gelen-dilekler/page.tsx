@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { api, type Etkinlik, type Katki } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
@@ -33,6 +33,7 @@ function Yukleniyor() {
 function DefterIcerik() {
   const router = useRouter();
   const arama = useSearchParams();
+  const yol = usePathname();
   const [etkinlik, setEtkinlik] = useState<Etkinlik | null>(null);
   const [kuyruk, setKuyruk] = useState<Katki[]>([]);
   const [defter, setDefter] = useState<Katki[]>([]);
@@ -74,13 +75,32 @@ function DefterIcerik() {
     const kuyruktaVar = kuyruk.some((k) => k.id === odakId);
     const defterdeVar = defter.some((k) => k.id === odakId);
 
+    // ODAK ISLENDIKTEN SONRA PARAMETRE TEMIZLENIR.
+    //
+    // Neden sart: parametre adreste kalirsa, kullanici AYNI bildirime ikinci kez
+    // tikladiginda adres DEGISMEZ; React hicbir degisiklik gormez ve ekranda hicbir
+    // sey olmaz - "olu taklidi". Temizlersek, ikinci tik parametreyi YENIDEN ekler,
+    // degisim algilanir ve odak tekrar calisir.
+    //
+    // Gecikme bilincli: once vurgu/scroll hook'u odakId'yi gorsun, sonra adres
+    // sadelessin. Erken temizlersek odak hic olusmaz.
+    const parametreyiTemizle = () => {
+      setTimeout(() => {
+        const p = new URLSearchParams(arama.toString());
+        p.delete("focus");
+        router.replace(yol + (p.toString() ? `?${p}` : ""), { scroll: false });
+      }, 1200);
+    };
+
     if (kuyruktaVar) {
       odakIslendi.current = odakId;
+      parametreyiTemizle();
       return; // bekleyen dilek - odak hook scroll+vurgu yapar
     }
     if (defterdeVar) {
       odakIslendi.current = odakId;
       toast.success("Bu dilek onaylanmış ve ortak deftere eklenmiş - aşağıda vurgulanıyor.");
+      parametreyiTemizle();
       return;
     }
 

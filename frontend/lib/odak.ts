@@ -61,7 +61,13 @@ export function useSwOdakDinleyici() {
     // yeni pencere acar - mesaja gerek kalmaz.
     function isle(olay: MessageEvent) {
       if (olay.data?.type === "bianibirak-odak" && olay.data.url) {
-        router.push(olay.data.url);
+        const url = String(olay.data.url);
+        // Destek hedefi ise olayi YAY: uygulama zaten o sayfadaysa adres degismez
+        // ve router.push hicbir sey tetiklemez. Olay bu bosluğu kapatir.
+        if (url.includes("destek=1")) {
+          window.dispatchEvent(new CustomEvent("bianibirak-destek-ac"));
+        }
+        router.push(url);
       }
     }
 

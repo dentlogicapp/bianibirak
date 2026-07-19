@@ -46,17 +46,48 @@ export function UserMenu() {
   // Destek bir sayfa degil modaldir; bu yuzden bildirim "?destek=1" ile gelir.
   // Modal acildiktan sonra parametre URL'den TEMIZLENIR - kullanici sayfayi
   // yenilerse ya da geri gelirse modal tekrar acilmasin.
+  // REAKTIF PARAMETRE OKUMA - "bazen calisiyor" hatasinin kok cozumu.
+  //
+  // ONCEKI HALI: window.location.search bir kez, useEffect(..., []) icinde okunuyordu.
+  // Bildirime tiklandiginda hedef ZATEN acik olan sayfaysa React bileseni yeniden
+  // kurmaz; efekt bir daha CALISMAZ ve hicbir sey olmaz. Farkli sayfadaysan calisir.
+  // Kullanicinin gordugu: "bazen goturuyor, bazen olu taklidi yapiyor".
+  //
+  // COZUM: useSearchParams REAKTIFTIR - adres degistiginde efekt yeniden calisir.
+  // Ayrica parametre router.replace ile TEMIZLENIR (window.history ile degil):
+  // boylece Next'in kendi durumu da guncellenir ve AYNI bildirime ikinci kez
+  // tiklandiginda parametre yeniden eklendigi icin degisim algilanir.
+  // DESTEK MODALI ACMA - OLAY TABANLI, ADRESE BAGIMLI DEGIL.
+  //
+  // ONCEKI IKI DENEME DE KAYBETTI:
+  //   1) window.location.search'i bir kez okumak: hedef sayfa ZATEN acikken bilesen
+  //      yeniden kurulmadigi icin efekt calismiyordu -> "bazen olu taklidi".
+  //   2) useSearchParams: reaktifti ama statik on-uretimi bozdu (/_not-found).
+  //
+  // COZUM: adres bir YAN URUN olsun, tetikleyici DEGIL. Bildirime tiklandiginda
+  // dogrudan bir olay yayinlanir; menu onu dinler. Olay her seferinde yeniden
+  // yayinlandigi icin AYNI bildirime ikinci tik da calisir - adresin degisip
+  // degismedigi hic onemli degildir.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("destek") === "1") {
+    function ac() {
       setDestekAcik(true);
-      // Bayrak PROP ile tasinir: parametre hemen siliniyor, modal URL'den okuyamaz.
       setDestekBildirimden(true);
-      p.delete("destek");
-      const yeni = window.location.pathname + (p.toString() ? `?${p}` : "");
-      window.history.replaceState(null, "", yeni);
     }
+    window.addEventListener("bianibirak-destek-ac", ac);
+
+    // Soguk baslangic: push bildirimi uygulamayi ADRESLE actiysa (uygulama kapaliydi),
+    // dinleyici henuz yokken olay kacirilmis olur. Bu yuzden ilk yuklemede adres
+    // bir kez kontrol edilir.
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("destek") === "1") {
+        ac();
+        p.delete("destek");
+        window.history.replaceState(null, "", window.location.pathname + (p.toString() ? `?${p}` : ""));
+      }
+    }
+
+    return () => window.removeEventListener("bianibirak-destek-ac", ac);
   }, []);
 
   // Turetilmis: acik defter ve digerleri. Tek kaynak - iki ayri filtre tutulmaz.
@@ -178,6 +209,10 @@ export function UserMenu() {
       return;
     }
 
+    // Hedef destek ise olayi YAY - ayni sayfadaysak bile modal acilir.
+    if (hedef.includes("destek=1")) {
+      window.dispatchEvent(new CustomEvent("bianibirak-destek-ac"));
+    }
     router.push(hedef);
   }
 
