@@ -46,13 +46,83 @@ export function useSwOdakDinleyici() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    // 1) MESAJ YOLU - sayfa uyanikken aninda calisir.
     function isle(olay: MessageEvent) {
       if (olay.data?.type === "bianibirak-odak" && olay.data.url) {
+        void bekleyeniTemizle();
         router.push(olay.data.url);
       }
     }
-    navigator.serviceWorker.addEventListener("message", isle);
-    return () => navigator.serviceWorker.removeEventListener("message", isle);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", isle);
+    }
+
+    // 2) BEKLEYEN HEDEF YOLU - iOS icin BELIRLEYICI olan yol.
+    //
+    // iOS'ta bildirime ilk dokunus cogu zaman yalnizca uygulamayi one getirir;
+    // service worker'in mesaji ya kaybolur ya da navigate reddedilir. Bu yuzden
+    // hedefi SW kalici bir depoya (Cache Storage) yazar. Sayfa uyandiginda -
+    // mount aninda, sekmeye geri donuldugunde ya da pencere odaklandiginda -
+    // bekleyen hedefi okur, TUKETIR ve gider.
+    //
+    // "Tuketir" onemli: kayit okunur okunmaz silinir, yoksa kullanici uygulamayi
+    // her actiginda eski bildirime yeniden yonlendirilirdi.
+    async function bekleyeniIsle() {
+      const hedef = await bekleyeniOku();
+      if (!hedef) return;
+      await bekleyeniTemizle();
+      router.push(hedef);
+    }
+
+    void bekleyeniIsle();
+
+    const gorunurluk = () => {
+      if (document.visibilityState === "visible") void bekleyeniIsle();
+    };
+    document.addEventListener("visibilitychange", gorunurluk);
+    window.addEventListener("focus", gorunurluk);
+
+    return () => {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", isle);
+      }
+      document.removeEventListener("visibilitychange", gorunurluk);
+      window.removeEventListener("focus", gorunurluk);
+    };
   }, [router]);
+}
+
+// Bekleyen yonlendirme kaydi - SW yazar, sayfa okur ve siler.
+const BEKLEYEN_KOVA = "bianibirak-nav";
+const BEKLEYEN_ANAHTAR = "/__bekleyen_yonlendirme";
+
+// Eski kayitlar yeniden yonlendirmesin: 2 dakikadan eski istek yok sayilir.
+const BEKLEYEN_OMUR_MS = 2 * 60 * 1000;
+
+async function bekleyeniOku(): Promise<string | null> {
+  try {
+    if (typeof caches === "undefined") return null;
+    const kova = await caches.open(BEKLEYEN_KOVA);
+    const yanit = await kova.match(BEKLEYEN_ANAHTAR);
+    if (!yanit) return null;
+    const veri = (await yanit.json()) as { url?: string; zaman?: number };
+    if (!veri?.url) return null;
+    if (veri.zaman && Date.now() - veri.zaman > BEKLEYEN_OMUR_MS) {
+      await bekleyeniTemizle();
+      return null;
+    }
+    return veri.url;
+  } catch {
+    return null;
+  }
+}
+
+async function bekleyeniTemizle(): Promise<void> {
+  try {
+    if (typeof caches === "undefined") return;
+    const kova = await caches.open(BEKLEYEN_KOVA);
+    await kova.delete(BEKLEYEN_ANAHTAR);
+  } catch {
+    /* sessiz - temizlik basarisiz olsa da omur kontrolu koruyor */
+  }
 }

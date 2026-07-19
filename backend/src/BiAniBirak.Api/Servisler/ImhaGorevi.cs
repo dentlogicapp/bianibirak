@@ -227,7 +227,10 @@ public sealed class ImhaGorevi : BackgroundService
                     + "uygulamadan ve veritabanımızdan kalıcı olarak silindi. Bu işlem geri "
                     + "alınamaz. Eserinizi indirdiyseniz mirasınız sizde güvende - o dosya "
                     + "artık tümüyle size aittir.",
-                Url = null,
+                // SESSIZ BILDIRIM YOK. Defter silindi diye tiklamanin hicbir sey
+                // yapmamasi kabul edilemez - kullanici "bozuk mu?" diye dusunur.
+                // Defter listesine goturur ve orada NE OLDUGU aciklanir.
+                Url = "/etkinliklerim?imha=1",
                 OkunduMu = false,
                 CreatedAt = DateTimeOffset.UtcNow,
             });

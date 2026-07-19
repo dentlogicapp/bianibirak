@@ -135,7 +135,20 @@ export function UserMenu() {
   }
 
   function bildirimeTikla(b: Bildirim) {
-    if (!b.url) return;
+    // SESSIZ TIKLAMA YOK.
+    // URL'siz bir bildirime tiklayip hicbir sey olmamasi, kullanicida "uygulama
+    // bozuk" izlenimi birakir. Gidilecek yer yoksa bile NE OLDUGUNU soyleriz -
+    // bildirimin tam metnini acariz. Sessizlik amatorluktur; her tiklamanin bir
+    // karsiligi olmalidir.
+    if (!b.url) {
+      setAcikBildirim(acikBildirim === b.id ? null : b.id);
+      if (!b.okundu_mu) {
+        setBildirimler((o) => o.map((x) => (x.id === b.id ? { ...x, okundu_mu: true } : x)));
+        setOkunmamis((s) => Math.max(0, s - 1));
+        void api.bildirimOkundu(b.id);
+      }
+      return;
+    }
 
     // TEK TIK, SIFIR SURTUNME: navigasyon SENKRON ve ONCE.
     // Ag istegi (durum kontrolu) tiklama anina KOYULMAZ - hedef rota zaten sabit

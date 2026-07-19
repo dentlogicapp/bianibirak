@@ -22,6 +22,9 @@ function PanelIcerik() {
   // Menuden "+ Yeni Etkinlik Defteri Ac" ile gelindiginde form ACIK baslar.
   // Kullanici bir sey aramak zorunda kalmaz: tikladigi sey neyse onu gorur.
   const yeniIstendi = arama.get("yeni") === "1";
+  // IMHA BILDIRIMINDEN GELINDI: defter artik yok; sessiz kalmak yerine ne oldugunu
+  // ve simdi ne yapabilecegini anlatiriz.
+  const imhaBildirimi = arama.get("imha") === "1";
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir">("yukleniyor");
@@ -79,6 +82,20 @@ function PanelIcerik() {
         </h1>
         <p className="mt-2 font-govde text-sm text-ikincil">{kullanici.email}</p>
       </div>
+
+      {imhaBildirimi && (
+        <div className="mb-5 rounded-2xl border border-ayrac bg-yuzey px-5 py-4">
+          <p className="font-govde text-sm font-medium text-murekkep">
+            Defteriniz kalıcı olarak silindi
+          </p>
+          <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+            Söz verdiğimiz takvim doldu ve defteriniz, dilekler ve fotoğraflarla birlikte
+            veritabanımızdan tamamen kaldırıldı. Bu işlem geri alınamaz. Baskıya hazır
+            nüshanızı indirdiyseniz mirasınız sizde güvende - o dosya tümüyle size aittir.
+            Yeni bir özel gün için dilediğiniz zaman yeni bir defter açabilirsiniz.
+          </p>
+        </div>
+      )}
 
       {etkinlikler.length === 0 ? (
         <AktivasyonFormu onEklendi={etkinlikEklendi} />

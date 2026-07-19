@@ -1,7 +1,7 @@
 // BiAniBirak - PWA service worker (Planlama Defteri deseni uyarlamasi).
 // Ilke: API (/api) ASLA onbellege alinmaz (her zaman canli); sayfa network-first
 // (en guncel surum); degismez statik varliklar (hash'li JS/CSS/ikon) cache-first.
-const CACHE = "bianibirak-pwa-v3"; // v3: bildirim tiklamasi tek tikta (client.navigate)
+const CACHE = "bianibirak-pwa-v4"; // v4: bildirim hedefi kalici depoda - iOS dahil tek tik
 
 self.addEventListener("install", (event) => {
   // Yeni surum beklemeden devreye girsin (guncellemeler aninda yansisin)
@@ -105,57 +105,67 @@ self.addEventListener("notificationclick", (event) => {
   const ham = event.notification.data?.url || "/";
   const hedef = new URL(ham, self.location.origin).href;
 
-  // BILDIRIM TIKLAMASI - ILK TIKTA CALISIR.
+  // BILDIRIM TIKLAMASI - HER PLATFORMDA TEK TIK.
   //
-  // ONCEKI HATA: burada yalniz postMessage gonderiliyordu ve gezinmeyi SAYFANIN JS'i
-  // yapiyordu. Arka plandaki (ya da dondurulmus) PWA penceresi mesaji kacirinca ILK TIK
-  // BOSA GIDIYOR, kullanici ikinci kez tiklayinca calisiyordu. Sebep: mesaj, pencere
-  // henuz uyanmadan teslim ediliyor ve dinleyici hicbir zaman gormuyordu.
+  // GECMIS: once yalnizca postMessage gonderiliyordu (sayfa uykudaysa kaybolur),
+  // sonra client.navigate() eklendi (Chrome/Android'de cozdu). Ama iOS'ta HALA
+  // cift tik gerekiyordu.
   //
-  // COZUM: gezinmeyi SERVICE WORKER'IN KENDISI yapar (client.navigate). Bu, sayfanin
-  // JS'inin uyanik olmasina BAGIMLI DEGILDIR - tarayici seviyesinde gerceklesir.
-  // postMessage yalnizca "zaten hedefteyiz, sadece odagi tazele" durumunda kullanilir.
+  // iOS GERCEGI: Safari/PWA'da ilk dokunus cogu zaman yalnizca uygulamayi ONE
+  // GETIRIR; o an service worker'in navigate() cagrisi ya reddedilir ya da sayfa
+  // henuz uyanmadigi icin postMessage'i kacirir. Ikinci dokunusta sayfa uyanik
+  // oldugu icin calisir. Yani sorun ZAMANLAMA'dir - ve zamanlamaya guvenen her
+  // cozum er ya da gec kaybeder.
+  //
+  // KALICI COZUM: hedefi UCUCU OLMAYAN bir yere yazariz (Cache Storage). Sayfa ne
+  // zaman uyanirsa uyansin - hemen, bir saniye sonra ya da gorunur oldugunda -
+  // bekleyen hedefi okur, tuketir ve gider. Mesaj kaybolsa da, navigate reddedilse
+  // de hedef KAYBOLMAZ.
   event.waitUntil(
     (async () => {
+      // 1) HEDEFI KALICI YAZ - her seyden once. Gerisi basarisiz olsa bile sayfa
+      //    uyandiginda bunu bulacak.
+      try {
+        const c = await caches.open("bianibirak-nav");
+        await c.put(
+          new Request("/__bekleyen_yonlendirme"),
+          new Response(JSON.stringify({ url: ham, zaman: Date.now() }), {
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      } catch (_) {
+        /* cache yoksa diger yollar devrede */
+      }
+
       const liste = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
-
       const pencere = liste.find((c) => c.url.startsWith(self.location.origin));
 
       if (!pencere) {
-        // Acik pencere yok - yenisini ac.
         await self.clients.openWindow(hedef);
         return;
       }
 
-      // Once odakla: kullanici uygulamayi GORSUN, sonra icerik degissin.
-      try {
-        await pencere.focus();
-      } catch (_) {
-        /* odak reddedilebilir - gezinme yine de denenir */
-      }
+      try { await pencere.focus(); } catch (_) { /* odak reddedilebilir */ }
 
-      // Zaten hedef adresteyiz: tam yenileme gereksiz, yumusak odak yeter
-      // (ornek: /gelen-dilekler acikken ayni sayfada baska bir dilege odaklanma).
+      // Zaten hedefteyiz: yumusak odak yeter.
       if (pencere.url === hedef) {
         pencere.postMessage({ type: "bianibirak-odak", url: ham });
         return;
       }
 
-      // Farkli adres: SW'nin kendisi gezdirir - tek tikta, kesin.
-      if ("navigate" in pencere) {
-        try {
-          await pencere.navigate(hedef);
-          return;
-        } catch (_) {
-          /* kontrol edilmeyen istemcide navigate reddedilir - mesajla devam */
-        }
-      }
-
-      // Son care: sayfanin dinleyicisine birak.
+      // Mesajla haber ver (uyanik sayfa aninda gider).
       pencere.postMessage({ type: "bianibirak-odak", url: ham });
+
+      // SW'nin kendisi gezdirsin (Chrome/Android'de kesin cozum).
+      if ("navigate" in pencere) {
+        try { await pencere.navigate(hedef); } catch (_) { /* iOS reddedebilir */ }
+      }
+    })()
+  );
+});
     })()
   );
 });
