@@ -107,7 +107,7 @@ public static class SuperUclari
     }
 
     // ---------------- SISTEM SAGLIGI ----------------
-    private static async Task<IResult> Ozet(HttpContext ctx, BiAniBirakDbContext db)
+    private static async Task<IResult> Ozet(HttpContext ctx, BiAniBirakDbContext db, DepolamaServisi depo)
     {
         var (ok, _) = await SuperAdminMi(ctx, db);
         if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
@@ -132,8 +132,57 @@ public static class SuperUclari
 
         var kvkkBekleyen = await db.KvkkTalepleri.CountAsync(t => t.Durum == "yeni" || t.Durum == "islemde");
 
+        // ---- SISTEM NABZI ----
+        // Panele girer girmez "her sey yolunda mi?" sorusunun cevabi. Bu sayilarin
+        // hepsi MUDAHALE GEREKTIREN durumlardir; suslu istatistik degildir.
+        var simdiNabiz = DateTimeOffset.UtcNow;
+        var imhaGecikmis = await db.Etkinlikler.CountAsync(e =>
+            !e.ImhaEdildi && !e.SilindiMi &&
+            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdiNabiz);
+        var destekBekleyen = await db.DestekTalepleri.CountAsync(t => t.Durum == "acik");
+        var odemeBekleyen = await db.Odemeler.CountAsync(o => o.Durum == "bekliyor");
+        var imhaYakin = await db.Etkinlikler.CountAsync(e =>
+            !e.ImhaEdildi && !e.SilindiMi &&
+            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) > simdiNabiz &&
+            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdiNabiz.AddDays(Sabitler.IndirmeGun));
+
+        // Disk: medya kokunun bagli oldugu surucu. DiskGozcusu ile AYNI olcum -
+        // iki farkli yerde iki farkli sayi gostermek guveni yikar.
+        int diskYuzde = 0;
+        string diskBos = "-";
+        try
+        {
+            var yol = Path.GetFullPath(depo.Kok);
+            DriveInfo? enIyi = null;
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                if (!d.IsReady) continue;
+                if (!yol.StartsWith(d.RootDirectory.FullName, StringComparison.Ordinal)) continue;
+                if (enIyi == null || d.RootDirectory.FullName.Length > enIyi.RootDirectory.FullName.Length)
+                    enIyi = d;
+            }
+            if (enIyi != null)
+            {
+                diskYuzde = (int)Math.Round((enIyi.TotalSize - enIyi.AvailableFreeSpace) * 100.0 / enIyi.TotalSize);
+                var bos = enIyi.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0;
+                diskBos = $"{Math.Round(bos, 1)} GB";
+            }
+        }
+        catch { /* olculemezse nabizda "-" gorunur, panel yine calisir */ }
+
         return Results.Json(new
         {
+            nabiz = new
+            {
+                disk_yuzde = diskYuzde,
+                disk_bos = diskBos,
+                imha_gecikmis = imhaGecikmis,
+                imha_yakin = imhaYakin,
+                destek_bekleyen = destekBekleyen,
+                odeme_bekleyen = odemeBekleyen,
+                kvkk_bekleyen = kvkkBekleyen,
+                dilek_beklemede = dilekBeklemede,
+            },
             defter = new
             {
                 toplam = defterToplam,

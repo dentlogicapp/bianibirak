@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/site/AppShell";
 import { BildirimAyari } from "@/components/site/BildirimAyari";
+import { BildirimIzinKarti } from "@/components/site/BildirimIzinKarti";
 
 // Hesap ayarlari: bildirimler + sessiz saatler (avatar menusunden).
 export default function AyarlarSayfasi() {
@@ -16,6 +17,12 @@ export default function AyarlarSayfasi() {
           Sana bir dilek bırakıldığında ve ortak deftere yeni bir anı eklendiğinde bildirim
           al. Sessiz saatlerde bildirimler ertelenir.
         </p>
+      </div>
+
+      {/* IZIN KARTI EN USTTE: izin yoksa asagidaki ince ayarlarin hicbir anlami
+          yoktur. Once kapiyi ac, sonra odayi duzenle. */}
+      <div className="mt-6">
+        <BildirimIzinKarti />
       </div>
 
       <div className="mt-6">

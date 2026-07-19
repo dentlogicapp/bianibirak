@@ -194,6 +194,16 @@ export type BildirimOzeti = {
 
 // ---- SUPER PANEL ----
 export type SuperOzet = {
+  nabiz: {
+    disk_yuzde: number;
+    disk_bos: string;
+    imha_gecikmis: number;
+    imha_yakin: number;
+    destek_bekleyen: number;
+    odeme_bekleyen: number;
+    kvkk_bekleyen: number;
+    dilek_beklemede: number;
+  };
   defter: { toplam: number; aktif: number; donduruldu: number; copte: number; yeni_7gun: number };
   kullanici: { toplam: number; super_admin: number };
   dilek: {

@@ -84,6 +84,10 @@ export default function SuperPanelSayfasi() {
 
   return (
     <AppShell>
+      {/* SISTEM NABZI - panele girer girmez "her sey yolunda mi?" cevabi.
+          Yalniz MUDAHALE GEREKTIREN sayilar burada; suslu istatistik asagida. */}
+      {ozet && <SistemNabzi ozet={ozet} onGit={setSekme} />}
+
       {/* Sistem sagligi ozeti */}
       {ozet && <OzetIzgara ozet={ozet} />}
 
@@ -882,4 +886,129 @@ function gecenSure(iso: string): string {
   if (gun === 1) return "dün";
   if (gun < 7) return `${gun} gün önce`;
   return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+}
+
+// ---- SISTEM NABZI ----
+//
+// TASARIM: her oge bir SORUYA yanit verir ve gerekiyorsa TIKLANIR - yonetici
+// sayiyi gorup "peki nerede?" diye aramaz, dogrudan oraya gider.
+//
+// RENK DILI: sakinken notr, esik asilinca uyari, kritikte sarap. Her seyi kirmiziya
+// boyamak kirmiziyi anlamsizlastirir; renk ancak SEYREK kullanildiginda uyarir.
+function SistemNabzi({
+  ozet, onGit,
+}: {
+  ozet: SuperOzet;
+  onGit: (s: Sekme) => void;
+}) {
+  const n = ozet.nabiz;
+
+  const diskTon =
+    n.disk_yuzde >= 92 ? "kritik" : n.disk_yuzde >= 75 ? "uyari" : "sakin";
+
+  const ogeler: {
+    etiket: string;
+    deger: string;
+    alt: string;
+    ton: "sakin" | "uyari" | "kritik";
+    sekme?: Sekme;
+  }[] = [
+    {
+      etiket: "Disk",
+      deger: `%${n.disk_yuzde}`,
+      alt: `${n.disk_bos} boş`,
+      ton: diskTon as "sakin" | "uyari" | "kritik",
+    },
+    {
+      etiket: "Destek",
+      deger: String(n.destek_bekleyen),
+      alt: n.destek_bekleyen > 0 ? "yanıt bekliyor" : "bekleyen yok",
+      ton: n.destek_bekleyen > 0 ? "uyari" : "sakin",
+      sekme: "destek",
+    },
+    {
+      etiket: "Gecikmiş imha",
+      deger: String(n.imha_gecikmis),
+      alt: n.imha_gecikmis > 0 ? "süresi doldu, hâlâ duruyor" : "temiz",
+      ton: n.imha_gecikmis > 0 ? "kritik" : "sakin",
+      sekme: "olcum",
+    },
+    {
+      etiket: "İmhası yakın",
+      deger: String(n.imha_yakin),
+      alt: "indirme penceresinde",
+      ton: "sakin",
+      sekme: "olcum",
+    },
+    {
+      etiket: "Ödeme",
+      deger: String(n.odeme_bekleyen),
+      alt: n.odeme_bekleyen > 0 ? "onay bekliyor" : "bekleyen yok",
+      ton: n.odeme_bekleyen > 0 ? "uyari" : "sakin",
+      sekme: "odemeler",
+    },
+    {
+      etiket: "KVKK",
+      deger: String(n.kvkk_bekleyen),
+      alt: n.kvkk_bekleyen > 0 ? "talep bekliyor" : "bekleyen yok",
+      ton: n.kvkk_bekleyen > 0 ? "uyari" : "sakin",
+      sekme: "kvkk",
+    },
+  ];
+
+  const stil = {
+    sakin: "border-ayrac bg-yuzey",
+    uyari: "border-amber-400/50 bg-amber-500/5",
+    kritik: "border-sarap/50 bg-sarap/5",
+  };
+  const renk = {
+    sakin: "text-murekkep",
+    uyari: "text-amber-600",
+    kritik: "text-sarap",
+  };
+
+  const sorunVar = ogeler.some((o) => o.ton !== "sakin");
+
+  return (
+    <section className="mb-5">
+      <div className="mb-2 flex items-center gap-2">
+        <span
+          className={`h-2 w-2 rounded-full ${sorunVar ? "bg-amber-500" : "bg-yaldiz"}`}
+          aria-hidden
+        />
+        <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+          {sorunVar ? "Dikkat gerektiren durumlar var" : "Sistem sakin"}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {ogeler.map((o) => {
+          const Icerik = (
+            <>
+              <p className="font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                {o.etiket}
+              </p>
+              <p className={`mt-0.5 font-display text-xl tabular-nums ${renk[o.ton]}`}>
+                {o.deger}
+              </p>
+              <p className="mt-0.5 font-govde text-[0.6rem] leading-tight text-ikincil">{o.alt}</p>
+            </>
+          );
+          return o.sekme ? (
+            <button
+              key={o.etiket}
+              onClick={() => onGit(o.sekme!)}
+              className={`min-w-0 rounded-2xl border px-3 py-2.5 text-left transition-colors hover:border-sarap/50 ${stil[o.ton]}`}
+            >
+              {Icerik}
+            </button>
+          ) : (
+            <div key={o.etiket} className={`min-w-0 rounded-2xl border px-3 py-2.5 ${stil[o.ton]}`}>
+              {Icerik}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
