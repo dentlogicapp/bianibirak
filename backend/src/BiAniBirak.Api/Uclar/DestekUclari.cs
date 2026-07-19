@@ -222,7 +222,10 @@ public static class DestekUclari
         var ozet = KonuTuret(metin);
         foreach (var yid in yoneticiler)
         {
-            if (yid == kid) continue; // kendi talebini kendine bildirme
+            // KENDI TALEBINE DE BILDIRIM GIDER.
+            // Sistem yoneticisi de bir kullanicidir ve talebi TAM OLARAK bir kullanici
+            // talebi gibi islemelidir: ayni kuyruga duser, ayni sekilde yanitlanir.
+            // Kendine bildirim gitmesi ayrica canli akisi test etmenin en dogal yoludur.
             await push.GonderAsync(
                 yid,
                 "Yeni destek talebi",
@@ -378,7 +381,10 @@ public static class DestekUclari
             talep.KullaniciId,
             "Destek talebiniz yanıtlandı",
             metin,
-            "/destek",
+            // "/destek" diye bir SAYFA YOK - destek bir modaldir. Onceden bu adrese
+            // yonlendiriliyordu ve bildirime tiklayan kullanici bos/hatali ekranla
+            // karsilasiyordu. Artik uygulamayi acip modali TETIKLEYEN adrese gider.
+            "/gelen-dilekler?destek=1",
             null,
             sessizSaateTabi: true,
             ct,

@@ -40,6 +40,21 @@ export function UserMenu() {
   const [acikBildirim, setAcikBildirim] = useState<string | null>(null);
   const [destekAcik, setDestekAcik] = useState(false);
 
+  // BILDIRIMDEN DESTEK MODALINI AC.
+  // Destek bir sayfa degil modaldir; bu yuzden bildirim "?destek=1" ile gelir.
+  // Modal acildiktan sonra parametre URL'den TEMIZLENIR - kullanici sayfayi
+  // yenilerse ya da geri gelirse modal tekrar acilmasin.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("destek") === "1") {
+      setDestekAcik(true);
+      p.delete("destek");
+      const yeni = window.location.pathname + (p.toString() ? `?${p}` : "");
+      window.history.replaceState(null, "", yeni);
+    }
+  }, []);
+
   // Turetilmis: acik defter ve digerleri. Tek kaynak - iki ayri filtre tutulmaz.
   const aktifEtkinlik = etkinlikler.find((e) => e.id === aktifId) ?? null;
   const digerEtkinlikler = etkinlikler.filter((e) => e.id !== aktifId);

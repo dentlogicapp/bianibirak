@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { defterDurumu, durumTonSinif } from "@/lib/durum";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
 // Zero-friction: cift yalniz isim + tarih girer; gerisi varsayilan (backend Sabitler).
@@ -138,8 +139,26 @@ function EtkinlikListesi({
                 {e.es1_ad} &amp; {e.es2_ad}
               </p>
               <p className="mt-1 font-govde text-xs uppercase tracking-etiket text-ikincil">
-                {turEtiketi(e.tur)} · {tarihSaatMetni(e.etkinlik_tarihi)} · {durumEtiketi(e.durum)}
+                {turEtiketi(e.tur)} · {tarihSaatMetni(e.etkinlik_tarihi)}
               </p>
+
+              {/* CANLI EVRE - "hazirlik" kalintisinin yerine.
+                  Rozet + tek cumle: kullanici defterin HANGI ASAMADA oldugunu ve
+                  simdi ne yapmasi gerektigini bir bakista gorur. */}
+              {(() => {
+                const d = defterDurumu(e);
+                return (
+                  <div className="mt-2">
+                    <span className={`inline-block rounded-full border px-2.5 py-0.5 font-govde text-[0.62rem] font-medium ${durumTonSinif(d.ton)}`}>
+                      {d.etiket}
+                    </span>
+                    <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+                      {d.aciklama}
+                      {d.eylem && <span className="text-murekkep"> · {d.eylem}</span>}
+                    </p>
+                  </div>
+                );
+              })()}
             </button>
             <div className="flex shrink-0 items-center gap-2">
               <button
@@ -388,13 +407,6 @@ function turEtiketi(tur: string): string {
   return tur;
 }
 
-function durumEtiketi(durum: string): string {
-  if (durum === "hazirlik") return "Hazırlık";
-  if (durum === "aktif") return "Aktif";
-  if (durum === "kapali") return "Kapalı";
-  if (durum === "arsiv") return "Arşiv";
-  return durum;
-}
 
 function tarihSaatMetni(iso: string): string {
   const t = new Date(iso);

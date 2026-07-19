@@ -129,7 +129,17 @@ public static class KatkiUclari
         var email = (istek.DavetliEmail ?? "").Trim();
         var telefon = (istek.DavetliTelefon ?? "").Trim();
         var iliski = (istek.DavetliIliski ?? "").Trim();
-        var mesaj = (istek.Mesaj ?? "").Trim();
+        // METIN NORMALLESTIRME - davetlinin NIYETI korunur, defter BOZULMAZ.
+        //
+        // Davetli satir basi yapabilir, paragraf birakabilir; bu bir bicimlendirme
+        // degil ANLAMDIR (siir, imza, alt satira gecen bir dilek). Bu yuzden satir
+        // sonlari SILINMEZ - hem onizlemede hem baskida aynen gorunur.
+        //
+        // Ama sinirsiz bos satir, defter sayfasini bos birakip diger dilekleri
+        // ileri iter. Bu yuzden: satir sonlari tek bicime getirilir, satir sonundaki
+        // bosluklar kirpilir ve UC VE UZERI ardisik bos satir IKIYE indirilir
+        // (paragraf ayrimi korunur, bosluk israfi engellenir).
+        var mesaj = MetniNormallestir(istek.Mesaj);
 
         // AD: en az iki kelime, rakam/sembol yok (isim deftere BASILACAK)
         if (ad.Length < 3 || !ad.Contains(' '))
@@ -316,4 +326,20 @@ public static class KatkiUclari
 
         return Results.Json(new { ok = true });
     }
+    // Bkz. yukaridaki aciklama. TEK YER - hem katki hem ileride baska metin girisleri
+    // ayni kuraldan gecer; iki farkli normallestirme kacinilmaz olarak ayrisir.
+    private static string MetniNormallestir(string? ham)
+    {
+        var t = (ham ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n");
+
+        // Satir sonundaki bosluklari kirp (gorunmez ama satir yuksekligini etkiler).
+        var satirlar = t.Split('\n').Select(x => x.TrimEnd(' ', '\t'));
+        t = string.Join("\n", satirlar);
+
+        // 3+ ardisik bos satir -> 2 (paragraf ayrimi korunur).
+        while (t.Contains("\n\n\n")) t = t.Replace("\n\n\n", "\n\n");
+
+        return t.Trim();
+    }
+
 }

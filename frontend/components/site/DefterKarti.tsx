@@ -130,8 +130,14 @@ export function DefterKarti({
         </div>
       )}
 
+      {/* WHITESPACE-PRE-WRAP ZORUNLU.
+          Onceden bu yoktu: HTML ardisik bosluklari tek bosluga indirir ve satir
+          sonlarini yutar. QuestPDF ise metni OLDUGU GIBI basar. Sonuc: davetlinin
+          satir basi yaparak yazdigi siir onizlemede duz gorunuyor, deftere ise
+          satirli giriyordu - onizleme YALAN SOYLUYORDU.
+          Kural: bir metin nerede gorunuyorsa AYNI gorunmelidir. */}
       <p
-        className={`font-govde text-[0.84rem] leading-[1.72] text-[#3a2f28] ${
+        className={`whitespace-pre-wrap font-govde text-[0.84rem] leading-[1.72] text-[#3a2f28] ${
           italik ? "italic" : ""
         }`}
       >
