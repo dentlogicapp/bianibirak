@@ -294,7 +294,9 @@ function DefterlerSekmesi() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {/* SAGLIK: yonetici, batan defteri LISTEDEN gorur - acmasi gerekmez */}
                   <SaglikRozeti skor={d.saglik} />
-                  <Rozet metin={durumEtiketi(d.durum)} />
+                  {/* Eski "durum" rozeti (Hazirlik/Aktif) KALDIRILDI: o alan defter
+                      kuruldugunda yazilip bir daha degismiyordu - bilgi tasimiyordu.
+                      Yerini asagidaki CANLI EVRE rozeti aldi (lib/durum.ts). */}
                   {d.donduruldu && <Rozet metin="Dondurulmuş" tip="uyari" />}
                   {d.yetim && <Rozet metin="Yetim" tip="uyari" />}
                   {d.hareketsiz && <Rozet metin="Hareketsiz" tip="soluk" />}
@@ -858,13 +860,6 @@ function turEtiketi(tur: string): string {
   return tur;
 }
 
-function durumEtiketi(durum: string): string {
-  if (durum === "hazirlik") return "Hazırlık";
-  if (durum === "aktif") return "Aktif";
-  if (durum === "kapali") return "Kapalı";
-  if (durum === "arsiv") return "Arşiv";
-  return durum;
-}
 
 function talepTipi(tip: string): string {
   if (tip === "erisim") return "Erişim talebi";
