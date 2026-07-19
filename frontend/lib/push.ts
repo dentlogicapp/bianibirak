@@ -22,6 +22,71 @@ export function pushDestekleniyorMu(): boolean {
 
 export type PushDurum = "abone" | "kapali" | "izin-reddedildi" | "desteklenmiyor";
 
+// ---- TANILAMA ----
+//
+// "Bu cihaz desteklemiyor" demek TESHIS DEGILDIR. Hangi yetenegin eksik oldugunu
+// bilmeden ne kullaniciya yol gosterebiliriz ne de sorunu biz cozebiliriz.
+//
+// iOS GERCEGI (en cok yanilgi buradadir):
+//   - Safari SEKMESINDE Web Push YOKTUR. PushManager tanimsizdir.
+//   - Yalnizca "Ana Ekrana Ekle" ile KURULMUS uygulamada ve iOS 16.4+ surumde vardir.
+//   - Yani "desteklemiyor" cogu zaman cihazin degil, UYGULAMANIN KURULU OLMAMASININ
+//     sonucudur - ve bu tamamen cozulebilir bir durumdur.
+export type PushTanilama = {
+  serviceWorker: boolean;
+  pushManager: boolean;
+  notification: boolean;
+  /** Ana ekrana eklenmis (standalone) olarak mi calisiyor? */
+  kurulu: boolean;
+  ios: boolean;
+  /** iOS surumu (okunabiliyorsa) - Web Push icin 16.4+ gerekir. */
+  iosSurum: number | null;
+  izin: NotificationPermission | "yok";
+  /** Tek cumlelik kok neden - kullaniciya gosterilebilir. */
+  sebep: string;
+};
+
+export function pushTanilama(): PushTanilama {
+  const pencereVar = typeof window !== "undefined";
+  const ua = pencereVar ? navigator.userAgent : "";
+  const ios =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (pencereVar && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  // "OS 16_4" bicimindeki surum damgasini oku.
+  let iosSurum: number | null = null;
+  const m = ua.match(/OS (\d+)[._](\d+)/);
+  if (m) iosSurum = parseFloat(`${m[1]}.${m[2]}`);
+
+  const kurulu =
+    pencereVar &&
+    (window.matchMedia?.("(display-mode: standalone)").matches === true ||
+      // iOS'un kendi bayragi (standart disi ama tek guvenilir isaret).
+      (navigator as unknown as { standalone?: boolean }).standalone === true);
+
+  const t: PushTanilama = {
+    serviceWorker: pencereVar && "serviceWorker" in navigator,
+    pushManager: pencereVar && "PushManager" in window,
+    notification: pencereVar && "Notification" in window,
+    kurulu,
+    ios,
+    iosSurum,
+    izin: pencereVar && "Notification" in window ? Notification.permission : "yok",
+    sebep: "",
+  };
+
+  if (!t.serviceWorker) t.sebep = "Tarayıcı arka plan servisini desteklemiyor.";
+  else if (ios && !kurulu)
+    t.sebep = "iPhone/iPad'de bildirimler yalnızca uygulama ana ekrana eklendiğinde çalışır.";
+  else if (ios && iosSurum !== null && iosSurum < 16.4)
+    t.sebep = "iOS sürümünüz bildirimleri desteklemiyor (iOS 16.4 ve üzeri gerekir).";
+  else if (!t.pushManager) t.sebep = "Tarayıcı anlık bildirim altyapısını sunmuyor.";
+  else if (!t.notification) t.sebep = "Tarayıcı bildirim izni sistemini sunmuyor.";
+  else t.sebep = "";
+
+  return t;
+}
+
 export async function pushDurumu(): Promise<PushDurum> {
   if (!pushDestekleniyorMu()) return "desteklenmiyor";
   if (Notification.permission === "denied") return "izin-reddedildi";

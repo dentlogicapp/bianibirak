@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { pushAboneOl, pushCikar, pushDurumu, type PushDurum } from "@/lib/push";
+import { pushAboneOl, pushCikar, pushDurumu, pushTanilama, type PushDurum, type PushTanilama } from "@/lib/push";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 
 // Bildirim ayari: push izin/abonelik + sessiz saat. Es, davetli katki bildirimlerini
 // buradan acar. Sessiz saatte bildirim ertelenir (gece rahatsiz etmez).
 export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
   const [durum, setDurum] = useState<PushDurum>("desteklenmiyor");
+  const [tani, setTani] = useState<PushTanilama | null>(null);
   const [islem, setIslem] = useState(false);
   const [hata, setHata] = useState("");
 
@@ -20,6 +21,7 @@ export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
 
   useEffect(() => {
     pushDurumu().then(setDurum);
+    setTani(pushTanilama());
     api.sessizSaatGetir().then((c) => {
       if (c.ok) {
         setSsAktif(c.veri.aktif);
@@ -82,10 +84,55 @@ export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
       </p>
 
       {durum === "desteklenmiyor" ? (
-        <p className="mt-5 rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-5 font-govde text-sm text-ikincil">
-          Bu cihaz/tarayıcı bildirimleri desteklemiyor. Uygulamayı ana ekrana ekleyerek
-          (PWA) deneyebilirsin.
-        </p>
+        <div className="mt-5 rounded-2xl border border-amber-400/50 bg-amber-500/5 px-6 py-5">
+          {/* GERCEK SEBEBI SOYLE.
+              "Bu cihaz desteklemiyor" teshis degildir ve umutsuzluk verir. iPhone'da
+              bildirimler cogu zaman cihaz yuzunden degil, uygulama ANA EKRANA
+              EKLENMEDIGI icin calismaz - ve bu tamamen cozulebilir bir durumdur. */}
+          <p className="font-govde text-sm font-medium text-murekkep">
+            {tani?.ios && !tani?.kurulu
+              ? "Uygulamayı ana ekrana ekleyin"
+              : "Bildirimler bu ortamda açılamıyor"}
+          </p>
+          <p className="metin-yasli mt-1.5 font-govde text-sm leading-relaxed text-ikincil">
+            {tani?.sebep || "Tarayıcı bildirim altyapısını sunmuyor."}
+          </p>
+
+          {tani?.ios && !tani?.kurulu && (
+            <ol className="mt-4 space-y-2">
+              {[
+                "Bu sayfayı Safari'de açın (iOS'ta yalnızca Safari ana ekrana ekleyebilir).",
+                "Alttaki paylaş simgesine (yukarı ok) dokunun.",
+                "Listeyi kaydırıp \"Ana Ekrana Ekle\" seçeneğine dokunun.",
+                "Ekle deyin; uygulamayı ana ekrandaki simgeden açın.",
+                "Açılınca bu ekrana dönüp \"Aç\" düğmesine dokunun.",
+              ].map((a, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sarap/10 font-govde text-[0.62rem] font-bold text-sarap">
+                    {i + 1}
+                  </span>
+                  <span className="metin-yasli font-govde text-xs leading-relaxed text-murekkep">{a}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {/* TANILAMA - destek konusmasinda "hangi yetenek eksik?" sorusunu
+              tahmine birakmaz. Kullaniciyi bogmadan, katlanmis halde durur. */}
+          {tani && (
+            <details className="mt-4">
+              <summary className="cursor-pointer font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                Teknik ayrıntı
+              </summary>
+              <p className="mt-2 font-govde text-[0.68rem] leading-relaxed text-ikincil">
+                Arka plan servisi: {tani.serviceWorker ? "var" : "yok"} · Bildirim altyapısı:{" "}
+                {tani.pushManager ? "var" : "yok"} · İzin sistemi: {tani.notification ? "var" : "yok"} ·
+                Ana ekrana ekli: {tani.kurulu ? "evet" : "hayır"}
+                {tani.ios && ` · iOS ${tani.iosSurum ?? "?"}`}
+              </p>
+            </details>
+          )}
+        </div>
       ) : durum === "izin-reddedildi" ? (
         <p className="mt-5 rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-5 font-govde text-sm text-ikincil">
           Bildirim izni tarayıcı ayarlarından reddedilmiş. Açmak için site ayarlarından
@@ -123,8 +170,12 @@ export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
         </p>
       )}
 
-      {/* Sessiz saatler */}
-      {durum !== "desteklenmiyor" && (
+      {/* SESSIZ SAATLER HER ZAMAN GORUNUR.
+          Onceden push desteklenmiyorsa bu bolum de GIZLENIYORDU - ama sessiz saat
+          SUNUCU TARAFI bir ayardir: bildirim gonderimini erteler ve uygulama ici
+          bildirimleri de etkiler. Push'u olmayan kullanicinin bu ayara erisememesi
+          icin hicbir sebep yok; gizlemek, var olan bir ozelligi yok saymaktir. */}
+      {(
         <div className="mt-6 border-t border-ayrac pt-6">
           <label className="flex items-center justify-between gap-3">
             <span className="font-govde text-sm text-murekkep">Sessiz saatler</span>
