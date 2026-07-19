@@ -315,6 +315,16 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.GonderenAd).HasColumnName("GonderenAd");
             e.Property(x => x.Metin).HasColumnName("Metin").IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+
+            // ILISKI TANIMI ZORUNLU (canlida 500 uretti):
+            // Veritabaninda TalepId bir YABANCI ANAHTAR, ama EF bunu bilmiyorsa
+            // ekleme SIRASINI bilemez ve mesaji talepten ONCE yazmaya kalkar ->
+            // FK ihlali -> istek 500 doner. Navigasyon ozelligi eklemeden, yalniz
+            // sirayi ogretmek icin iliskiyi tanimliyoruz.
+            e.HasOne<DestekTalebi>()
+                .WithMany()
+                .HasForeignKey(x => x.TalepId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         model.Entity<ErtelenenBildirim>(e =>

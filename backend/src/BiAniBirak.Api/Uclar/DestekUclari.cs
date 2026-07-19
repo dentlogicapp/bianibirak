@@ -154,6 +154,13 @@ public static class DestekUclari
                 UpdatedAt = simdi,
             };
             db.DestekTalepleri.Add(talep);
+
+            // ONCE TALEP YAZILIR (savunma katmani).
+            // EF iliskisi tanimli oldugu icin sira zaten dogrudur; ama mesaj bir
+            // YABANCI ANAHTARLA talebe baglidir ve bu baglantinin yanlis sirada
+            // yazilmasi istegi 500'e dusurur. Yeni talepte tek ekstra gidis-gelis
+            // karsiliginda bu risk TAMAMEN kapanir.
+            await db.SaveChangesAsync(ct);
         }
 
         talep.Durum = "acik";              // kullanici yazdi -> yanit bekleniyor
