@@ -173,6 +173,7 @@ app.DavetiyeKarekodumUclariniEkle(); // Davetiye karekodu: ciftin kendi kisa kod
 app.OdemeUclariniEkle();         // Odeme: durum, MSS/On Bilgilendirme, baslat, "havalemi yaptim"
 app.SuperOdemeUclariniEkle();    // Super: odeme onayla/reddet, IBAN+fiyat ayarlari
 app.CopUclariniEkle();           // Cop kutusu: reddedilen dilekler, geri al, kalici sil
+app.DestekUclariniEkle();        // Destek: kullanici <-> super yonetici konusmasi
 
 // Saglik ucu (anonim)
 app.MapGet("/api/saglik", () => Results.Ok(new

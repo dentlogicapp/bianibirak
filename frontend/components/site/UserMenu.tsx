@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, type Kullanici, type Bildirim, type Etkinlik } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
+import { DestekModal } from "@/components/site/DestekModal";
 
 // Avatar menusu: bolumlu dropdown (Planlama Defteri tenant deseninin defter karsiligi).
 // A) Baslik: isim + mail + ACIK DEFTER (baglam her zaman gorunur)
@@ -37,6 +38,7 @@ export function UserMenu() {
   // BILDIRIM GENISLETME - hangi bildirimin tam metni acik.
   // Tek seferde TEK bildirim acilir: liste "akordeon" gibi calisir, menu sismez.
   const [acikBildirim, setAcikBildirim] = useState<string | null>(null);
+  const [destekAcik, setDestekAcik] = useState(false);
 
   // Turetilmis: acik defter ve digerleri. Tek kaynak - iki ayri filtre tutulmaz.
   const aktifEtkinlik = etkinlikler.find((e) => e.id === aktifId) ?? null;
@@ -509,6 +511,23 @@ export function UserMenu() {
             )}
           </div>
 
+          {/* SORUN BILDIR & DESTEK AL - cikisin hemen ustunde, kendi alaninda.
+              Konum bilincli: kullanici "buradan cikayim" derken once "sorabilirim"i
+              gorur. Uygulamayi terk etmeden once son bir kapi. */}
+          <div className="border-b border-ayrac p-1.5">
+            <button
+              onClick={() => { setAcik(false); setTimeout(() => setDestekAcik(true), 50); }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+                <path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 20.5l1.5-5.4A8.5 8.5 0 1 1 21 11.5Z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" fill="none" />
+                <path d="M9.6 9.2a2.4 2.4 0 1 1 3.2 2.3c-.5.2-.8.7-.8 1.2v.3" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" fill="none" />
+                <circle cx="12" cy="16" r="0.6" fill="currentColor" />
+              </svg>
+              Sorun Bildir &amp; Destek Al
+            </button>
+          </div>
+
           {/* Cikis */}
           <div className="p-1.5">
             <button
@@ -523,6 +542,8 @@ export function UserMenu() {
           </div>
         </div>
       )}
+
+      <DestekModal acik={destekAcik} onKapat={() => setDestekAcik(false)} />
 
       {profilAcik && (
         <ProfilimModal

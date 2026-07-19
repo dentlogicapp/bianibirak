@@ -192,6 +192,33 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_bildirimler_kullanici_okundu ON bildirimler ("KullaniciId", "OkunduMu");
 
+        -- DESTEK SISTEMI: kullanici <-> sistem yoneticileri konusmasi.
+        CREATE TABLE IF NOT EXISTS destek_talepleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NOT NULL REFERENCES kullanicilar ("Id"),
+            "EtkinlikId" uuid NULL,
+            "Konu" text NOT NULL DEFAULT '',
+            "Durum" text NOT NULL DEFAULT 'acik',
+            "SonMesajZamani" timestamptz NOT NULL DEFAULT now(),
+            "KullaniciOkunmamis" integer NOT NULL DEFAULT 0,
+            "YoneticiOkunmamis" integer NOT NULL DEFAULT 0,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_destek_talepleri_kullanici ON destek_talepleri ("KullaniciId", "SonMesajZamani" DESC);
+        CREATE INDEX IF NOT EXISTS ix_destek_talepleri_durum ON destek_talepleri ("Durum", "SonMesajZamani" DESC);
+
+        CREATE TABLE IF NOT EXISTS destek_mesajlari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "TalepId" uuid NOT NULL REFERENCES destek_talepleri ("Id") ON DELETE CASCADE,
+            "GonderenKullaniciId" uuid NOT NULL,
+            "YoneticiMi" boolean NOT NULL DEFAULT false,
+            "GonderenAd" text NOT NULL DEFAULT '',
+            "Metin" text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_destek_mesajlari_talep ON destek_mesajlari ("TalepId", created_at);
+
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
         -- NOT: kolon adi super_admin (snake_case) - DbContext eslemesi boyle. PascalCase DEGIL.

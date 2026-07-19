@@ -27,6 +27,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Cihaz> Cihazlar => Set<Cihaz>();
     public DbSet<ErtelenenBildirim> ErtelenenBildirimler => Set<ErtelenenBildirim>();
     public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
+    public DbSet<DestekTalebi> DestekTalepleri => Set<DestekTalebi>();
+    public DbSet<DestekMesaji> DestekMesajlari => Set<DestekMesaji>();
     public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
     public DbSet<KullanimOnayi> KullanimOnaylari => Set<KullanimOnayi>();
@@ -286,6 +288,35 @@ public class BiAniBirakDbContext : DbContext
         });
 
         // ---- ertelenen_bildirimler (sessiz saat kuyrugu) ----
+        model.Entity<DestekTalebi>(e =>
+        {
+            e.ToTable("destek_talepleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.EtkinlikId).HasColumnName("EtkinlikId");
+            e.Property(x => x.Konu).HasColumnName("Konu").IsRequired();
+            e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
+            e.Property(x => x.SonMesajZamani).HasColumnName("SonMesajZamani");
+            e.Property(x => x.KullaniciOkunmamis).HasColumnName("KullaniciOkunmamis");
+            e.Property(x => x.YoneticiOkunmamis).HasColumnName("YoneticiOkunmamis");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        model.Entity<DestekMesaji>(e =>
+        {
+            e.ToTable("destek_mesajlari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.TalepId).HasColumnName("TalepId");
+            e.Property(x => x.GonderenKullaniciId).HasColumnName("GonderenKullaniciId");
+            e.Property(x => x.YoneticiMi).HasColumnName("YoneticiMi");
+            e.Property(x => x.GonderenAd).HasColumnName("GonderenAd");
+            e.Property(x => x.Metin).HasColumnName("Metin").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
         model.Entity<ErtelenenBildirim>(e =>
         {
             e.ToTable("ertelenen_bildirimler");

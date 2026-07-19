@@ -92,6 +92,46 @@ export type KatkiKarsilama = {
 };
 
 // Katki (moderasyon kuyrugu / defter).
+export type DestekMesaj = {
+  id: string;
+  yonetici_mi: boolean;
+  gonderen_ad: string;
+  metin: string;
+  created_at: string;
+};
+
+export type DestekTalep = {
+  id: string;
+  konu: string;
+  durum: string;
+  son_mesaj: string;
+  created_at: string;
+  mesajlar: DestekMesaj[];
+};
+
+export type SuperDestekOzet = {
+  id: string;
+  konu: string;
+  durum: string;
+  son_mesaj: string;
+  okunmamis: number;
+  kullanici_ad: string;
+  kullanici_email: string;
+  son_metin: string;
+  son_yonetici_mi: boolean;
+};
+
+export type SuperDestekKonusma = {
+  id: string;
+  konu: string;
+  durum: string;
+  kullanici_ad: string;
+  kullanici_email: string;
+  etkinlik_id: string | null;
+  created_at: string;
+  mesajlar: DestekMesaj[];
+};
+
 export type CopDilek = {
   id: string;
   davetliAd: string;
@@ -720,6 +760,26 @@ export const api = {
     istek<{ durum: string }>(`/api/katki/${id}/geri-al`, { method: "POST" }),
   copKaliciSil: (id: string) =>
     istek<{ silindi: boolean }>(`/api/katki/${id}/kalici-sil`, { method: "POST" }),
+  // ---- DESTEK ----
+  destekKonusmam: () =>
+    istek<{ talepler: DestekTalep[] }>("/api/destek"),
+  destekGonder: (metin: string) =>
+    istek<{ ok: boolean; talep_id: string }>("/api/destek", {
+      method: "POST",
+      body: JSON.stringify({ Metin: metin }),
+    }),
+  superDestekListe: () =>
+    istek<{ bekleyen: number; talepler: SuperDestekOzet[] }>("/api/super/destek"),
+  superDestekKonusma: (id: string) =>
+    istek<SuperDestekKonusma>(`/api/super/destek/${id}`),
+  superDestekYanit: (id: string, metin: string) =>
+    istek<{ ok: boolean }>(`/api/super/destek/${id}/yanit`, {
+      method: "POST",
+      body: JSON.stringify({ Metin: metin }),
+    }),
+  superDestekKapat: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/destek/${id}/kapat`, { method: "POST" }),
+
   copeat: (id: string) =>
     istek<{ copeAtildi: boolean }>(`/api/katki/${id}/copeat`, { method: "POST" }),
 
