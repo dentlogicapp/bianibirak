@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "cross-env NODE_ENV=production next build",
+    "build": "node --check public/sw.js && cross-env NODE_ENV=production next build",
     "start": "cross-env NODE_ENV=production next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sw-kontrol": "node --check public/sw.js"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "5.1.1",
