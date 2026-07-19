@@ -8,7 +8,11 @@ import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
 // Bildirim ayari: push izin/abonelik + sessiz saat. Es, davetli katki bildirimlerini
 // buradan acar. Sessiz saatte bildirim ertelenir (gece rahatsiz etmez).
 export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
-  const [durum, setDurum] = useState<PushDurum>("desteklenmiyor");
+  // BASLANGIC "yukleniyor" - "desteklenmiyor" DEGIL.
+  // Onceki hali oleumcul bir varsayimdi: durum okunamazsa (promise asili kalirsa)
+  // ekran sonsuza dek "desteklenmiyor" gosteriyordu. Bilmemek ile desteklememek
+  // AYNI SEY DEGILDIR; arayuz bunlari asla ayni gostermemelidir.
+  const [durum, setDurum] = useState<PushDurum>("yukleniyor");
   const [tani, setTani] = useState<PushTanilama | null>(null);
   const [islem, setIslem] = useState(false);
   const [hata, setHata] = useState("");
@@ -83,7 +87,28 @@ export function BildirimAyari({ yalin = false }: { yalin?: boolean }) {
         al. Böylece onay bekleyen dileklerini kaçırmazsın.
       </p>
 
-      {durum === "desteklenmiyor" ? (
+      {durum === "yukleniyor" ? (
+        <p className="mt-5 rounded-2xl border border-ayrac bg-parsomen px-6 py-5 font-govde text-sm text-ikincil">
+          Bildirim durumu kontrol ediliyor...
+        </p>
+      ) : durum === "hazir-degil" ? (
+        // YETENEK VAR, WORKER DEVREDE DEGIL - gecici durum, cozumu tek dokunus.
+        <div className="mt-5 rounded-2xl border border-amber-400/50 bg-amber-500/5 px-6 py-5">
+          <p className="font-govde text-sm font-medium text-murekkep">
+            Bildirim servisi hazırlanıyor
+          </p>
+          <p className="metin-yasli mt-1.5 font-govde text-sm leading-relaxed text-ikincil">
+            Cihazınız bildirimleri destekliyor ancak arka plan servisi bu sayfada henüz
+            devreye girmemiş. Sayfayı yenilemek genellikle yeterlidir.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-full bg-sarap px-6 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+          >
+            Sayfayı yenile
+          </button>
+        </div>
+      ) : durum === "desteklenmiyor" ? (
         <div className="mt-5 rounded-2xl border border-amber-400/50 bg-amber-500/5 px-6 py-5">
           {/* GERCEK SEBEBI SOYLE.
               "Bu cihaz desteklemiyor" teshis degildir ve umutsuzluk verir. iPhone'da

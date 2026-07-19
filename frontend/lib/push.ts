@@ -20,7 +20,15 @@ export function pushDestekleniyorMu(): boolean {
   );
 }
 
-export type PushDurum = "abone" | "kapali" | "izin-reddedildi" | "desteklenmiyor";
+// "hazir-degil": yetenekler VAR ama service worker henuz bu sayfayi kontrol etmiyor.
+// Bu GECICI bir durumdur ve "desteklenmiyor" ile KARISTIRILAMAZ.
+export type PushDurum =
+  | "yukleniyor"
+  | "abone"
+  | "kapali"
+  | "izin-reddedildi"
+  | "hazir-degil"
+  | "desteklenmiyor";
 
 // ---- TANILAMA ----
 //
@@ -82,17 +90,54 @@ export function pushTanilama(): PushTanilama {
     t.sebep = "iOS sürümünüz bildirimleri desteklemiyor (iOS 16.4 ve üzeri gerekir).";
   else if (!t.pushManager) t.sebep = "Tarayıcı anlık bildirim altyapısını sunmuyor.";
   else if (!t.notification) t.sebep = "Tarayıcı bildirim izni sistemini sunmuyor.";
-  else t.sebep = "";
+  else t.sebep = ""; // her sey yerinde - hicbir engel yok
 
   return t;
 }
 
+// PAHALI OGRENILEN HATA (canlida uc platformda da yanlis ekran gosterdi):
+//
+// Burada "await navigator.serviceWorker.ready" vardi. Bu promise, sayfayi KONTROL
+// EDEN aktif bir service worker yoksa HIC COZULMEZ - hata da firlatmaz, sessizce
+// asili kalir. Cagiran taraf "pushDurumu().then(setDurum)" yaziyordu; then hic
+// calismadigi icin bilesen BASLANGIC degerinde ("desteklenmiyor") donup kaliyordu.
+//
+// Sonuc: yetenekleri TAM olan bir tarayicida bile "bu cihaz bildirimleri
+// desteklemiyor" yaziyordu - ve bu yazi yuzunden sessiz saatler de gizleniyordu.
+// Android'de calisiyor gorunmesinin tek sebebi, orada worker'in zaten aktif olmasiydi.
+//
+// KURAL: bir promise'in cozulecegini VARSAYMA. Sonsuza kadar bekleyebilecek her
+// bekleme bir ZAMAN ASIMI ile sinirlanir ve zaman asiminin KENDI anlami olur.
 export async function pushDurumu(): Promise<PushDurum> {
   if (!pushDestekleniyorMu()) return "desteklenmiyor";
   if (Notification.permission === "denied") return "izin-reddedildi";
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  return sub ? "abone" : "kapali";
+
+  const reg = await swHazir(4000);
+  if (!reg) return "hazir-degil"; // yetenek var, worker henuz devrede degil
+
+  try {
+    const sub = await reg.pushManager.getSubscription();
+    return sub ? "abone" : "kapali";
+  } catch {
+    return "kapali";
+  }
+}
+
+// Service worker hazir mi - ZAMAN ASIMLI. Kayit yoksa tetikler.
+async function swHazir(msSinir: number): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator)) return null;
+  try {
+    // Kayit hic yoksa "ready" asla cozulmez; once mevcut kaydi soralim.
+    const mevcut = await navigator.serviceWorker.getRegistration();
+    if (!mevcut) {
+      // Kayit yoksa kendimiz kaydedelim - PWARegister'i beklemeye gerek yok.
+      try { await navigator.serviceWorker.register("/sw.js"); } catch { /* yoksay */ }
+    }
+    const zamanAsimi = new Promise<null>((coz) => setTimeout(() => coz(null), msSinir));
+    return (await Promise.race([navigator.serviceWorker.ready, zamanAsimi])) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function platformBul(): string {
@@ -122,7 +167,8 @@ export async function pushAboneOl(cihazAdi?: string): Promise<void> {
   const izin = await Notification.requestPermission();
   if (izin !== "granted") throw new Error("Bildirim izni verilmedi.");
 
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await swHazir(8000);
+  if (!reg) throw new Error("Bildirim servisi hazırlanamadı. Sayfayı yenileyip tekrar deneyin.");
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     sub = await reg.pushManager.subscribe({
@@ -146,7 +192,8 @@ export async function pushAboneOl(cihazAdi?: string): Promise<void> {
 // Bu cihazin aboneligini kaldir (yerel). Backend kaydi sonraki gonderimde 410 ile temizlenir.
 export async function pushCikar(): Promise<void> {
   if (!pushDestekleniyorMu()) return;
-  const reg = await navigator.serviceWorker.ready;
+  const reg = await swHazir(4000);
+  if (!reg) return;
   const sub = await reg.pushManager.getSubscription();
   if (sub) await sub.unsubscribe();
 }
@@ -163,7 +210,8 @@ export async function pushSenkronEt(): Promise<void> {
     if (!anahtarCevap.ok || !anahtarCevap.veri.anahtar) return;
     const vapidPublic = anahtarCevap.veri.anahtar;
 
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await swHazir(8000);
+    if (!reg) return;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
       // izin var ama abonelik yok -> sessizce olustur
