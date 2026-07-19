@@ -491,6 +491,28 @@ public static class SuperUclari
         db.KatkiMedyalari.RemoveRange(db.KatkiMedyalari.Where(m => katkiIdler.Contains(m.KatkiId)));
         db.Katkilar.RemoveRange(db.Katkilar.Where(k => k.EtkinlikId == id));
         db.PaylasimBaglantilari.RemoveRange(db.PaylasimBaglantilari.Where(p => p.EtkinlikId == id));
+
+        // EKSIK HALKALAR (canlida 500 uretiyordu).
+        //
+        // Bu uc tablo etkinlikler'e YABANCI ANAHTARLA baglidir ama silme zincirinde
+        // yoklardi - sonradan eklenmis, zincir guncellenmemisti. PostgreSQL, cocuk
+        // satirlar dururken ebeveyni silmeyi REDDEDER; istek 500'e duser ve yonetici
+        // "Bir hata olustu" gorur. Sebebi ekranda gorunmez, cunku hata veritabani
+        // katmanindadir.
+        //
+        // KURAL: etkinlige bagli YENI bir tablo eklendiginde bu zincir de guncellenir.
+        // Silme sirasi COCUKTAN EBEVEYNE dogrudur.
+        var kurasyonIdler = await db.Kurasyonlar
+            .Where(k => k.EtkinlikId == id).Select(k => k.Id).ToListAsync();
+        db.KurasyonCiktilari.RemoveRange(db.KurasyonCiktilari.Where(c => kurasyonIdler.Contains(c.KurasyonId)));
+        db.KurasyonOgeleri.RemoveRange(db.KurasyonOgeleri.Where(o => kurasyonIdler.Contains(o.KurasyonId)));
+        db.Kurasyonlar.RemoveRange(db.Kurasyonlar.Where(k => k.EtkinlikId == id));
+
+        db.EtkinlikGorselleri.RemoveRange(db.EtkinlikGorselleri.Where(g => g.EtkinlikId == id));
+        db.DavetiyeOnizlemeleri.RemoveRange(db.DavetiyeOnizlemeleri.Where(d => d.EtkinlikId == id));
+
+        // Odeme kayitlari: FK yok ama defter silinince oksuz kalirlar.
+        db.Odemeler.RemoveRange(db.Odemeler.Where(o => o.EtkinlikId == id));
         db.EtkinlikAyarlari.RemoveRange(db.EtkinlikAyarlari.Where(a => a.EtkinlikId == id));
         db.UyeDavetleri.RemoveRange(db.UyeDavetleri.Where(d => d.EtkinlikId == id));
         db.EtkinlikUyelikleri.RemoveRange(db.EtkinlikUyelikleri.Where(u => u.EtkinlikId == id));

@@ -330,7 +330,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-2 block font-govde text-xs uppercase tracking-etiket text-ikincil">
-            Birinci eş adı
+            İlk isim
           </label>
           <input
             value={es1Ad}
@@ -341,7 +341,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
         </div>
         <div>
           <label className="mb-2 block font-govde text-xs uppercase tracking-etiket text-ikincil">
-            İkinci eş adı
+            İkinci isim
           </label>
           <input
             value={es2Ad}
@@ -360,7 +360,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
         <div className="grid grid-cols-2 gap-2">
           {[
             { deger: "es1", ad: es1Ad.trim() || "İlk eş" },
-            { deger: "es2", ad: es2Ad.trim() || "İkinci eş" },
+            { deger: "es2", ad: es2Ad.trim() || "İkinci isim" },
           ].map((o) => {
             const secili = kurucuEs === o.deger;
             return (

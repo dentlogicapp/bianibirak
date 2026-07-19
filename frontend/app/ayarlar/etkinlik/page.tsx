@@ -225,14 +225,14 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
         <div className="min-w-0 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           {sekme === "etkinlik" && (
             <div className="space-y-5">
-              <Alan etiket="Birinci eş adı">
+              <Alan etiket="İlk isim">
                 <input
                   value={es1Ad}
                   onChange={(e) => setEs1Ad(e.target.value)}
                   className={girdiSinif}
                 />
               </Alan>
-              <Alan etiket="İkinci eş adı">
+              <Alan etiket="İkinci isim">
                 <input
                   value={es2Ad}
                   onChange={(e) => setEs2Ad(e.target.value)}

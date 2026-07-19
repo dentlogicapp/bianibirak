@@ -323,7 +323,7 @@ function DefterlerSekmesi() {
                   d.uyeler.map((u) => (
                     <div key={u.email} className="flex min-w-0 items-center justify-between gap-2">
                       <p className="min-w-0 truncate font-govde text-xs text-ikincil">
-                        <span className="text-murekkep">{u.ad}</span> · {u.email} · {u.rol === "es1" ? "Birinci eş" : "İkinci eş"}
+                        <span className="text-murekkep">{u.ad}</span> · {u.email}
                       </p>
                       {/* PROAKTIF MESAJ - sikayeti beklemeden ulasmak.
                           Odemesi takilan, defteri imhaya yaklasan ya da bir sorunu

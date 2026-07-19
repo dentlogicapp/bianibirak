@@ -583,11 +583,27 @@ public static class SuperTeshisUclari
                 (o, ks) => new { Onay = o, Kullanicilar = ks })
             .SelectMany(x => x.Kullanicilar.DefaultIfEmpty(),
                 (x, k) => new { x.Onay, Kullanici = k })
+            // DAVETLININ KIMLIGI KATKIDA DURUR.
+            //
+            // Onceden davetli satirlari "(anonim)" olarak dokuluyordu; cunku
+            // KullaniciId null olunca "kimlik yok" varsayiliyordu. Oysa davetli
+            // hesap ACMAZ - bu kasitlidir; kimligi (beyan ettigi ad ve iletisim
+            // bilgisi) birakiligi DILEGIN kendisinde tutulur ve onay kaydi o dilege
+            // KatkiId ile baglidir.
+            //
+            // Onay kaydinin tek amaci "kim, neyi, ne zaman onayladi" sorusunu
+            // yanitlamaktir. Elimizde duran kimligi gostermemek, kaydi ISLEVSIZ
+            // birakir - ve imhadan once bu veri zaten mevcuttur.
+            .GroupJoin(db.Katkilar.AsNoTracking(),
+                x => x.Onay.KatkiId, k => (Guid?)k.Id,
+                (x, ks) => new { x.Onay, x.Kullanici, Katkilar = ks })
+            .SelectMany(x => x.Katkilar.DefaultIfEmpty(),
+                (x, kt) => new { x.Onay, x.Kullanici, Katki = kt })
             .Take(10000)
             .ToListAsync();
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Onay Kimligi;Sifat;Ad;E-posta;Hesap Silinmis;Metin;Surum;Parmak Izi;IP;Onay Zamani (TR)");
+        sb.AppendLine("Onay Kimligi;Sifat;Ad;E-posta;Telefon;Kayit Durumu;Metin;Surum;Parmak Izi;IP;Onay Zamani (TR)");
 
         foreach (var x in kayitlar)
         {
@@ -596,9 +612,17 @@ public static class SuperTeshisUclari
 
             sb.Append(Kacir(x.Onay.Id.ToString())).Append(';')
               .Append(davetliMi ? "Davetli" : "Hesap sahibi").Append(';')
-              .Append(Kacir(davetliMi ? "(anonim)" : x.Kullanici?.Ad ?? "(silinmis)")).Append(';')
-              .Append(Kacir(davetliMi ? "" : x.Kullanici?.Email ?? "(silinmis)")).Append(';')
-              .Append(!davetliMi && (x.Kullanici == null || x.Kullanici.DeletedAt != null) ? "Evet" : "Hayir").Append(';')
+              .Append(Kacir(davetliMi
+                  ? (x.Katki?.DavetliAd ?? "(dilek silinmis)")
+                  : x.Kullanici?.Ad ?? "(hesap silinmis)")).Append(';')
+              .Append(Kacir(davetliMi
+                  ? (x.Katki?.DavetliEmail ?? "")
+                  : x.Kullanici?.Email ?? "(hesap silinmis)")).Append(';')
+              .Append(Kacir(davetliMi ? (x.Katki?.DavetliTelefon ?? "") : "")).Append(';')
+              // Kayit durumu: veri hala duruyor mu, yoksa imha/silme ile gitti mi.
+              .Append(davetliMi
+                  ? (x.Katki == null ? "Dilek silinmis" : "Mevcut")
+                  : (x.Kullanici == null || x.Kullanici.DeletedAt != null ? "Hesap silinmis" : "Mevcut")).Append(';')
               .Append(Kacir(x.Onay.MetinAnahtar)).Append(';')
               .Append(Kacir(x.Onay.MetinSurum)).Append(';')
               .Append(Kacir(x.Onay.MetinHash)).Append(';')

@@ -188,7 +188,7 @@ function UyeSatiri({
       <span className="min-w-0 flex-1">
         <span className="block truncate font-govde text-sm font-medium text-murekkep">{ad}</span>
         <span className="block font-govde text-xs text-ikincil">
-          {etiket} · {rol === "es1" ? "Birinci eş" : "İkinci eş"}
+          {etiket}
         </span>
       </span>
       <span
