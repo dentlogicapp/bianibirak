@@ -127,14 +127,27 @@ export async function pushDurumu(): Promise<PushDurum> {
 async function swHazir(msSinir: number): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    // Kayit hic yoksa "ready" asla cozulmez; once mevcut kaydi soralim.
+    // 1) Zaten aktif bir worker varsa BEKLEME - dogrudan kullan.
+    //    "ready" bazi durumlarda gec cozulur; elimizde aktif kayit varken
+    //    beklemenin anlami yok.
     const mevcut = await navigator.serviceWorker.getRegistration();
+    if (mevcut?.active) return mevcut;
+
+    // 2) Kayit yoksa kaydet. (Kayit varsa tekrar kaydetmek zararsizdir ama
+    //    gereksiz - yalnizca yoksa yapariz.)
     if (!mevcut) {
-      // Kayit yoksa kendimiz kaydedelim - PWARegister'i beklemeye gerek yok.
       try { await navigator.serviceWorker.register("/sw.js"); } catch { /* yoksay */ }
     }
+
+    // 3) Hazir olmasini SINIRLI sure bekle. Sonsuz bekleyis yasak.
     const zamanAsimi = new Promise<null>((coz) => setTimeout(() => coz(null), msSinir));
-    return (await Promise.race([navigator.serviceWorker.ready, zamanAsimi])) ?? null;
+    const hazir = await Promise.race([navigator.serviceWorker.ready, zamanAsimi]);
+    if (hazir) return hazir;
+
+    // 4) Zaman asti - son bir kez daha aktif kayit var mi diye bak.
+    //    (Worker tam o sirada aktiflesmis olabilir.)
+    const sonKontrol = await navigator.serviceWorker.getRegistration();
+    return sonKontrol?.active ? sonKontrol : null;
   } catch {
     return null;
   }

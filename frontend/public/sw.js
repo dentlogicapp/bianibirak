@@ -1,21 +1,55 @@
 // BiAniBirak - PWA service worker (Planlama Defteri deseni uyarlamasi).
 // Ilke: API (/api) ASLA onbellege alinmaz (her zaman canli); sayfa network-first
 // (en guncel surum); degismez statik varliklar (hash'li JS/CSS/ikon) cache-first.
-const CACHE = "bianibirak-pwa-v5"; // v5: bildirim tiklamasi TEK yol (odak + mesaj) - yarisan mekanizmalar kaldirildi
+const CACHE = "bianibirak-pwa-v6"; // v6: kurulum onbellek hatasindan BAGIMSIZ - worker her kosulda aktiflesir
 
 self.addEventListener("install", (event) => {
-  // Yeni surum beklemeden devreye girsin (guncellemeler aninda yansisin)
+  // KURULUM ASLA ONBELLEK YUZUNDEN COKMEZ.
+  //
+  // PAHALI OGRENILEN HATA (uc platformda bildirimleri oldurdu):
+  //   caches.open(CACHE).then(c => c.add("/")).then(() => skipWaiting())
+  // Burada c.add("/") bir AG ISTEGIDIR. Istek basarisiz olursa ya da 2xx disi bir
+  // yanit donerse promise REDDEDILIR; waitUntil reddedilince KURULUM COKER; worker
+  // hic aktiflesmez. Bunun sonucu yalnizca "onbellek yok" degildir:
+  //   navigator.serviceWorker.ready SONSUZA KADAR COZULMEZ
+  //   -> push abonelik durumu hic okunamaz
+  //   -> bildirimler tamamen olur.
+  // Yani tamamen ISTEGE BAGLI bir iyilestirme, kritik bir altyapiyi dusuruyordu.
+  //
+  // KURAL: kritik olmayan hicbir islem, kritik bir kurulumu engelleyemez.
+  // Onbellek denenir; olmazsa SESSIZCE gecilir ve worker yine de devreye girer.
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.add("/")).then(() => self.skipWaiting())
+    (async () => {
+      try {
+        const c = await caches.open(CACHE);
+        await c.add("/");
+      } catch (_) {
+        /* onbellek opsiyonel - kurulum devam eder */
+      }
+      await self.skipWaiting();
+    })()
   );
 });
 
 self.addEventListener("activate", (event) => {
-  // Eski surum onbelleklerini temizle, kontrolu hemen al
+  // Eski surum onbelleklerini temizle, kontrolu hemen al.
+  // Temizlik de kritik degildir - basarisiz olsa bile claim() CALISMALIDIR.
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter((k) => k !== CACHE && k !== "bianibirak-nav").map((k) => caches.delete(k))
+        );
+      } catch (_) {
+        /* temizlik opsiyonel */
+      }
+      try {
+        await self.clients.claim();
+      } catch (_) {
+        /* claim reddedilse bile worker aktiftir */
+      }
+    })()
   );
 });
 
