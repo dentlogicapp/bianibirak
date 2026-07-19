@@ -23,6 +23,9 @@ export function UserMenu() {
   const [okunmamis, setOkunmamis] = useState(0);
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
   const [aktifId, setAktifId] = useState<string | null>(null);
+  // BILDIRIM GENISLETME - hangi bildirimin tam metni acik.
+  // Tek seferde TEK bildirim acilir: liste "akordeon" gibi calisir, menu sismez.
+  const [acikBildirim, setAcikBildirim] = useState<string | null>(null);
 
   // Turetilmis: acik defter ve digerleri. Tek kaynak - iki ayri filtre tutulmaz.
   const aktifEtkinlik = etkinlikler.find((e) => e.id === aktifId) ?? null;
@@ -187,7 +190,7 @@ export function UserMenu() {
       </button>
 
       {acik && (
-        <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-xl">
+        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-xl">
           {/* Kullanici basligi (isim + mail + ICINDE BULUNULAN DEFTER) */}
           <div className="border-b border-ayrac px-4 py-3.5">
             <div className="flex items-center gap-3">
@@ -258,16 +261,6 @@ export function UserMenu() {
                   </svg>
                 </button>
               ))}
-              <Link
-                href="/etkinliklerim"
-                onClick={() => setAcik(false)}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2 font-govde text-xs text-ikincil transition-colors hover:bg-yuzeyKoyu"
-              >
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden>
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-                </svg>
-                Tüm defterlerim
-              </Link>
             </div>
           )}
 
@@ -426,8 +419,11 @@ export function UserMenu() {
             {bildirimler.length === 0 ? (
               <p className="px-3 py-2 font-govde text-xs text-ikincil">Yeni bildirim yok.</p>
             ) : (
-              <div className="max-h-64 overflow-y-auto">
-                {bildirimler.slice(0, 8).map((b) => (
+              <div className="max-h-[26rem] overflow-y-auto overscroll-contain">
+                {/* SINIR YOK: onceden yalniz ilk 8 gosteriliyordu ve gerisi SESSIZCE
+                    kayboluyordu - kullanici "bildirim gelmedi" saniyordu. Liste zaten
+                    kaydirilabilir; backend de makul bir ust sinirla getiriyor. */}
+                {bildirimler.map((b) => (
                   <div key={b.id} className="group flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-yuzeyKoyu">
                     <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${b.okundu_mu ? "bg-yuzeyKoyu text-ikincil" : "bg-sarap/12 text-sarap"}`}>
                       <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
@@ -435,11 +431,48 @@ export function UserMenu() {
                         <path d="M8 9h6M8 12h4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
                       </svg>
                     </span>
-                    <button onClick={() => bildirimeTikla(b)} className="min-w-0 flex-1 text-left">
-                      <p className={`truncate font-govde text-xs font-medium ${b.okundu_mu ? "text-ikincil" : "text-sarap"}`}>{b.baslik}</p>
-                      <p className={`mt-0.5 line-clamp-2 font-govde text-[0.7rem] leading-snug ${b.okundu_mu ? "text-ikincil/70" : "text-murekkep"}`}>{b.mesaj}</p>
+                    <div className="min-w-0 flex-1">
+                      {/* BASLIK + METIN: tiklayinca ilgili yere GIDER (asil eylem). */}
+                      <button onClick={() => bildirimeTikla(b)} className="w-full min-w-0 text-left">
+                        <p className={`font-govde text-xs font-medium ${b.okundu_mu ? "text-ikincil" : "text-sarap"}`}>
+                          {b.baslik}
+                        </p>
+                        <p
+                          className={`mt-0.5 font-govde text-[0.7rem] leading-snug ${
+                            acikBildirim === b.id ? "whitespace-pre-wrap" : "line-clamp-2"
+                          } ${b.okundu_mu ? "text-ikincil/70" : "text-murekkep"}`}
+                        >
+                          {b.mesaj}
+                        </p>
+                      </button>
+
+                      {/* DEVAMINI OKU - SURTUNMESIZ.
+                          Uzun bildirim (ozellikle silme uyarilari) iki satirda kesiliyor
+                          ve ciddiyetini yitiriyordu. Ayri bir sayfaya/modala gondermek
+                          ise okumak icin menuyu KAPATTIRIRDI - kullanici baglami kaybeder.
+                          Cozum: YERINDE acilir. Menuden cikmadan tam metin okunur;
+                          eylem butonu (basliga tiklama) hala calisir. */}
+                      {b.mesaj.length > 90 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAcikBildirim(acikBildirim === b.id ? null : b.id);
+                          }}
+                          className="mt-1 inline-flex items-center gap-1 font-govde text-[0.62rem] font-medium text-sarap transition-colors hover:text-sarapKoyu"
+                        >
+                          {acikBildirim === b.id ? "Daralt" : "Devamını oku"}
+                          <svg
+                            viewBox="0 0 24 24"
+                            className={`h-3 w-3 transition-transform ${acikBildirim === b.id ? "rotate-180" : ""}`}
+                            aria-hidden
+                          >
+                            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          </svg>
+                        </button>
+                      )}
+
                       <p className="mt-0.5 font-govde text-[0.6rem] text-ikincil">{gecenSure(b.created_at)}</p>
-                    </button>
+                    </div>
                     {!b.okundu_mu && <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sarap" aria-hidden />}
                     <button
                       onClick={(e) => { e.stopPropagation(); bildirimSil(b.id); }}

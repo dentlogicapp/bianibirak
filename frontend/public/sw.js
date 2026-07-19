@@ -1,7 +1,7 @@
 // BiAniBirak - PWA service worker (Planlama Defteri deseni uyarlamasi).
 // Ilke: API (/api) ASLA onbellege alinmaz (her zaman canli); sayfa network-first
 // (en guncel surum); degismez statik varliklar (hash'li JS/CSS/ikon) cache-first.
-const CACHE = "bianibirak-pwa-v2";
+const CACHE = "bianibirak-pwa-v3"; // v3: bildirim tiklamasi tek tikta (client.navigate)
 
 self.addEventListener("install", (event) => {
   // Yeni surum beklemeden devreye girsin (guncellemeler aninda yansisin)
@@ -101,16 +101,61 @@ self.addEventListener("push", (event) => {
 // ?focus={id} korunur -> dilege scroll + vurgu). Yoksa yeni pencere ac.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const hedef = event.notification.data?.url || "/";
+
+  const ham = event.notification.data?.url || "/";
+  const hedef = new URL(ham, self.location.origin).href;
+
+  // BILDIRIM TIKLAMASI - ILK TIKTA CALISIR.
+  //
+  // ONCEKI HATA: burada yalniz postMessage gonderiliyordu ve gezinmeyi SAYFANIN JS'i
+  // yapiyordu. Arka plandaki (ya da dondurulmus) PWA penceresi mesaji kacirinca ILK TIK
+  // BOSA GIDIYOR, kullanici ikinci kez tiklayinca calisiyordu. Sebep: mesaj, pencere
+  // henuz uyanmadan teslim ediliyor ve dinleyici hicbir zaman gormuyordu.
+  //
+  // COZUM: gezinmeyi SERVICE WORKER'IN KENDISI yapar (client.navigate). Bu, sayfanin
+  // JS'inin uyanik olmasina BAGIMLI DEGILDIR - tarayici seviyesinde gerceklesir.
+  // postMessage yalnizca "zaten hedefteyiz, sadece odagi tazele" durumunda kullanilir.
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((liste) => {
-      for (const istemci of liste) {
-        if ("focus" in istemci) {
-          istemci.postMessage({ type: "bianibirak-odak", url: hedef });
-          return istemci.focus();
+    (async () => {
+      const liste = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      const pencere = liste.find((c) => c.url.startsWith(self.location.origin));
+
+      if (!pencere) {
+        // Acik pencere yok - yenisini ac.
+        await self.clients.openWindow(hedef);
+        return;
+      }
+
+      // Once odakla: kullanici uygulamayi GORSUN, sonra icerik degissin.
+      try {
+        await pencere.focus();
+      } catch (_) {
+        /* odak reddedilebilir - gezinme yine de denenir */
+      }
+
+      // Zaten hedef adresteyiz: tam yenileme gereksiz, yumusak odak yeter
+      // (ornek: /gelen-dilekler acikken ayni sayfada baska bir dilege odaklanma).
+      if (pencere.url === hedef) {
+        pencere.postMessage({ type: "bianibirak-odak", url: ham });
+        return;
+      }
+
+      // Farkli adres: SW'nin kendisi gezdirir - tek tikta, kesin.
+      if ("navigate" in pencere) {
+        try {
+          await pencere.navigate(hedef);
+          return;
+        } catch (_) {
+          /* kontrol edilmeyen istemcide navigate reddedilir - mesajla devam */
         }
       }
-      return self.clients.openWindow(hedef);
-    })
+
+      // Son care: sayfanin dinleyicisine birak.
+      pencere.postMessage({ type: "bianibirak-odak", url: ham });
+    })()
   );
 });
