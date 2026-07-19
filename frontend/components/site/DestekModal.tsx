@@ -14,6 +14,11 @@ import { Portal } from "@/components/site/Portal";
 //
 // KONUSMA OLARAK GOSTERILIR: gecmis yazismalar ayni pencerede akar. "Bilet no"
 // yoktur; kullanici "yazdim mi, gordu mu, ne dedi" sorularini tek bakista yanitlar.
+// Sunucu en az bu kadar karakter ister (DestekUclari.Gonder). Iki tarafta AYNI sayi
+// olmak zorunda: arayuz daha musamahakar olursa kullanici gonderir ve sunucudan
+// anlamsiz bir hata alir.
+const ASGARI = 10;
+
 export function DestekModal({
   acik, bildirimden = false, onKapat,
 }: {
@@ -90,7 +95,7 @@ export function DestekModal({
 
   async function gonder() {
     const t = metin.trim();
-    if (t.length < 10) {
+    if (t.length < ASGARI) {
       toast.error("Lütfen durumu biraz daha açıklayın.");
       return;
     }
@@ -468,10 +473,26 @@ export function DestekModal({
             burada saklanır, dilediğiniz zaman geri dönüp okuyabilirsiniz.
           </p>
 
+          {/* NEDEN KAPALI OLDUGUNU SOYLE.
+              Onceki hali kotu bir tasarimdi: kullanici yaziyor, dugme olu kaliyor,
+              imlec "girilmez" isaretine donuyor ve HICBIR ACIKLAMA yok. Bir kontrol,
+              engellediginde SEBEBINI de gostermek zorundadir - yoksa kullanici
+              uygulamanin bozuk oldugunu dusunur. */}
+          {metin.trim().length > 0 && metin.trim().length < ASGARI && (
+            <p className="mt-2 font-govde text-xs text-amber-600">
+              Biraz daha yazın - en az {ASGARI} karakter gerekiyor ({metin.trim().length}/{ASGARI}).
+            </p>
+          )}
+
           <button
             onClick={gonder}
-            disabled={gonderiliyor || metin.trim().length < 10}
-            className="mt-3 w-full rounded-full bg-sarap px-6 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={gonderiliyor || metin.trim().length < ASGARI}
+            title={
+              metin.trim().length < ASGARI
+                ? `Göndermek için en az ${ASGARI} karakter yazın.`
+                : "Gönder"
+            }
+            className="mt-3 w-full rounded-full bg-sarap px-6 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-40"
           >
             {gonderiliyor ? "Gönderiliyor..." : "Gönder"}
           </button>
