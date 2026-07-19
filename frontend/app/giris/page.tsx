@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
@@ -34,6 +34,40 @@ function GirisIcerik() {
   // ve KVKK m.3/1-a uyarinca GECERSIZDIR (acik riza, ozgur iradeyle aciklanan olmali).
   // Varsayilan isaretli kutucuk da ayni sebeple gecersizdir - kullanici HAREKET
   // ETMELIDIR.
+  // ZATEN GIRISLIYSE BURADA DURMA.
+  //
+  // KOK NEDEN (canlida en cok sikayet edilen hata): PWA'nin start_url'i "/giris" idi
+  // ve bu sayfa oturumu HIC KONTROL ETMIYORDU. Uygulamayi her acan kullanici giris
+  // ekraniyla karsilasiyor, "sistem beni atti" sanip yeniden giris yapiyordu. Oysa
+  // cerez 7 GUN gecerliydi ve oturum hic dusmuyordu - sorun kimlikte degil, ACILIS
+  // ADRESINDEYDI.
+  //
+  // Iki katmanli cozum: manifest start_url duzeltildi VE bu sayfa artik oturumu
+  // dogruluyor. Ikincisi sart, cunku kurulu PWA'lar eski manifest'i bir sure tasir
+  // ve kullanici /giris'e elle de gelebilir.
+  const [oturumKontrol, setOturumKontrol] = useState(true);
+
+  useEffect(() => {
+    let iptal = false;
+    void (async () => {
+      const ben = await api.ben();
+      if (iptal) return;
+      if (ben.ok) {
+        // Davet akisi varsa oraya, yoksa uygulamaya.
+        const liste = await api.etkinliklerim();
+        if (iptal) return;
+        if (liste.ok && liste.veri.length > 0) {
+          window.location.replace(liste.veri.length === 1 ? "/gelen-dilekler" : "/etkinliklerim");
+          return;
+        }
+        window.location.replace("/etkinliklerim");
+        return;
+      }
+      setOturumKontrol(false);
+    })();
+    return () => { iptal = true; };
+  }, []);
+
   const [onayKvkk, setOnayKvkk] = useState(false);
   const [onayKosullar, setOnayKosullar] = useState(false);
 
@@ -82,6 +116,17 @@ function GirisIcerik() {
       return;
     }
     router.push("/etkinliklerim");
+  }
+
+  // Oturum dogrulanana kadar FORM GOSTERME: girisli kullaniciya bir an bile giris
+  // ekrani gostermek, "yine atildim" hissini yeniden uretirdi.
+  if (oturumKontrol) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6">
+        <MarkaKilidi varyant="wordmark" boyut="orta" animasyonlu />
+        <p className="mt-6 font-govde text-sm text-ikincil">Oturumunuz hazırlanıyor...</p>
+      </main>
+    );
   }
 
   return (

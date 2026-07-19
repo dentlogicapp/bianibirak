@@ -13,6 +13,17 @@ import { ProfilimModal } from "@/components/site/ProfilimModal";
 // C) Hesap & araclar: Profilim, Fotograflar, Ayarlar, Cop Kutusu, Super Panel
 // D) Defter yollari: Gelen Dilekler, Dilek Baglantisi, Davetiye QR, Baskiya Hazir Defter
 // E) Tema, Bildirimler, Cikis.
+// BILDIRIM KIRPMA - kelime sinirinda, hayalet bosluk birakmadan.
+const KIRPMA_SINIR = 110;
+
+function kisalt(metin: string): string {
+  const t = (metin ?? "").trim();
+  if (t.length <= KIRPMA_SINIR) return t;
+  const parca = t.slice(0, KIRPMA_SINIR);
+  const bosluk = parca.lastIndexOf(" ");
+  return (bosluk > 60 ? parca.slice(0, bosluk) : parca).trimEnd() + "...";
+}
+
 export function UserMenu() {
   const router = useRouter();
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
@@ -190,7 +201,7 @@ export function UserMenu() {
       </button>
 
       {acik && (
-        <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-ayrac bg-yuzey shadow-xl">
+        <div className="absolute right-0 z-50 mt-2 max-h-[calc(100dvh-5rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border border-ayrac bg-yuzey shadow-xl">
           {/* Kullanici basligi (isim + mail + ICINDE BULUNULAN DEFTER) */}
           <div className="border-b border-ayrac px-4 py-3.5">
             <div className="flex items-center gap-3">
@@ -419,10 +430,13 @@ export function UserMenu() {
             {bildirimler.length === 0 ? (
               <p className="px-3 py-2 font-govde text-xs text-ikincil">Yeni bildirim yok.</p>
             ) : (
-              <div className="max-h-[26rem] overflow-y-auto overscroll-contain">
-                {/* SINIR YOK: onceden yalniz ilk 8 gosteriliyordu ve gerisi SESSIZCE
-                    kayboluyordu - kullanici "bildirim gelmedi" saniyordu. Liste zaten
-                    kaydirilabilir; backend de makul bir ust sinirla getiriyor. */}
+              // IC SCROLL YOK: menunun KENDISI kaydirilir. Ic ice kaydirma alanlari,
+              // parmak nereye denk gelirse orayi kaydirdigi icin kullanici
+              // "Cikis yap"a ULASAMIYORDU - klasik ic-ice scroll tuzagi.
+              //
+              // SINIR YOK: onceden yalniz ilk 8 gosteriliyordu, gerisi SESSIZCE
+              // kayboluyordu. Backend zaten makul bir ust sinirla getiriyor.
+              <div>
                 {bildirimler.map((b) => (
                   <div key={b.id} className="group flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-colors hover:bg-yuzeyKoyu">
                     <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${b.okundu_mu ? "bg-yuzeyKoyu text-ikincil" : "bg-sarap/12 text-sarap"}`}>
@@ -437,12 +451,18 @@ export function UserMenu() {
                         <p className={`font-govde text-xs font-medium ${b.okundu_mu ? "text-ikincil" : "text-sarap"}`}>
                           {b.baslik}
                         </p>
+                        {/* KIRPMA JS ILE YAPILIR - CSS line-clamp DEGIL.
+                            line-clamp gizli metni kutunun icinde tutar; bazi
+                            tarayicilarda kutu yuksekligi TAM metne gore hesaplanir ve
+                            altta hayalet bosluk kalir - "Devamini oku" metinden kopuk,
+                            havada durur gibi gorunurdu. JS ile kesilen metin, tam
+                            gorundugu kadar yer kaplar; buton HEMEN altina oturur. */}
                         <p
-                          className={`mt-0.5 font-govde text-[0.7rem] leading-snug ${
-                            acikBildirim === b.id ? "whitespace-pre-wrap" : "line-clamp-2"
-                          } ${b.okundu_mu ? "text-ikincil/70" : "text-murekkep"}`}
+                          className={`mt-0.5 whitespace-pre-wrap font-govde text-[0.7rem] leading-snug ${
+                            b.okundu_mu ? "text-ikincil/70" : "text-murekkep"
+                          }`}
                         >
-                          {b.mesaj}
+                          {acikBildirim === b.id ? b.mesaj : kisalt(b.mesaj)}
                         </p>
                       </button>
 
@@ -452,7 +472,7 @@ export function UserMenu() {
                           ise okumak icin menuyu KAPATTIRIRDI - kullanici baglami kaybeder.
                           Cozum: YERINDE acilir. Menuden cikmadan tam metin okunur;
                           eylem butonu (basliga tiklama) hala calisir. */}
-                      {b.mesaj.length > 90 && (
+                      {b.mesaj.length > KIRPMA_SINIR && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
