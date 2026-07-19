@@ -28,6 +28,8 @@ public static class DestekUclari
         // Kullanici tarafi
         app.MapGet("/api/destek", Konusmam).RequireAuthorization();
         app.MapPost("/api/destek", Gonder).RequireAuthorization();
+        // BONUS 3: kullanici kendi konusmasini cozuldu isaretleyebilir.
+        app.MapPost("/api/destek/kapat", KullaniciKapat).RequireAuthorization();
 
         // SSS (bilgi tabani) - okuma herkese acik degil, oturum yeter.
         app.MapGet("/api/sss", SssAgac).RequireAuthorization();
@@ -78,8 +80,12 @@ public static class DestekUclari
     {
         if (!Kimlik(ctx, out var kid)) return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
 
+        // KAPALI KONUSMALAR KULLANICIYA GORUNMEZ.
+        // "Cozuldu" isaretlenen yazisma kullanicinin ekranindan kalkar - konu bitmistir.
+        // Mesajlar SILINMEZ, yalnizca gizlenir: yonetici yeniden acarsa yazisma
+        // AYNEN geri gelir. Silseydik geri alma imkansiz olurdu.
         var talepler = await db.DestekTalepleri.AsNoTracking()
-            .Where(t => t.KullaniciId == kid)
+            .Where(t => t.KullaniciId == kid && t.Durum != "kapali")
             .OrderByDescending(t => t.SonMesajZamani)
             .ToListAsync(ct);
 
@@ -222,7 +228,14 @@ public static class DestekUclari
             .Select(k => k.Id)
             .ToListAsync(ct);
 
+        // BASLIK AYRIMI: "yeni talep" ile "mevcut konusmaya yeni mesaj" ayni sey degildir.
+        // Yonetici, bildirimi okumadan once hangi tur olayla karsi karsiya oldugunu
+        // BILMELIDIR - biri sifirdan bir konu, digeri suren bir konusmanin devami.
         var ozet = KonuTuret(metin);
+        var yoneticiBaslik = yeniTalep ? "Yeni destek talebi" : "Destek talebine yeni mesaj";
+        // DERIN BAGLANTI: dogrudan ilgili konusmaya goturur - yonetici listede aramaz.
+        var yoneticiUrl = $"/super-panel?sekme=destek&talep={talep.Id}";
+
         foreach (var yid in yoneticiler)
         {
             // KENDI TALEBINE DE BILDIRIM GIDER.
@@ -231,13 +244,15 @@ public static class DestekUclari
             // Kendine bildirim gitmesi ayrica canli akisi test etmenin en dogal yoludur.
             await push.GonderAsync(
                 yid,
-                "Yeni destek talebi",
+                yoneticiBaslik,
                 $"{kullanici.Ad}: {metin}",
-                "/super-panel?sekme=destek",
+                yoneticiUrl,
                 null,
                 sessizSaateTabi: false,
                 ct,
-                pushGovde: $"{kullanici.Ad} bir destek talebi gönderdi: {ozet}");
+                pushGovde: yeniTalep
+                    ? $"{kullanici.Ad} bir destek talebi gönderdi: {ozet}"
+                    : $"{kullanici.Ad} yazdı: {ozet}");
         }
 
         return Results.Ok(new { ok = true, talep_id = talep.Id });
@@ -296,6 +311,8 @@ public static class DestekUclari
                     kullanici_email = k?.Email ?? "-",
                     son_metin = son?.Metin ?? "",
                     son_yonetici_mi = son?.YoneticiMi ?? false,
+                    // Sayac icin: kapanma ani + kalici silmeye kalan saat.
+                    kapanma = t.KapanmaZamani,
                 };
             }),
         });
@@ -331,6 +348,9 @@ public static class DestekUclari
             id = talep.Id,
             konu = talep.Konu,
             durum = talep.Durum,
+            kapanma = talep.KapanmaZamani,
+            // Yonetici, hic yanit yazmadan kapatmak uzereyse UYARILIR (bonus 2).
+            yonetici_yaniti_var = mesajlar.Any(m => m.YoneticiMi && m.GonderenAd != "BiAnıBırak"),
             kullanici_ad = sahip?.Ad ?? "-",
             kullanici_email = sahip?.Email ?? "-",
             etkinlik_id = talep.EtkinlikId,
@@ -407,31 +427,104 @@ public static class DestekUclari
     // penceresi koymak yerine, islemi GERI ALINABILIR yapmak daha iyidir - onay
     // penceresi hatayi azaltir, geri alinabilirlik SIFIRLAR.
     private static async Task<IResult> SuperKapat(
-        Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
-        => await DurumDegistir(id, ctx, db, "kapali", ct);
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, PushGonderici push, CancellationToken ct)
+        => await DurumDegistir(id, ctx, db, push, "kapali", ct);
 
     // YENIDEN AC - kapatilan konusma tekrar canlanir; gecmis mesajlar KORUNUR.
     private static async Task<IResult> SuperYenidenAc(
-        Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
-        => await DurumDegistir(id, ctx, db, "acik", ct);
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, PushGonderici push, CancellationToken ct)
+        => await DurumDegistir(id, ctx, db, push, "acik", ct);
 
     private static async Task<IResult> DurumDegistir(
-        Guid id, HttpContext ctx, BiAniBirakDbContext db, string yeniDurum, CancellationToken ct)
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, PushGonderici push,
+        string yeniDurum, CancellationToken ct)
     {
-        var (ok, _) = await SuperMi(ctx, db, ct);
-        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+        var (ok, yonetici) = await SuperMi(ctx, db, ct);
+        if (!ok || yonetici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
         var talep = await db.DestekTalepleri.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (talep == null) return Hata(404, "TALEP_BULUNAMADI", "Talep bulunamadı.");
 
+        var simdi = DateTimeOffset.UtcNow;
+        var kapaniyor = yeniDurum == "kapali";
+
         talep.Durum = yeniDurum;
-        talep.UpdatedAt = DateTimeOffset.UtcNow;
+        // Damga: kapanista kurulur, yeniden acilista SIFIRLANIR (sayac durur, silme iptal).
+        talep.KapanmaZamani = kapaniyor ? simdi : null;
+        talep.UpdatedAt = simdi;
+
+        // BONUS 5 - DENETIM IZI: "bu konusmayi kim, ne zaman kapatti?" sorusu
+        // yanitsiz kalmaz. Destek kayitlari silinse bile bu iz kalir (PII-free).
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = talep.EtkinlikId,
+            KullaniciId = yonetici.Id,
+            Eylem = kapaniyor ? "DESTEK_KAPATILDI" : "DESTEK_YENIDEN_ACILDI",
+            Varlik = "destek_talepleri",
+            VarlikId = talep.Id,
+            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { durum = yeniDurum }),
+            CreatedAt = simdi,
+        });
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { ok = true, durum = yeniDurum });
+        // BONUS 1 - KAPANIS BILDIRIMI (zorunlu tamamlayici).
+        // Kapatilinca kullanicinin yazismasi ekranindan KALKAR. Haber verilmezse
+        // kullanici "mesajlarim silindi mi, hata mi var?" diye dusunur - sessiz
+        // kayboluş guveni yikar. Bu yuzden ne oldugunu ACIKCA soyleriz.
+        if (kapaniyor)
+        {
+            await push.GonderAsync(
+                talep.KullaniciId,
+                "Destek talebiniz çözüldü olarak işaretlendi",
+                "Yazışmanız tamamlandı olarak işaretlendi ve destek ekranınızdan kaldırıldı. "
+                + "Yeni bir sorunuz olursa aynı ekrandan yeni bir mesaj yazabilirsiniz; "
+                + "hemen ilgileneceğiz.",
+                "/gelen-dilekler?destek=1", null,
+                sessizSaateTabi: true, ct,
+                pushGovde: "Destek talebiniz çözüldü olarak işaretlendi.");
+        }
+
+        return Results.Ok(new { ok = true, durum = yeniDurum, kapanma = talep.KapanmaZamani });
     }
 
-    // PROAKTIF KONUSMA - yonetici, talep BEKLEMEDEN kullaniciya yazar.
+    // BONUS 3 - KULLANICI KENDI KONUSMASINI KAPATIR.
+    // "Sorunum cozuldu" demek kullanicinin hakkidir; yoneticinin kapatmasini beklemek
+    // hem gereksiz hem de yonetici yukunu artirir. Ayni 24 saat kurali isler.
+    private static async Task<IResult> KullaniciKapat(
+        HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        if (!Kimlik(ctx, out var kid)) return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+
+        var talep = await db.DestekTalepleri
+            .Where(t => t.KullaniciId == kid && t.Durum != "kapali")
+            .OrderByDescending(t => t.SonMesajZamani)
+            .FirstOrDefaultAsync(ct);
+        if (talep == null) return Hata(404, "TALEP_BULUNAMADI", "Açık bir yazışmanız yok.");
+
+        var simdi = DateTimeOffset.UtcNow;
+        talep.Durum = "kapali";
+        talep.KapanmaZamani = simdi;
+        talep.UpdatedAt = simdi;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = talep.EtkinlikId,
+            KullaniciId = kid,
+            Eylem = "DESTEK_KULLANICI_KAPATTI",
+            Varlik = "destek_talepleri",
+            VarlikId = talep.Id,
+            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { durum = "kapali" }),
+            CreatedAt = simdi,
+        });
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new { ok = true });
+    }
+
+    // PROAKTIF KONUSMA    // PROAKTIF KONUSMA - yonetici, talep BEKLEMEDEN kullaniciya yazar.
     //
     // NEDEN: destek her zaman kullanicidan baslamaz. Odemesi takilan, defteri
     // imhaya yaklasan ya da bir sorunu FARK ETTIGIMIZ kullaniciya once BIZ

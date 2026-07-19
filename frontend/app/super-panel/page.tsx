@@ -42,6 +42,22 @@ export default function SuperPanelSayfasi() {
   const [ozet, setOzet] = useState<SuperOzet | null>(null);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yetkisiz">("yukleniyor");
   const [sekme, setSekme] = useState<Sekme>("defterler");
+  // DERIN BAGLANTI: bildirimden gelen "?sekme=destek&talep=..." dogru sekmeyi acar.
+  // Yonetici listede aramaz - bildirimin isaret ettigi konusmaya DOGRUDAN duser.
+  const [odakTalep, setOdakTalep] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const s = p.get("sekme");
+    const t = p.get("talep");
+    if (s === "destek") setSekme("destek");
+    if (t) setOdakTalep(t);
+    if (s || t) {
+      p.delete("sekme"); p.delete("talep");
+      window.history.replaceState(null, "", window.location.pathname + (p.toString() ? `?${p}` : ""));
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -113,7 +129,7 @@ export default function SuperPanelSayfasi() {
 
       <div className="mt-6">
         {sekme === "defterler" && <DefterlerSekmesi />}
-        {sekme === "destek" && <DestekSekmesi />}
+        {sekme === "destek" && <DestekSekmesi odakTalep={odakTalep} />}
         {sekme === "sss" && <SssYonetimi />}
         {sekme === "odemeler" && <OdemelerSekmesi />}
         {sekme === "olcum" && <OlcumSekmesi />}

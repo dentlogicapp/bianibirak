@@ -318,6 +318,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.KullaniciOkunmamis).HasColumnName("KullaniciOkunmamis");
             e.Property(x => x.YoneticiOkunmamis).HasColumnName("YoneticiOkunmamis");
             e.Property(x => x.YoneticiOkuduZamani).HasColumnName("YoneticiOkuduZamani");
+            e.Property(x => x.KapanmaZamani).HasColumnName("KapanmaZamani");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });

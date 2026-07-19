@@ -130,6 +130,7 @@ export type SuperDestekOzet = {
   id: string;
   konu: string;
   durum: string;
+  kapanma: string | null;
   son_mesaj: string;
   okunmamis: number;
   kullanici_ad: string;
@@ -142,6 +143,8 @@ export type SuperDestekKonusma = {
   id: string;
   konu: string;
   durum: string;
+  kapanma: string | null;
+  yonetici_yaniti_var: boolean;
   kullanici_ad: string;
   kullanici_email: string;
   etkinlik_id: string | null;
@@ -824,6 +827,7 @@ export const api = {
 
   superDestekKapat: (id: string) =>
     istek<{ ok: boolean; durum: string }>(`/api/super/destek/${id}/kapat`, { method: "POST" }),
+  destekKapat: () => istek<{ ok: boolean }>("/api/destek/kapat", { method: "POST" }),
   superDestekYenidenAc: (id: string) =>
     istek<{ ok: boolean; durum: string }>(`/api/super/destek/${id}/yeniden-ac`, { method: "POST" }),
   superDestekBaslat: (v: { kullaniciId: string; etkinlikId?: string | null; baslik?: string; metin: string }) =>

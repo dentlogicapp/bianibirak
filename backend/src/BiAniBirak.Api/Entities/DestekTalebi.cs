@@ -39,6 +39,16 @@ public class DestekTalebi
     // Kullanici gorulduğunu bilmezse ayni seyi tekrar yazar; iki taraf da yorulur.
     public DateTimeOffset? YoneticiOkuduZamani { get; set; }
 
+    // KAPANMA DAMGASI - "cozuldu" isaretlendigi an.
+    //
+    // Iki isi vardir:
+    //   1) Kullaniciya ve yoneticiye KALICI SILINMEYE KALAN SUREYI gosterir.
+    //   2) Arka plan gorevi 24 saati dolan konusmayi mesajlariyla birlikte siler.
+    //
+    // Yeniden acilirsa NULL'a doner - sayac durur, silme iptal olur.
+    public DateTimeOffset? KapanmaZamani { get; set; }
+
+    // Son hareket - 7 gun sessiz kalan "yanitlandi" konusmalari otomatik kapatmak icin.
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

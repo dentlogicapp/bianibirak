@@ -236,6 +236,7 @@ public static class SemaKurucu
 
         -- DESTEK: yonetici okuma damgasi (okundu isareti) + otomatik ilk yanit izi.
         ALTER TABLE destek_talepleri ADD COLUMN IF NOT EXISTS "YoneticiOkuduZamani" timestamptz NULL;
+        ALTER TABLE destek_talepleri ADD COLUMN IF NOT EXISTS "KapanmaZamani" timestamptz NULL;
 
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)

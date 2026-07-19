@@ -14,11 +14,19 @@ import { Portal } from "@/components/site/Portal";
 //
 // KONUSMA OLARAK GOSTERILIR: gecmis yazismalar ayni pencerede akar. "Bilet no"
 // yoktur; kullanici "yazdim mi, gordu mu, ne dedi" sorularini tek bakista yanitlar.
-export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => void }) {
+export function DestekModal({
+  acik, bildirimden = false, onKapat,
+}: {
+  acik: boolean;
+  /** Bildirime tiklanarak acildi mi - sonlanmis yazisma ekrani buna bagli. */
+  bildirimden?: boolean;
+  onKapat: () => void;
+}) {
   // IKI SEKME: once CEVAP ARA (SSS), sonra YAZ. Sirasi bilincli - insanlarin cogu
   // sorusunu sormadan once yanitini bulmayi TERCIH EDER; onlerine once bilgi tabani
   // koymak hem onlari hizlandirir hem destek yukunu dusurur.
   const [sekme, setSekme] = useState<"sss" | "yazisma">("sss");
+
   const [agac, setAgac] = useState<SssKategori[]>([]);
   const [acikKategori, setAcikKategori] = useState<string | null>(null);
   const [acikAlt, setAcikAlt] = useState<string | null>(null);
@@ -40,12 +48,15 @@ export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => v
         setTalepler(k.veri.talepler);
         // Yazismasi VARSA dogrudan yazisma sekmesi acilsin - bekledigi yanit oradadir.
         if (k.veri.talepler.some((t) => t.mesajlar.length > 0)) setSekme("yazisma");
+        // Bildirimden gelindiyse yazisma sekmesi acilir - BOS olsa bile, cunku
+        // aciklayici ekran orada gosterilir.
+        else if (bildirimden) setSekme("yazisma");
       }
       if (a.ok) setAgac(a.veri.agac);
       setYukleniyor(false);
     });
     return () => { iptal = true; };
-  }, [acik]);
+  }, [acik, bildirimden]);
 
   // Yeni mesaj gelince en alta kaydir - konusma hissi.
   useEffect(() => {
@@ -60,6 +71,22 @@ export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => v
   }, [acik, onKapat]);
 
   if (!acik) return null;
+
+  // BONUS 3 - "Sorunum cozuldu".
+  // Kullanicinin kendi konusmasini bitirebilmesi onun hakkidir; yoneticinin
+  // kapatmasini beklemek hem gereksiz hem yonetici yukudur.
+  async function kendiKapat() {
+    const emin = window.confirm(
+      "Yazışmanız çözüldü olarak işaretlenecek ve bu ekrandan kaldırılacak. "
+      + "Yeni bir sorunuz olursa istediğiniz zaman yeniden yazabilirsiniz.\n\nDevam edilsin mi?"
+    );
+    if (!emin) return;
+    const c = await api.destekKapat();
+    if (!c.ok) { toast.error(c.mesaj); return; }
+    setTalepler([]);
+    setSekme("sss");
+    toast.success("Yazışmanız çözüldü olarak işaretlendi.");
+  }
 
   async function gonder() {
     const t = metin.trim();
@@ -310,6 +337,33 @@ export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => v
         {/* Konusma akisi */}
         {sekme === "yazisma" && (
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          {/* SONLANMIS OLAY - aciklayici ekran.
+              Kullanici "destek talebiniz yanitlandi/cozuldu" bildirimine tikladi ama
+              yazisma kapatilmis ve ekrandan kalkmis olabilir. Bos ekran birakmak
+              yerine NE OLDUGUNU soyleriz - belirsizlik guveni yikar. */}
+          {akis.length === 0 && bildirimden && (
+            <div className="mb-3 rounded-2xl border border-amber-400/50 bg-amber-500/10 px-5 py-4">
+              <p className="font-govde text-sm font-medium text-murekkep">
+                Bu yazışma sonlandırıldı
+              </p>
+              <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+                Ulaşmaya çalıştığınız destek yazışması çözüldü olarak işaretlendiği için
+                bu ekrandan kaldırıldı. Konu devam ediyorsa ya da yeni bir sorunuz varsa
+                aşağıdan yazmanız yeterli - hemen ilgileneceğiz.
+              </p>
+            </div>
+          )}
+
+          {akis.length > 0 && (
+            <div className="mb-3 flex justify-end">
+              <button
+                onClick={kendiKapat}
+                className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-yaldiz hover:text-yaldiz"
+              >
+                Sorunum çözüldü
+              </button>
+            </div>
+          )}
           {yukleniyor ? (
             <p className="text-center font-govde text-sm text-ikincil">Yükleniyor...</p>
           ) : akis.length === 0 ? (

@@ -39,6 +39,8 @@ export function UserMenu() {
   // Tek seferde TEK bildirim acilir: liste "akordeon" gibi calisir, menu sismez.
   const [acikBildirim, setAcikBildirim] = useState<string | null>(null);
   const [destekAcik, setDestekAcik] = useState(false);
+  // Bildirimden mi gelindi - modal "sonlanmis yazisma" ekranini buna gore gosterir.
+  const [destekBildirimden, setDestekBildirimden] = useState(false);
 
   // BILDIRIMDEN DESTEK MODALINI AC.
   // Destek bir sayfa degil modaldir; bu yuzden bildirim "?destek=1" ile gelir.
@@ -49,6 +51,8 @@ export function UserMenu() {
     const p = new URLSearchParams(window.location.search);
     if (p.get("destek") === "1") {
       setDestekAcik(true);
+      // Bayrak PROP ile tasinir: parametre hemen siliniyor, modal URL'den okuyamaz.
+      setDestekBildirimden(true);
       p.delete("destek");
       const yeni = window.location.pathname + (p.toString() ? `?${p}` : "");
       window.history.replaceState(null, "", yeni);
@@ -558,7 +562,11 @@ export function UserMenu() {
         </div>
       )}
 
-      <DestekModal acik={destekAcik} onKapat={() => setDestekAcik(false)} />
+      <DestekModal
+        acik={destekAcik}
+        bildirimden={destekBildirimden}
+        onKapat={() => { setDestekAcik(false); setDestekBildirimden(false); }}
+      />
 
       {profilAcik && (
         <ProfilimModal

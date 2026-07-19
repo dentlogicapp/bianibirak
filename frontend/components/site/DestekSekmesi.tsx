@@ -13,10 +13,11 @@ import { api, type SuperDestekOzet, type SuperDestekKonusma } from "@/lib/api";
 // ONCELIK GORUNURLUGU: "acik" (yanit bekliyor) talepler once ve isaretli gelir. Bir
 // destek ekraninin TEK isi vardir: "hangisi beni bekliyor?" sorusunu bir bakista
 // yanitlamak. Karisik filtreler bu isi zorlastirir, kolaylastirmaz.
-export function DestekSekmesi() {
+export function DestekSekmesi({ odakTalep = null }: { odakTalep?: string | null }) {
   const [liste, setListe] = useState<SuperDestekOzet[]>([]);
   const [bekleyen, setBekleyen] = useState(0);
-  const [secili, setSecili] = useState<string | null>(null);
+  const [secili, setSecili] = useState<string | null>(odakTalep);
+  const [vurgu, setVurgu] = useState<string | null>(odakTalep);
   const [konusma, setKonusma] = useState<SuperDestekKonusma | null>(null);
   const [yanit, setYanit] = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -33,6 +34,17 @@ export function DestekSekmesi() {
   }, []);
 
   useEffect(() => { void listeCek(); }, [listeCek]);
+
+  // ODAK - bildirimden gelen konusmaya KAYDIR ve VURGULA (yeni dilek odagi gibi).
+  // Vurgu 3 saniyede soner: dikkati ceker, sonra ekrani rahat birakir.
+  useEffect(() => {
+    if (!vurgu) return;
+    const t = setTimeout(() => {
+      document.getElementById(`talep-${vurgu}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    const s = setTimeout(() => setVurgu(null), 3000);
+    return () => { clearTimeout(t); clearTimeout(s); };
+  }, [vurgu, liste.length]);
 
   // Secili konusmayi cek
   useEffect(() => {
@@ -69,6 +81,17 @@ export function DestekSekmesi() {
   // islem icin onay istemek gereksiz surtunmedir; yanlislik olursa tek tikla donulur.
   async function durumDegistir(kapat: boolean) {
     if (!secili) return;
+    // BONUS 2 - YANITSIZ KAPATMA UYARISI.
+    // Hic yanit yazmadan kapatmak, kullaniciyi cevapsiz birakip konusmayi
+    // silmeye goturur. Bu neredeyse her zaman bir DIKKATSIZLIKTIR; sormak gerekir.
+    if (kapat && konusma && !konusma.yonetici_yaniti_var) {
+      const emin = window.confirm(
+        "Bu talebe henüz yanıt yazmadınız. Çözüldü olarak işaretlerseniz kullanıcının "
+        + "yazışması ekranından kalkacak ve 24 saat sonra kalıcı olarak silinecek.\n\n"
+        + "Yine de devam edilsin mi?"
+      );
+      if (!emin) return;
+    }
     const c = kapat ? await api.superDestekKapat(secili) : await api.superDestekYenidenAc(secili);
     if (!c.ok) { toast.error(c.mesaj); return; }
     const k = await api.superDestekKonusma(secili);
@@ -120,9 +143,12 @@ export function DestekSekmesi() {
               {liste.map((t) => (
                 <button
                   key={t.id}
+                  id={`talep-${t.id}`}
                   onClick={() => setSecili(t.id)}
-                  className={`w-full min-w-0 rounded-2xl border px-4 py-3 text-left transition-colors ${
-                    secili === t.id
+                  className={`w-full min-w-0 rounded-2xl border px-4 py-3 text-left transition-all ${
+                    vurgu === t.id
+                      ? "border-yaldiz bg-yaldiz/10 ring-2 ring-yaldiz/40"
+                      : secili === t.id
                       ? "border-sarap bg-sarap/5"
                       : "border-ayrac bg-yuzey hover:border-sarap/40"
                   }`}
@@ -131,7 +157,10 @@ export function DestekSekmesi() {
                     <p className="min-w-0 truncate font-govde text-sm font-medium text-murekkep">
                       {t.kullanici_ad}
                     </p>
-                    <DurumRozeti durum={t.durum} okunmamis={t.okunmamis} />
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {t.durum === "kapali" && <SilmeSayaci kapanma={t.kapanma} />}
+                      <DurumRozeti durum={t.durum} okunmamis={t.okunmamis} />
+                    </span>
                   </div>
                   <p className="mt-0.5 truncate font-govde text-xs text-ikincil">
                     {t.kullanici_email}
@@ -173,6 +202,7 @@ export function DestekSekmesi() {
                   <p className="truncate font-govde text-xs text-ikincil">{konusma.kullanici_email}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {konusma.durum === "kapali" && <SilmeSayaci kapanma={konusma.kapanma} />}
                   <DurumRozeti durum={konusma.durum} okunmamis={0} />
                   {/* DEFTER BAGLAMI - "hangi defterdi?" diye sormaya gerek yok.
                       Talep acilirken aktif defter kaydedildi; yonetici tek tikla
@@ -296,6 +326,39 @@ function DurumRozeti({ durum, okunmamis }: { durum: string; okunmamis: number })
   return (
     <span className={`shrink-0 rounded-full px-2 py-0.5 font-govde text-[0.6rem] ${d.sinif}`}>
       {d.etiket}
+    </span>
+  );
+}
+
+// KALICI SILME SAYACI - kapanan konusma 24 saat sonra tamamen silinir.
+// Sayac, geri alma penceresinin DARALDIGINI gorunur kilar: "kalici silinmeye 17 saat"
+// yazan bir rozet, yoneticiye "yanlis kapattiysan simdi geri al" der.
+function SilmeSayaci({ kapanma }: { kapanma: string | null }) {
+  const [metin, setMetin] = useState<string>("");
+
+  useEffect(() => {
+    if (!kapanma) { setMetin(""); return; }
+    const hesapla = () => {
+      const silme = new Date(kapanma).getTime() + 24 * 3_600_000;
+      const kalan = silme - Date.now();
+      if (kalan <= 0) { setMetin("siliniyor"); return; }
+      const saat = Math.floor(kalan / 3_600_000);
+      if (saat >= 1) { setMetin(`${saat} saat`); return; }
+      setMetin(`${Math.max(1, Math.floor(kalan / 60_000))} dk`);
+    };
+    hesapla();
+    // Dakikada bir tazele - sayac "canli" hissettirir, sayfa yenilemeye gerek kalmaz.
+    const z = setInterval(hesapla, 60_000);
+    return () => clearInterval(z);
+  }, [kapanma]);
+
+  if (!metin) return null;
+  return (
+    <span
+      title="Bu yazışma kalıcı olarak silinecek. Geri almak için yeniden açın."
+      className="shrink-0 rounded-full bg-yuzeyKoyu px-2 py-0.5 font-govde text-[0.55rem] text-ikincil"
+    >
+      silinmeye {metin}
     </span>
   );
 }
