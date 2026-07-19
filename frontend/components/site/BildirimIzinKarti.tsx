@@ -93,11 +93,57 @@ export function BildirimIzinKarti() {
   if (durum === "bilinmiyor") return null;
 
   if (durum === "desteklenmiyor") {
+    // GERCEK SEBEBI SOYLE - "desteklenmiyor" demek yol gostermez.
+    //
+    // iPhone'da bildirimler YALNIZCA uygulama ana ekrana eklendiginde (PWA olarak
+    // kurulduğunda) calisir. Tarayici sekmesinde acikken Notification API hic yoktur.
+    // Kullaniciya "cihazin desteklemiyor" demek YANLIS ve umutsuzluk vericidir;
+    // dogrusu "uygulamayi ana ekrana ekle" demektir.
+    const iosMu =
+      typeof navigator !== "undefined" &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
     return (
-      <Kart ton="notr" baslik="Bu cihaz bildirimleri desteklemiyor">
-        <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
-          Uygulama içi bildirimler yine de çalışır: avatar menüsündeki zil simgesinden
-          tüm bildirimlerini görebilirsin.
+      <Kart ton="uyari" baslik={iosMu ? "Uygulamayı ana ekrana ekleyin" : "Bu tarayıcı bildirimleri desteklemiyor"}>
+        {iosMu ? (
+          <>
+            <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
+              iPhone ve iPad'de bildirimler yalnızca uygulama ana ekrana eklendiğinde
+              çalışır. Tarayıcı sekmesinde açıkken bildirim izni verilemez - bu bir
+              ayar sorunu değil, iOS'un kuralıdır.
+            </p>
+            <div className="mt-4 rounded-2xl border border-ayrac bg-parsomen px-5 py-4">
+              <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-yaldiz">
+                Nasıl eklenir
+              </p>
+              <ol className="mt-2 space-y-2">
+                {[
+                  "Safari'de bu sayfayı açın (Chrome değil - iOS'ta yalnızca Safari ekleyebilir).",
+                  "Alttaki paylaş simgesine (yukarı ok) dokunun.",
+                  "Listeyi kaydırıp \"Ana Ekrana Ekle\" seçeneğine dokunun.",
+                  "Ekle deyin ve uygulamayı ana ekrandaki simgeden açın.",
+                  "Açılınca bildirim davetine dokunup izin verin.",
+                ].map((a, i) => (
+                  <li key={i} className="flex gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sarap/10 font-govde text-[0.62rem] font-bold text-sarap">
+                      {i + 1}
+                    </span>
+                    <span className="metin-yasli font-govde text-xs leading-relaxed text-murekkep">{a}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </>
+        ) : (
+          <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
+            Kullandığınız tarayıcı bildirim özelliğini sunmuyor. Güncel bir tarayıcıda
+            açtığınızda bildirimleri açabilirsiniz.
+          </p>
+        )}
+        <p className="mt-3 font-govde text-xs text-ikincil">
+          Bu arada uygulama içi bildirimleriniz çalışmaya devam eder - avatar
+          menüsündeki zil simgesinden hepsini görebilirsiniz.
         </p>
       </Kart>
     );

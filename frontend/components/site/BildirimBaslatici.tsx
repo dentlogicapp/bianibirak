@@ -3,11 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import { pushDestekleniyorMu, pushAboneOl, pushSenkronEt } from "@/lib/push";
 
-// Uygulama acilisinda bildirim baslatici (enterprise):
-// 1) Izin GRANTED ise -> sessizce aboneligi tazele (bayat abonelik cozumu).
-// 2) Izin DEFAULT ise -> kisa gecikmeyle sistem izin formunu bir kez tetikle;
-//    verilmezse ekranda hafif bir davet gosterir (kullanici jestiyle tekrar dener).
-// 3) Izin DENIED ise -> dokunmaz (kullanici cihaz ayarindan acmali).
+// BILDIRIM BASLATICI
+//
+// KRITIK KURAL: IZIN ASLA KENDILIGINDEN ISTENMEZ - YALNIZ KULLANICI DOKUNUSUYLA.
+//
+// PAHALI OGRENILEN HATA: burada izin, acilistan 1200 ms sonra bir ZAMANLAYICI ile
+// isteniyordu. Chrome'da calisiyordu ama iOS'ta felaketti:
+//   iOS, Notification.requestPermission() cagrisini KULLANICI JESTI disinda
+//   REDDEDER. Ret kaydedilir. Ve reddedilen izin BIR DAHA SORULAMAZ.
+// Yani uygulama, kullanici daha hicbir seye dokunmadan, kendi bildirim iznini
+// ilk saniyede YAKIYORDU. Kullanicinin sonradan yapabilecegi hicbir sey kalmiyordu.
+//
+// YENI DAVRANIS:
+//   granted -> sessizce aboneligi tazele
+//   denied  -> dokunma (Ayarlar > Bildirimler ekraninda cihaz adimlari anlatilir)
+//   default -> DAVET KARTI goster; izin YALNIZCA karta dokununca istenir.
+//
+// Boylece izin penceresi her zaman bir dokunusun ardindan acilir - hem iOS kuralina
+// uyar hem de kullanici ne oldugunu bilerek karar verir.
 export function BildirimBaslatici() {
   const [davet, setDavet] = useState(false);
   const calisti = useRef(false);
@@ -19,35 +32,25 @@ export function BildirimBaslatici() {
 
     const izin = Notification.permission;
     if (izin === "granted") {
-      // Izinli: aboneligi backend'e tazele
-      void pushSenkronEt();
+      void pushSenkronEt();   // izinli: aboneligi tazele
       return;
     }
-    if (izin === "denied") return;
+    if (izin === "denied") return; // cihaz ayarindan acilmali
 
-    // izin === "default": acilista bir kez iste (cogu tarayici jest istemez).
-    const zaman = setTimeout(async () => {
-      try {
-        const sonuc = await Notification.requestPermission();
-        if (sonuc === "granted") {
-          await pushAboneOl();
-        } else {
-          setDavet(true); // verilmedi -> hafif davet goster
-        }
-      } catch {
-        setDavet(true);
-      }
-    }, 1200);
-
-    return () => clearTimeout(zaman);
+    // default: SORMA - DAVET ET. Izin, davete dokunuldugunda istenir.
+    setDavet(true);
   }, []);
 
+  // JEST ICINDE IZIN ISTEME - iOS'un tek kabul ettigi yol.
   async function davetKabul() {
     try {
-      await pushAboneOl();
+      const sonuc = await Notification.requestPermission();
+      if (sonuc === "granted") {
+        await pushAboneOl();
+      }
+      // Reddedildiyse karti kapatiriz; yol gosterme Ayarlar > Bildirimler'de.
       setDavet(false);
     } catch {
-      // hala verilmedi - cihaz ayarindan acilmali
       setDavet(false);
     }
   }
