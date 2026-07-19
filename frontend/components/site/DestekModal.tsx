@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api, type DestekTalep, type SssKategori } from "@/lib/api";
+import { Portal } from "@/components/site/Portal";
 
 // DESTEK MODALI - "Sorun Bildir & Destek Al".
 //
@@ -107,6 +108,7 @@ export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => v
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 
   return (
+    <Portal>
     <div
       className="fixed inset-0 z-[70] flex items-end justify-center bg-murekkep/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onKapat}
@@ -423,6 +425,7 @@ export function DestekModal({ acik, onKapat }: { acik: boolean; onKapat: () => v
         )}
       </div>
     </div>
+    </Portal>
   );
 }
 
