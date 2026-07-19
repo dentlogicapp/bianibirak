@@ -92,6 +92,22 @@ export type KatkiKarsilama = {
 };
 
 // Katki (moderasyon kuyrugu / defter).
+export type SssMadde = {
+  id: string;
+  kategori: string;
+  alt_kategori: string;
+  soru: string;
+  cevap: string;
+  sira: number;
+  aktif: boolean;
+  goruntulenme: number;
+};
+
+export type SssKategori = {
+  kategori: string;
+  alt_kategoriler: { alt_kategori: string; maddeler: { id: string; soru: string; cevap: string }[] }[];
+};
+
 export type DestekMesaj = {
   id: string;
   yonetici_mi: boolean;
@@ -106,6 +122,7 @@ export type DestekTalep = {
   durum: string;
   son_mesaj: string;
   created_at: string;
+  yonetici_okudu: string | null;
   mesajlar: DestekMesaj[];
 };
 
@@ -777,6 +794,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ Metin: metin }),
     }),
+  sssAgac: () => istek<{ agac: SssKategori[] }>("/api/sss"),
+  sssGoruntulendi: (id: string) =>
+    istek<{ ok: boolean }>(`/api/sss/${id}/goruntulendi`, { method: "POST" }),
+  superSssListe: () => istek<{ maddeler: SssMadde[] }>("/api/super/sss"),
+  superSssKaydet: (v: {
+    id?: string; kategori: string; altKategori: string;
+    soru: string; cevap: string; sira?: number; aktif?: boolean;
+  }) =>
+    istek<{ ok: boolean; id: string }>("/api/super/sss", {
+      method: "POST",
+      body: JSON.stringify({
+        Id: v.id ?? null, Kategori: v.kategori, AltKategori: v.altKategori,
+        Soru: v.soru, Cevap: v.cevap, Sira: v.sira ?? null, Aktif: v.aktif ?? null,
+      }),
+    }),
+  superSssSil: (id: string) =>
+    istek<{ ok: boolean }>(`/api/super/sss/${id}`, { method: "DELETE" }),
+
   superDestekKapat: (id: string) =>
     istek<{ ok: boolean }>(`/api/super/destek/${id}/kapat`, { method: "POST" }),
 

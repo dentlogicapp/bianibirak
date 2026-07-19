@@ -219,6 +219,24 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_destek_mesajlari_talep ON destek_mesajlari ("TalepId", created_at);
 
+        -- SSS / BILGI TABANI: uc kademeli agac (kategori > alt kategori > soru).
+        CREATE TABLE IF NOT EXISTS sss_maddeleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "Kategori" text NOT NULL,
+            "AltKategori" text NOT NULL,
+            "Soru" text NOT NULL,
+            "Cevap" text NOT NULL,
+            "Sira" integer NOT NULL DEFAULT 0,
+            "Aktif" boolean NOT NULL DEFAULT true,
+            "GoruntulenmeSayisi" integer NOT NULL DEFAULT 0,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_sss_agac ON sss_maddeleri ("Aktif", "Kategori", "AltKategori", "Sira");
+
+        -- DESTEK: yonetici okuma damgasi (okundu isareti) + otomatik ilk yanit izi.
+        ALTER TABLE destek_talepleri ADD COLUMN IF NOT EXISTS "YoneticiOkuduZamani" timestamptz NULL;
+
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
         -- NOT: kolon adi super_admin (snake_case) - DbContext eslemesi boyle. PascalCase DEGIL.

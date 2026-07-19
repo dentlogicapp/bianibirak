@@ -17,16 +17,18 @@ import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
 import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 import { DestekSekmesi } from "@/components/site/DestekSekmesi";
+import { SssYonetimi } from "@/components/site/SssYonetimi";
 import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
 import OdemelerSekmesi from "@/components/site/OdemelerSekmesi";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
-type Sekme = "defterler" | "destek" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
+type Sekme = "defterler" | "destek" | "sss" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "defterler", etiket: "Defterler" },
   { kod: "destek", etiket: "Destek Talepleri" },
+  { kod: "sss", etiket: "Sık Sorulanlar" },
   { kod: "odemeler", etiket: "Ödemeler" },
   { kod: "olcum", etiket: "Ölçüm" },
   { kod: "kullanicilar", etiket: "Kullanıcılar" },
@@ -108,6 +110,7 @@ export default function SuperPanelSayfasi() {
       <div className="mt-6">
         {sekme === "defterler" && <DefterlerSekmesi />}
         {sekme === "destek" && <DestekSekmesi />}
+        {sekme === "sss" && <SssYonetimi />}
         {sekme === "odemeler" && <OdemelerSekmesi />}
         {sekme === "olcum" && <OlcumSekmesi />}
         {sekme === "kullanicilar" && <KullanicilarSekmesi />}

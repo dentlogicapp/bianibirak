@@ -29,8 +29,15 @@ public static class DestekUclari
         app.MapGet("/api/destek", Konusmam).RequireAuthorization();
         app.MapPost("/api/destek", Gonder).RequireAuthorization();
 
+        // SSS (bilgi tabani) - okuma herkese acik degil, oturum yeter.
+        app.MapGet("/api/sss", SssAgac).RequireAuthorization();
+        app.MapPost("/api/sss/{id:guid}/goruntulendi", SssGoruntulendi).RequireAuthorization();
+
         // Super yonetici tarafi
         app.MapGet("/api/super/destek", SuperListe).RequireAuthorization();
+        app.MapGet("/api/super/sss", SuperSssListe).RequireAuthorization();
+        app.MapPost("/api/super/sss", SuperSssKaydet).RequireAuthorization();
+        app.MapDelete("/api/super/sss/{id:guid}", SuperSssSil).RequireAuthorization();
         app.MapGet("/api/super/destek/{id:guid}", SuperKonusma).RequireAuthorization();
         app.MapPost("/api/super/destek/{id:guid}/yanit", SuperYanit).RequireAuthorization();
         app.MapPost("/api/super/destek/{id:guid}/kapat", SuperKapat).RequireAuthorization();
@@ -98,6 +105,8 @@ public static class DestekUclari
                 durum = t.Durum,
                 son_mesaj = t.SonMesajZamani,
                 created_at = t.CreatedAt,
+                // Bu andan ONCE gonderdigi mesajlar "Okundu" gorunur.
+                yonetici_okudu = t.YoneticiOkuduZamani,
                 mesajlar = mesajlar.Where(m => m.TalepId == t.Id).Select(m => new
                 {
                     id = m.Id,
@@ -138,6 +147,7 @@ public static class DestekUclari
             .OrderByDescending(t => t.SonMesajZamani)
             .FirstOrDefaultAsync(ct);
 
+        var yeniTalep = talep == null;
         if (talep == null)
         {
             talep = new DestekTalebi
@@ -178,6 +188,26 @@ public static class DestekUclari
             Metin = metin,
             CreatedAt = simdi,
         });
+
+        // OTOMATIK ILK YANIT - sessizlik en cok kaygilandiran seydir.
+        // Yeni acilan talepte, kullanici "ulasti mi?" diye beklemesin diye sistem
+        // hemen bir balon dusurur. Bu bir OTOMATIK MESAJDIR ve oyle gorunur;
+        // gercek yaniti taklit etmez (guveni yanlis yerden kazanmayiz).
+        if (yeniTalep)
+        {
+            db.DestekMesajlari.Add(new DestekMesaji
+            {
+                Id = Guid.NewGuid(),
+                TalepId = talep.Id,
+                GonderenKullaniciId = kid,
+                YoneticiMi = true,
+                GonderenAd = "BiAnıBırak",
+                Metin =
+                    "İletiniz sistem yöneticilerimize ulaştı. En kısa sürede buradan "
+                    + "dönüş yapacağız; yanıt geldiğinde ayrıca bildirim alacaksınız.",
+                CreatedAt = simdi.AddSeconds(1),
+            });
+        }
 
         await db.SaveChangesAsync(ct);
 
@@ -285,11 +315,10 @@ public static class DestekUclari
             .FirstOrDefaultAsync(ct);
 
         // Yonetici konusmayi acti -> okunmamis sifirlanir.
-        if (talep.YoneticiOkunmamis > 0)
-        {
-            talep.YoneticiOkunmamis = 0;
-            await db.SaveChangesAsync(ct);
-        }
+        // OKUNDU DAMGASI - kullanici "gordunuz mu?" diye tekrar yazmasin.
+        talep.YoneticiOkunmamis = 0;
+        talep.YoneticiOkuduZamani = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
 
         return Results.Ok(new
         {
@@ -373,6 +402,140 @@ public static class DestekUclari
 
         return Results.Ok(new { ok = true });
     }
+
+    // ---------------- SSS / BILGI TABANI ----------------
+
+    // Agac halinde doner: kategori > alt kategori > maddeler.
+    // Istemci duz liste alip gruplamak zorunda kalmaz - siralama TEK yerde (burada)
+    // belirlenir ve her istemci ayni sirayi gorur.
+    private static async Task<IResult> SssAgac(BiAniBirakDbContext db, CancellationToken ct)
+    {
+        var maddeler = await db.SssMaddeleri.AsNoTracking()
+            .Where(m => m.Aktif)
+            .OrderBy(m => m.Sira)
+            .ToListAsync(ct);
+
+        var agac = maddeler
+            .GroupBy(m => m.Kategori)
+            .Select(k => new
+            {
+                kategori = k.Key,
+                alt_kategoriler = k.GroupBy(m => m.AltKategori).Select(a => new
+                {
+                    alt_kategori = a.Key,
+                    maddeler = a.Select(m => new
+                    {
+                        id = m.Id,
+                        soru = m.Soru,
+                        cevap = m.Cevap,
+                    }),
+                }),
+            });
+
+        return Results.Ok(new { agac });
+    }
+
+    // Hangi maddenin gercekten aciliyor oldugunu OLC. Bu sayi, bir sonraki urun
+    // kararini yonlendirir: cok acilan bir madde, cozulmesi gereken bir SORUNDUR.
+    private static async Task<IResult> SssGoruntulendi(
+        Guid id, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        await db.SssMaddeleri.Where(m => m.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.GoruntulenmeSayisi, m => m.GoruntulenmeSayisi + 1), ct);
+        return Results.Ok(new { ok = true });
+    }
+
+    private static async Task<IResult> SuperSssListe(
+        HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        var (ok, _) = await SuperMi(ctx, db, ct);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var maddeler = await db.SssMaddeleri.AsNoTracking()
+            .OrderBy(m => m.Sira)
+            .Select(m => new
+            {
+                id = m.Id,
+                kategori = m.Kategori,
+                alt_kategori = m.AltKategori,
+                soru = m.Soru,
+                cevap = m.Cevap,
+                sira = m.Sira,
+                aktif = m.Aktif,
+                goruntulenme = m.GoruntulenmeSayisi,
+            })
+            .ToListAsync(ct);
+
+        return Results.Ok(new { maddeler });
+    }
+
+    // Tek uc hem EKLER hem GUNCELLER (Id varsa guncelle, yoksa ekle).
+    // Iki ayri uc, iki ayri dogrulama ve kacinilmaz olarak ayrisan iki davranis demekti.
+    private static async Task<IResult> SuperSssKaydet(
+        HttpContext ctx, BiAniBirakDbContext db, SssGirdi girdi, CancellationToken ct)
+    {
+        var (ok, _) = await SuperMi(ctx, db, ct);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var kategori = (girdi.Kategori ?? "").Trim();
+        var alt = (girdi.AltKategori ?? "").Trim();
+        var soru = (girdi.Soru ?? "").Trim();
+        var cevap = (girdi.Cevap ?? "").Trim();
+
+        if (kategori.Length == 0 || alt.Length == 0 || soru.Length == 0 || cevap.Length == 0)
+            return Hata(400, "DOGRULAMA_HATASI", "Kategori, alt kategori, soru ve cevap zorunludur.");
+
+        var simdi = DateTimeOffset.UtcNow;
+
+        if (girdi.Id.HasValue)
+        {
+            var m = await db.SssMaddeleri.FirstOrDefaultAsync(x => x.Id == girdi.Id.Value, ct);
+            if (m == null) return Hata(404, "MADDE_BULUNAMADI", "Madde bulunamadı.");
+            m.Kategori = kategori;
+            m.AltKategori = alt;
+            m.Soru = soru;
+            m.Cevap = cevap;
+            m.Sira = girdi.Sira ?? m.Sira;
+            m.Aktif = girdi.Aktif ?? m.Aktif;
+            m.UpdatedAt = simdi;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { ok = true, id = m.Id });
+        }
+
+        var enBuyuk = await db.SssMaddeleri.AnyAsync(ct)
+            ? await db.SssMaddeleri.MaxAsync(x => x.Sira, ct)
+            : 0;
+
+        var yeni = new SssMaddesi
+        {
+            Id = Guid.NewGuid(),
+            Kategori = kategori,
+            AltKategori = alt,
+            Soru = soru,
+            Cevap = cevap,
+            Sira = girdi.Sira ?? (enBuyuk + 1),
+            Aktif = girdi.Aktif ?? true,
+            CreatedAt = simdi,
+            UpdatedAt = simdi,
+        };
+        db.SssMaddeleri.Add(yeni);
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new { ok = true, id = yeni.Id });
+    }
+
+    private static async Task<IResult> SuperSssSil(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        var (ok, _) = await SuperMi(ctx, db, ct);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        await db.SssMaddeleri.Where(m => m.Id == id).ExecuteDeleteAsync(ct);
+        return Results.Ok(new { ok = true });
+    }
 }
 
 public record DestekGirdi(string? Metin);
+
+public record SssGirdi(
+    Guid? Id, string? Kategori, string? AltKategori,
+    string? Soru, string? Cevap, int? Sira, bool? Aktif);

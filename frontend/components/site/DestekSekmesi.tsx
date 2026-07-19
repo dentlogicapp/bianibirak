@@ -168,6 +168,17 @@ export function DestekSekmesi() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <DurumRozeti durum={konusma.durum} okunmamis={0} />
+                  {/* DEFTER BAGLAMI - "hangi defterdi?" diye sormaya gerek yok.
+                      Talep acilirken aktif defter kaydedildi; yonetici tek tikla
+                      o defterin teshis ekranina gecer. */}
+                  {konusma.etkinlik_id && (
+                    <a
+                      href={`/super-panel?defter=${konusma.etkinlik_id}`}
+                      className="rounded-full border border-yaldiz/50 px-3 py-1.5 font-govde text-xs text-yaldiz transition-colors hover:bg-yaldiz/10"
+                    >
+                      Defteri incele
+                    </a>
+                  )}
                   {konusma.durum !== "kapali" && (
                     <button
                       onClick={kapat}

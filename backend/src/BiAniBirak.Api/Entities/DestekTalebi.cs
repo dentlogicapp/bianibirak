@@ -32,6 +32,13 @@ public class DestekTalebi
     public int KullaniciOkunmamis { get; set; }
     public int YoneticiOkunmamis { get; set; }
 
+    // OKUNDU ISARETI: yonetici konusmayi actigi an. Kullanici, bu andan ONCE
+    // gonderdigi mesajlarin yaninda "Okundu" gorur.
+    //
+    // NEDEN ONEMLI: destek yukunun en buyuk kaynagi "gordunuz mu?" belirsizligidir.
+    // Kullanici gorulduğunu bilmezse ayni seyi tekrar yazar; iki taraf da yorulur.
+    public DateTimeOffset? YoneticiOkuduZamani { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

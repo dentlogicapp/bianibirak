@@ -29,6 +29,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<Bildirim> Bildirimler => Set<Bildirim>();
     public DbSet<DestekTalebi> DestekTalepleri => Set<DestekTalebi>();
     public DbSet<DestekMesaji> DestekMesajlari => Set<DestekMesaji>();
+    public DbSet<SssMaddesi> SssMaddeleri => Set<SssMaddesi>();
     public DbSet<SistemMetni> SistemMetinleri => Set<SistemMetni>();
     public DbSet<KvkkTalebi> KvkkTalepleri => Set<KvkkTalebi>();
     public DbSet<KullanimOnayi> KullanimOnaylari => Set<KullanimOnayi>();
@@ -288,6 +289,22 @@ public class BiAniBirakDbContext : DbContext
         });
 
         // ---- ertelenen_bildirimler (sessiz saat kuyrugu) ----
+        model.Entity<SssMaddesi>(e =>
+        {
+            e.ToTable("sss_maddeleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Kategori).HasColumnName("Kategori").IsRequired();
+            e.Property(x => x.AltKategori).HasColumnName("AltKategori").IsRequired();
+            e.Property(x => x.Soru).HasColumnName("Soru").IsRequired();
+            e.Property(x => x.Cevap).HasColumnName("Cevap").IsRequired();
+            e.Property(x => x.Sira).HasColumnName("Sira");
+            e.Property(x => x.Aktif).HasColumnName("Aktif");
+            e.Property(x => x.GoruntulenmeSayisi).HasColumnName("GoruntulenmeSayisi");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
         model.Entity<DestekTalebi>(e =>
         {
             e.ToTable("destek_talepleri");
@@ -300,6 +317,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.SonMesajZamani).HasColumnName("SonMesajZamani");
             e.Property(x => x.KullaniciOkunmamis).HasColumnName("KullaniciOkunmamis");
             e.Property(x => x.YoneticiOkunmamis).HasColumnName("YoneticiOkunmamis");
+            e.Property(x => x.YoneticiOkuduZamani).HasColumnName("YoneticiOkuduZamani");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });

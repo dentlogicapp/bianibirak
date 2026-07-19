@@ -101,6 +101,7 @@ if (!string.IsNullOrWhiteSpace(postgresBaglanti))
     // onaylanacak metin yoktu. Metin VARSA dokunulmaz (super panelden yapilan
     // duzenleme restart'ta ezilmez).
     await YasalMetinler.SeedAsync(db);
+    await SssTohumu.TohumlaAsync(db);   // bilgi tabani ilk hali (tablo bossa)
 
     app.Logger.LogInformation("Idempotent sema uygulandi + yasal metinler hazir.");
 }
