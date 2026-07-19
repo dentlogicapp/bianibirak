@@ -16,6 +16,7 @@ import { AppShell } from "@/components/site/AppShell";
 import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
 import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
+import { defterDurumu, durumTonSinif } from "@/lib/durum";
 import { DestekSekmesi } from "@/components/site/DestekSekmesi";
 import { SssYonetimi } from "@/components/site/SssYonetimi";
 import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
@@ -201,7 +202,6 @@ function DefterlerSekmesi() {
   const [ara, setAra] = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islenen, setIslenen] = useState<string | null>(null);
-  const [silHedef, setSilHedef] = useState<SuperDefter | null>(null);
   // ONAY HEDEFLERI - geri alinabilir eylemler de artik ETKISINI anlatarak sorar.
   const [dondurHedef, setDondurHedef] = useState<SuperDefter | null>(null);
   const [copHedef, setCopHedef] = useState<SuperDefter | null>(null);
@@ -257,20 +257,6 @@ function DefterlerSekmesi() {
     void cek();
   }
 
-  async function kaliciSil() {
-    if (!silHedef) return;
-    // Teyit metni ARTIK bilesende dogrulaniyor (kullanici birebir yazmadan buton
-    // acilmiyor). Backend yine de kendi kontrolunu yapar - defense in depth.
-    const c = await api.superDefterKaliciSil(
-      silHedef.id, `${silHedef.es1_ad} & ${silHedef.es2_ad}`);
-    if (!c.ok) {
-      toast.error(c.mesaj);
-      return;
-    }
-    toast.success("Defter kalıcı olarak silindi.");
-    setSilHedef(null);
-    void cek();
-  }
 
   return (
     <div>
@@ -314,6 +300,18 @@ function DefterlerSekmesi() {
                   {d.hareketsiz && <Rozet metin="Hareketsiz" tip="soluk" />}
                 </div>
               </div>
+
+              {/* EVRE - kullanicinin gordugu ile AYNI kaynak (lib/durum.ts).
+                  Yonetici, ciftin ekraninda ne yazdigini BILEREK konusur; iki taraf
+                  ayni cumleyi gorur. Ayri bir "yonetici dili" uydurmak, destekte
+                  yanlis anlasilmanin en yaygin sebebidir. */}
+              {!d.silindi_mi && (
+                <div className="mt-2">
+                  <span className={`inline-block rounded-full border px-2.5 py-0.5 font-govde text-[0.6rem] font-medium ${durumTonSinif(defterDurumu(d).ton)}`}>
+                    {defterDurumu(d).etiket}
+                  </span>
+                </div>
+              )}
 
               {/* Uyeler - kim, hangi rolde */}
               <div className="mt-3 space-y-1">
@@ -378,14 +376,6 @@ function DefterlerSekmesi() {
                   className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
                 >
                   Çöpe at
-                </button>
-                <button
-                  onClick={() => setSilHedef(d)}
-                  disabled={islenen === d.id || !d.silindi_mi}
-                  title={d.silindi_mi ? "" : "Önce çöpe atılmalı"}
-                  className="rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-40"
-                >
-                  Kalıcı sil
                 </button>
               </div>
             </div>
@@ -456,26 +446,7 @@ function DefterlerSekmesi() {
         />
       )}
 
-      {/* KALICI SIL - GERI ALINAMAZ. Ayni bilesen, en yuksek siddet.
-          Onceden burada AYRI bir modal vardi; iki farkli onay tasarimi, iki farkli
-          dikkat seviyesi uretiyordu. Tek bilesen = tek dil = ogrenilmis guven. */}
-      <TehlikeliEylem
-        acik={silHedef !== null}
-        siddet="kritik"
-        baslik={`Kalıcı sil: ${silHedef?.es1_ad} & ${silHedef?.es2_ad}`}
-        etkilenen="Çift, davetliler ve tüm defter içeriği"
-        etkiler={[
-          "Defter, dilekler, fotoğraflar, bağlantılar ve üyelikler veritabanından silinir.",
-          "Yüklenen tüm medya dosyaları diskten silinir.",
-          "Çift bir daha bu deftere erişemez; kurtarma yolu yoktur.",
-          "Denetim kayıtları adli iz olarak korunur (kişisel veri içermez).",
-        ]}
-        geriDonus={null}
-        teyitMetni={silHedef ? `${silHedef.es1_ad} & ${silHedef.es2_ad}` : undefined}
-        onayEtiket="Kalıcı olarak sil"
-        onOnay={() => { void kaliciSil(); }}
-        onKapat={() => setSilHedef(null)}
-      />
+
     </div>
   );
 }
@@ -655,6 +626,8 @@ function KullanicilarSekmesi() {
 
 // ---------------- COP KUTUSU ----------------
 function CopSekmesi() {
+  // Kalici silme hedefi - onay ayni TehlikeliEylem bileseniyle (panelde TEK dil).
+  const [kaliciHedef, setKaliciHedef] = useState<{ id: string; es1_ad: string; es2_ad: string } | null>(null);
   const [cop, setCop] = useState<CopKutusu | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
 
@@ -723,6 +696,17 @@ function CopSekmesi() {
                     {turEtiketi(d.tur)} · silindi: {tarihKisa(d.silinme_zamani)}
                   </p>
                 </div>
+                {/* KALICI SIL - DOGRU YER BURASI.
+                    Onceden Defterler sekmesindeydi ve "once cope atilmali" diye
+                    PASIF duruyordu: gorunuyor ama calismiyor - kullanici icin bu
+                    "bozuk buton"dur. Bir eylem, ancak YAPILABILIR oldugu yerde
+                    gosterilmelidir. Cop kutusundaki defter zaten silinmeye hazirdir. */}
+                <button
+                  onClick={() => setKaliciHedef(d)}
+                  className="shrink-0 rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
+                >
+                  Kalıcı sil
+                </button>
                 <button
                   onClick={() => defterGeriAl(d.id)}
                   className="shrink-0 rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
@@ -767,6 +751,32 @@ function CopSekmesi() {
           </div>
         </section>
       )}
+
+      <TehlikeliEylem
+        acik={kaliciHedef !== null}
+        siddet="kritik"
+        baslik={`Kalıcı sil: ${kaliciHedef?.es1_ad} & ${kaliciHedef?.es2_ad}`}
+        etkilenen="Çift, davetliler ve tüm defter içeriği"
+        etkiler={[
+          "Defter, dilekler, fotoğraflar, bağlantılar ve üyelikler veritabanından silinir.",
+          "Yüklenen tüm medya dosyaları diskten silinir.",
+          "Çift bir daha bu deftere erişemez; kurtarma yolu yoktur.",
+          "Denetim kayıtları adli iz olarak korunur (kişisel veri içermez).",
+        ]}
+        geriDonus={null}
+        teyitMetni={kaliciHedef ? `${kaliciHedef.es1_ad} & ${kaliciHedef.es2_ad}` : undefined}
+        onayEtiket="Kalıcı olarak sil"
+        onOnay={async () => {
+          if (!kaliciHedef) return;
+          const c = await api.superDefterKaliciSil(
+            kaliciHedef.id, `${kaliciHedef.es1_ad} & ${kaliciHedef.es2_ad}`);
+          if (!c.ok) { toast.error(c.mesaj); return; }
+          toast.success("Defter kalıcı olarak silindi.");
+          setKaliciHedef(null);
+          void cek();
+        }}
+        onKapat={() => setKaliciHedef(null)}
+      />
     </div>
   );
 }

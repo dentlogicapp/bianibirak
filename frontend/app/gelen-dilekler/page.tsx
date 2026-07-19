@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type Etkinlik, type Katki } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { defterDurumu, durumTonSinif } from "@/lib/durum";
 import { DilekInceleme } from "@/components/site/DilekInceleme";
 import { esTarafiKisa } from "@/lib/es";
 import { useOdakKatki } from "@/lib/odak";
@@ -192,7 +193,7 @@ function DefterIcerik() {
       {/* Ozet basligi */}
       <div className="rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
         <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">
-          {turEtiketi(etkinlik.tur)} · {durumEtiketi(etkinlik.durum)}
+          {turEtiketi(etkinlik.tur)}
         </p>
         <h1 className="mt-3 font-display text-2xl text-murekkep sm:text-3xl">
           {etkinlik.es1_ad} &amp; {etkinlik.es2_ad}
@@ -200,6 +201,22 @@ function DefterIcerik() {
         <p className="mt-2 font-govde text-sm text-ikincil">
           {tarihSaatMetni(etkinlik.etkinlik_tarihi)}
         </p>
+
+        {/* CANLI EVRE - /etkinliklerim ile AYNI fonksiyondan. Uc yerde uc farkli
+            cumle olusmasin diye tek kaynak: lib/durum.ts */}
+        {(() => {
+          const d = defterDurumu(etkinlik);
+          return (
+            <div className="mt-3">
+              <span className={`inline-block rounded-full border px-2.5 py-0.5 font-govde text-[0.62rem] font-medium ${durumTonSinif(d.ton)}`}>
+                {d.etiket}
+              </span>
+              <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+                {d.aciklama}
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Onay kuyrugu */}

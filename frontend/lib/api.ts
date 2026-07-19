@@ -226,6 +226,9 @@ export type SuperDefter = {
   es2_ad: string;
   tur: string;
   etkinlik_tarihi: string;
+  kapanis_tarihi: string;
+  imha_tarihi: string;
+  imha_edildi: boolean;
   durum: string;
   donduruldu: boolean;
   silindi_mi: boolean;

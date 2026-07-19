@@ -1,4 +1,14 @@
-import type { Etkinlik } from "@/lib/api";
+// GIRDI TIPI: hem Etkinlik hem SuperDefter kabul edilir. Ikisi de ayni ALANLARI
+// tasir; evre hesabi icin gereken yalnizca bu alanlardir. Boylece kullanici ekrani
+// ile yonetici ekrani AYNI fonksiyondan beslenir - iki farkli cumle olusamaz.
+export type EvreGirdisi = {
+  tur: string;
+  etkinlik_tarihi: string;
+  kapanis_tarihi: string;
+  imha_tarihi: string;
+  imha_edildi: boolean;
+  donduruldu: boolean;
+};
 
 // DEFTER EVRESI - "hazirlik" kalintisinin yerine gecen CANLI durum.
 //
@@ -56,7 +66,7 @@ function kalanMetin(ms: number): string {
   return `${Math.floor(saat / 24)} gün`;
 }
 
-export function defterDurumu(e: Etkinlik): DefterDurum {
+export function defterDurumu(e: EvreGirdisi): DefterDurum {
   const tur = turAdi(e.tur);
   const simdi = Date.now();
   const imha = new Date(e.imha_tarihi).getTime();

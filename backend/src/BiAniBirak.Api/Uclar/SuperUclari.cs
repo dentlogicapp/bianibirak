@@ -273,6 +273,11 @@ public static class SuperUclari
             es2_ad = e.Es2Ad,
             tur = e.Tur,
             etkinlik_tarihi = e.EtkinlikTarihi,
+            // Evre hesabi icin (lib/durum.ts): kullanicinin gordugu ile
+            // yoneticinin gordugu AYNI cumle olmali.
+            kapanis_tarihi = e.KapanisTarihi,
+            imha_tarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
+            imha_edildi = e.ImhaEdildi,
             durum = e.Durum,
             donduruldu = e.Donduruldu,
             silindi_mi = e.SilindiMi,
