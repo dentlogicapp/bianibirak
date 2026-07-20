@@ -56,6 +56,8 @@ export type Etkinlik = {
   imha_edildi: boolean;
   // Super admin defteri dondurdu: salt okunur (yazim ve indirme kapali).
   donduruldu: boolean;
+  // Ozel gun gectiyse tarih degistirilemez (yasam dongusu kilitlenir).
+  tarih_kilitli: boolean;
 
   durum: string;
   rol: string | null;

@@ -394,9 +394,18 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
           onChange={(ev) => setEtkinlikTarihi(ev.target.value)}
           className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap sm:w-72"
         />
-        <p className="mt-2 font-govde text-xs text-ikincil">
+        <p className="mt-2 font-govde text-xs leading-relaxed text-ikincil">
           Davetli girişleri özel gününden 15 gün sonra kapanır; defterin 20. günün
           sonunda kalıcı olarak silinir. Bu takvim her defterde aynıdır.
+        </p>
+        {/* KILIT UYARISI - ILK ANDAN ITIBAREN.
+            Kullanici tarihi girerken bu kurali BILMELIDIR; sonradan ogrenirse
+            "neden degistiremiyorum" diye destek yazar. Bir kural, uygulandigi
+            andan once anlatilir. */}
+        <p className="mt-1.5 font-govde text-xs leading-relaxed text-yaldiz">
+          Tarihi özel gününüz gelmeden önce dilediğiniz zaman değiştirebilirsiniz.
+          Özel gün geçtikten sonra tarih kilitlenir - defterin kapanış ve saklama
+          takvimi bu tarihe göre işlediği için sonradan değiştirilemez.
         </p>
       </div>
 

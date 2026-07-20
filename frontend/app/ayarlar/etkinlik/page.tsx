@@ -240,12 +240,29 @@ function Icerik({ ilkEtkinlik, ilkAyar }: { ilkEtkinlik: Etkinlik; ilkAyar: Etki
                 />
               </Alan>
               <Alan etiket="Etkinlik tarihi ve saati">
+                {/* OZEL GUN GECTIYSE ALAN KAPALI.
+                    Sunucu zaten reddediyor (TARIH_KILITLI); burada alani kapatmak
+                    kullaniciyi bos yere denemekten kurtarir ve SEBEBINI soyler.
+                    Defense in depth: iki katman, tek kural. */}
                 <input
                   type="datetime-local"
                   value={tarih}
                   onChange={(e) => setTarih(e.target.value)}
-                  className={girdiSinif}
+                  disabled={ilkEtkinlik.tarih_kilitli}
+                  className={girdiSinif + (ilkEtkinlik.tarih_kilitli ? " opacity-60" : "")}
                 />
+                {ilkEtkinlik.tarih_kilitli ? (
+                  <p className="mt-2 font-govde text-xs leading-relaxed text-yaldiz">
+                    Özel gününüz geçtiği için tarih kilitlendi. Defterinizin kapanış ve
+                    saklama takvimi bu tarihe göre işlemektedir; bu yüzden sonradan
+                    değiştirilemez.
+                  </p>
+                ) : (
+                  <p className="mt-2 font-govde text-xs leading-relaxed text-ikincil">
+                    Özel gününüz gelene kadar tarihi değiştirebilirsiniz. Tarih geçtikten
+                    sonra kilitlenir - takvim bu tarihe göre işler.
+                  </p>
+                )}
               </Alan>
               <p className="font-govde text-xs text-ikincil">
                 Etkinlik türü ({turEtiketi(ilkEtkinlik.tur)}) oluşturulduktan sonra

@@ -92,6 +92,10 @@ public static class EtkinlikUclari
             // hicbir fark hissetmiyordu; davetliler sessizce reddediliyor, cift
             // "bende bir sorun yok" saniyordu.
             donduruldu = e.Donduruldu,
+            // TARIH KILITLI MI - ozel gun gectiyse arayuz alani KAPATIR.
+            // Sunucu zaten reddediyor; bu bayrak kullaniciya "neden yapamiyorum"
+            // sorusunu SORDURMADAN yanit vermek icin (defense in depth + iyi UX).
+            tarih_kilitli = e.EtkinlikTarihi <= DateTimeOffset.UtcNow,
 
             durum = e.Durum,
             rol,
@@ -291,6 +295,24 @@ public static class EtkinlikUclari
             if (!DateTimeOffset.TryParse(istek.EtkinlikTarihi, CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var yeniTarih))
                 return Hata(400, "DOGRULAMA_HATASI", "Gecerli bir etkinlik tarihi/saati gereklidir.");
+
+            // ÖZEL GÜN GEÇTİYSE TARİH DEĞİŞTİRİLEMEZ.
+            //
+            // KAPATILAN ACIK: tum yasam dongusu (toplama kapanisi, indirme penceresi,
+            // IMHA) ozel gunden turetilir. Tarih serbestce ileri alinabilseydi, bir
+            // cift her seferinde tarihi biraz ileri atarak defterini SONSUZA KADAR
+            // yasatabilir, imha hicbir zaman calismazdi. Sonuc: veri sonsuza dek
+            // saklanir, disk siser ve "20 gun sonra silinir" sozu ANLAMSIZ hale gelir.
+            // Bu yalnizca bir kaynak sorunu degil, VERDIGIMIZ SOZUN ihlalidir.
+            //
+            // Kural: ozel gun GELMEDEN once tarih serbestce degistirilebilir (dugun
+            // ertelenebilir - bu mesru bir ihtiyactir). Ozel gun GECTIKTEN sonra
+            // takvim KILITLENIR.
+            if (etkinlik.EtkinlikTarihi <= DateTimeOffset.UtcNow)
+                return Hata(409, "TARIH_KILITLI",
+                    "Özel gününüz geçtiği için tarih artık değiştirilemez. Defterinizin "
+                    + "kapanış ve saklama takvimi bu tarihe göre işlemektedir.");
+
             etkinlik.EtkinlikTarihi = yeniTarih;
 
             // TEK KANON: kapanis HER ZAMAN ozel gun + ToplamaGun. Ayardan okunmaz.
