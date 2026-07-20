@@ -949,15 +949,18 @@ public static class SuperUclari
             return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
         var evre = (istek.Evre ?? "toplaniyor").Trim();
-        var id = await DenemeDefteri.UretAsync(db, kullanici.Id, evre, ct);
+        var tur = (istek.Tur ?? "dugun").Trim();
+        if (tur != "dugun" && tur != "nisan" && tur != "nikah") tur = "dugun";
+
+        var (id, ad) = await DenemeDefteri.UretAsync(db, kullanici.Id, evre, tur, ct);
 
         await Denetim(db, id, kullanici.Id, "DENEME_DEFTERI_URETILDI",
-            "etkinlikler", id, new { evre });
+            "etkinlikler", id, new { evre, tur });
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { ok = true, etkinlik_id = id, evre });
+        return Results.Ok(new { ok = true, etkinlik_id = id, evre, tur, ad });
     }
 
 }
 
-public record DenemeIstek(string? Evre);
+public record DenemeIstek(string? Evre, string? Tur);

@@ -23,10 +23,36 @@ namespace BiAniBirak.Api.Servisler;
 // gerçek yoldan geçmezse test etmiş sayılmayız.
 public static class DenemeDefteri
 {
-    public static async Task<Guid> UretAsync(
-        BiAniBirakDbContext db, Guid sahipKullaniciId, string evre, CancellationToken ct = default)
+    public static async Task<(Guid Id, string Ad)> UretAsync(
+        BiAniBirakDbContext db, Guid sahipKullaniciId, string evre, string tur,
+        CancellationToken ct = default)
     {
         var simdi = DateTimeOffset.UtcNow;
+
+        // BENZERSIZ VE ANLAMLI AD.
+        //
+        // Onceden her defter "Deneme & Defteri" adiyla dogyordu; besinci defterden
+        // sonra hangisinin hangi evrede oldugunu anlamak imkansizdi - arac, cozdugunden
+        // fazla karmasa uretiyordu. Artik ad, defterin NE OLDUGUNU soyler:
+        //   "Deneme 03 · İndirme" gibi. Sira numarasi mevcut deneme defterlerinden
+        // turetilir; ayni ad iki kez olusamaz.
+        var mevcutDeneme = await db.Etkinlikler
+            .CountAsync(e => e.Es1Ad.StartsWith("Deneme"), ct);
+        var sira = (mevcutDeneme + 1).ToString("00");
+
+        var evreAdi = evre switch
+        {
+            "indirme" => "İndirme",
+            "sonlaniyor" => "Son saatler",
+            "son-gunler" => "Gün geçti",
+            _ => "Toplanıyor",
+        };
+        var turAdi = tur switch
+        {
+            "nisan" => "Nişan",
+            "nikah" => "Nikâh",
+            _ => "Düğün",
+        };
 
         // Evreye göre özel gün: geriye alınarak defter istenen aşamada doğar.
         var ozelGun = evre switch
@@ -41,9 +67,9 @@ public static class DenemeDefteri
         var etkinlik = new Etkinlik
         {
             Id = etkinlikId,
-            Tur = "dugun",
-            Es1Ad = "Deneme",
-            Es2Ad = "Defteri",
+            Tur = tur,
+            Es1Ad = $"Deneme {sira}",
+            Es2Ad = $"{turAdi} · {evreAdi}",
             EtkinlikTarihi = ozelGun,
             AcilisTarihi = simdi.AddDays(-30),
             KapanisTarihi = ozelGun.AddDays(Sabitler.ToplamaGun),
@@ -69,7 +95,25 @@ public static class DenemeDefteri
             UpdatedAt = simdi,
         });
 
-        // Talep sırası önemli: etkinlik önce yazılır, katkılar ona bağlıdır.
+        // PAYLAŞIM BAĞLANTILARI - ZORUNLU.
+        //
+        // katkilar.PaylasimBaglantiId NOT NULL ve bu tabloya yabancı anahtarla bağlı:
+        // her dilek, hangi bağlantıdan geldiğini taşır (çift-link izolasyonunun temeli).
+        // Bağlantı üretilmezse dilek yazımı veritabanı düzeyinde reddedilir.
+        var baglantiEs1 = new PaylasimBaglantisi
+        {
+            Id = Guid.NewGuid(), EtkinlikId = etkinlikId, Es = "es1",
+            Token = Guid.NewGuid().ToString("N"), Aktif = true, CreatedAt = simdi,
+        };
+        var baglantiEs2 = new PaylasimBaglantisi
+        {
+            Id = Guid.NewGuid(), EtkinlikId = etkinlikId, Es = "es2",
+            Token = Guid.NewGuid().ToString("N"), Aktif = true, CreatedAt = simdi,
+        };
+        db.PaylasimBaglantilari.Add(baglantiEs1);
+        db.PaylasimBaglantilari.Add(baglantiEs2);
+
+        // Talep sırası önemli: etkinlik ve bağlantılar önce yazılır, katkılar onlara bağlıdır.
         await db.SaveChangesAsync(ct);
 
         // ---- DİLEKLER ----
@@ -123,6 +167,9 @@ public static class DenemeDefteri
                 DavetliTelefon = "",
                 Mesaj = d.Mesaj,
                 KaynakEs = d.Es,
+                // ZORUNLU ALANLAR (NOT NULL): eksik biri tum dilek yazimini dusurur.
+                Tur = "dilek",
+                PaylasimBaglantiId = d.Es == "es1" ? baglantiEs1.Id : baglantiEs2.Id,
                 Durum = d.Durum,
                 SilindiMi = false,
                 CreatedAt = ozelGun.AddHours(-6 + i),
@@ -132,6 +179,6 @@ public static class DenemeDefteri
         }
 
         await db.SaveChangesAsync(ct);
-        return etkinlikId;
+        return (etkinlikId, $"Deneme {sira} · {turAdi} · {evreAdi}");
     }
 }

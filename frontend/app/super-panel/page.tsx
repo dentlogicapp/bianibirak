@@ -205,6 +205,10 @@ function DefterlerSekmesi() {
   // ONAY HEDEFLERI - geri alinabilir eylemler de artik ETKISINI anlatarak sorar.
   const [dondurHedef, setDondurHedef] = useState<SuperDefter | null>(null);
   const [copHedef, setCopHedef] = useState<SuperDefter | null>(null);
+  const [denemeTur, setDenemeTur] = useState("dugun");
+  // Cift tiklama korumasi: onceden hata mesaji yuzunden kullanici tekrar tekrar
+  // basip 5-6 defter uretmisti.
+  const [uretiliyor, setUretiliyor] = useState(false);
   const [mesajHedef, setMesajHedef] = useState<
     { kullaniciId: string; ad: string; email: string; etkinlikId: string } | null
   >(null);
@@ -268,30 +272,61 @@ function DefterlerSekmesi() {
       />
 
       {/* DENEME DEFTERI - gelistirme ve dogrulama araci.
-          Uretilen defter NORMAL bir defterdir; secilen evrede dogar. Boylece
-          "indirme penceresi" ya da "son saatler" ekranlari gunlerce beklemeden
-          gorulebilir - canlida yakalanan hatalarin cogu bu yuzden kacmisti. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-ayrac bg-parsomen px-4 py-3">
-        <span className="font-govde text-xs text-ikincil">Deneme defteri üret:</span>
-        {[
-          { kod: "toplaniyor", ad: "Toplanıyor" },
-          { kod: "son-gunler", ad: "Özel gün geçti" },
-          { kod: "indirme", ad: "İndirme penceresi" },
-          { kod: "sonlaniyor", ad: "Son saatler" },
-        ].map((e) => (
-          <button
-            key={e.kod}
-            onClick={async () => {
-              const c = await api.superDenemeDefteri(e.kod);
-              if (!c.ok) { toast.error(c.mesaj); return; }
-              toast.success(`Deneme defteri üretildi (${e.ad}).`);
-              void cek();
-            }}
-            className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-          >
-            {e.ad}
-          </button>
-        ))}
+          Uretilen defter NORMAL bir defterdir; secilen tur ve evrede dogar. Boylece
+          "nisan defterinin indirme penceresi" gibi bir durum gunlerce beklemeden
+          gorulebilir - canlida yakalanan hatalarin cogu bu yuzden kacmisti.
+          Ad benzersizdir ("Deneme 03 · Nişan · İndirme"): birden fazla deneme
+          defteri uretildiginde hangisinin ne oldugu LISTEDEN okunur. */}
+      <div className="mt-3 rounded-2xl border border-dashed border-ayrac bg-parsomen px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-govde text-xs text-ikincil">Deneme defteri türü:</span>
+          {[
+            { kod: "dugun", ad: "Düğün" },
+            { kod: "nisan", ad: "Nişan" },
+            { kod: "nikah", ad: "Nikâh" },
+          ].map((t) => (
+            <button
+              key={t.kod}
+              onClick={() => setDenemeTur(t.kod)}
+              className={`rounded-full px-3 py-1.5 font-govde text-[0.65rem] transition-colors ${
+                denemeTur === t.kod
+                  ? "bg-sarap text-parsomen"
+                  : "border border-ayrac text-ikincil hover:border-sarap hover:text-sarap"
+              }`}
+            >
+              {t.ad}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="font-govde text-xs text-ikincil">Evre seç ve üret:</span>
+          {[
+            { kod: "toplaniyor", ad: "Toplanıyor" },
+            { kod: "son-gunler", ad: "Özel gün geçti" },
+            { kod: "indirme", ad: "İndirme penceresi" },
+            { kod: "sonlaniyor", ad: "Son saatler" },
+          ].map((e) => (
+            <button
+              key={e.kod}
+              disabled={uretiliyor}
+              onClick={async () => {
+                setUretiliyor(true);
+                const c = await api.superDenemeDefteri(e.kod, denemeTur);
+                setUretiliyor(false);
+                if (!c.ok) { toast.error(c.mesaj); return; }
+                toast.success(`Üretildi: ${c.veri.ad}`);
+                void cek();
+              }}
+              className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
+            >
+              {e.ad}
+            </button>
+          ))}
+          {uretiliyor && (
+            <span className="font-govde text-[0.65rem] text-ikincil">Üretiliyor...</span>
+          )}
+        </div>
       </div>
 
       {yukleniyor ? (
