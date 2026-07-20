@@ -9,7 +9,7 @@
 konuşması, 62 maddelik SSS bilgi tabanı), **süper panel elden geçirme** (Sistem Nabzı, tehlikeli
 eylem katmanı, dondurmanın gerçekten çalışması), **bildirim altyapısının kökten onarımı**
 (service worker sözdizimi hatası, iOS izin yakması, tıklama kararlılığı) ve çok sayıda
-canlı hata düzeltmesi tamamlandı. **Sırada: Ödeme CTA'sı → Defter Zaman Tüneli.**
+canlı hata düzeltmesi tamamlandı. **Yol haritası FAZLI plana çevrildi (Bölüm 3). Sırada: FAZ 1 — altyapı sağlamlaştırma.**
 
 Canlı: **https://www.bianibirak.com** (eski `bianibirak.dentlogicapp.com` → 301 yönlendirme)
 
@@ -306,90 +306,140 @@ ihtiyaç). Özel gün **geçtikten sonra takvim KİLİTLENİR.**
 - **PWA sürekli giriş ekranı** — `start_url: "/giris"` idi ve sayfa oturumu kontrol etmiyordu;
   oturum hiç düşmüyordu, açılış adresi yanlıştı
 
-## 3. YAPILACAK — Sıralı
+## 3. YAPILACAK — FAZLI PLAN `[nihai: 2026-07-20]`
 
-### 3.1 ▶ ÖDEME CTA'SI `[SIRADA — bir sonraki iş]` `[onaylandı 2026-07-20]`
-İki aşamalı: **bilgilendirme ekranı** → **kesin ödeme**.
-- Onaylanan bonuslar: **"bu ne değildir" bölümü** (ödeme süreyi UZATMAZ, defter yine 20. günde
-  silinir) · **havale sonrası bekleme ekranı** ("ödemeniz kontrol ediliyor") · **ödeme sonrası
-  ilk indirme rehberi** (indir → yedekle → matbaaya ver)
-- **Reddedilen:** "fiyatın yanında ne aldığın" (sayfa/dilek sayısı listesi)
-- **KARAR:** CTA yalnızca **ödeme aktifken görünür** — inert haldeyken kafa karışıklığı yaratmaz
+> Sıra bağlayıcıdır. Her faz bir öncekinin üstüne kurulur; atlanmaz.
 
-### 3.2 ▶ DEFTER ZAMAN TÜNELİ `[SIRADA]` `[onaylandı 2026-07-20]`
-Bir defterin doğumundan bugüne tüm olayları tek dikey akışta.
-- Onaylanan bonusların **tamamı**: `denetim_gunlukleri`'nden beslenir (**yeni tablo yok**) ·
+---
+
+### FAZ 1 — ALTYAPI SAĞLAMLAŞTIRMA `[SIRADA]`
+Hızlı, düşük riskli, sonraki her işi kolaylaştırır.
+
+**1.1 Sağlık ucu (`/api/saglik`)** — tek satır JSON: veritabanı erişilebilir mi, disk %,
+son imha görevi ne zaman çalıştı. "Sistem ayakta mı?" sorusu tahminle değil ölçümle yanıtlanır.
+
+**1.2 Hata görünürlüğü** — süper panelde "son 20 hata" (mesaj + zaman + uç). 500'ler için
+sunucuya SSH atmak gerekmez.
+
+**1.3 Deneme defteri (seed)** — tek komutla gerçekçi dolu defter (dilekler, fotoğraflar,
+farklı evreler). Bundan sonraki her özellik elle veri girmeden test edilir.
+
+---
+
+### FAZ 2 — ÖDEME CTA'SI + ZAMAN TÜNELİ
+
+**2.1 Ödeme CTA'sı** — iki aşamalı: **bilgilendirme ekranı** → **kesin ödeme**.
+- Onaylı bonuslar: **"bu ne değildir"** bölümü (ödeme süreyi UZATMAZ; defter yine 20. günde
+  silinir) · **havale sonrası bekleme ekranı** · **ödeme sonrası ilk indirme rehberi**
+- **Reddedildi:** "fiyatın yanında ne aldığın" listesi
+- **KARAR:** CTA yalnızca **ödeme aktifken** görünür
+- **KARAR:** Fiyat kodda sabit DEĞİL — Süper Panel → Ödemeler → Ayarlar → Fiyat (TL)
+  alanından anlık girilir. Mağaza geçişinde fiyatlandırma yeniden ele alınır.
+
+**2.2 Defter Zaman Tüneli** — bir defterin doğumundan bugüne tüm olayları tek dikey akışta.
+- Onaylı bonusların tamamı: `denetim_gunlukleri`'nden beslenir (**yeni tablo yok**) ·
   anlamlı olay **kümeleme** ("14 dilek onaylandı, 3 gün içinde") · **sessizlik boşlukları**
   ("12 gün hareketsiz") · **destek konuşmaları da akışta**
 
-### 3.3 ▶ E-POSTA ALTYAPISI `[YENİ KARAR 2026-07-19]`
-**Karar:** Şifre yenileme akışı için e-posta gönderimi kurulacak; başka zaruri amaç
-görülmüyor ama altyapı bir kez düzgün kurulur.
-- Sağlayıcı seçimi (Resend / Postmark / Brevo / SMTP) — maliyet + teslim edilebilirlik karşılaştırması
-- **Görsel olarak mükemmel HTML mail şablonu** (marka lockup, "Senden Bize Kalan", responsive)
-- Şifre sıfırlama: token + süre sınırı + tek kullanım + audit
-- **DİKKAT — İYS/6563:** pazarlama e-postası YOK, yalnız **işlemsel** (transactional) mail.
-  E-posta toplama kararı hâlâ "toplanmayacak" (ölçüm dönemi).
-- SPF/DKIM/DMARC kurulumu (domain artık bizde: www.bianibirak.com)
+---
 
-### 3.4 ▶ DEFTER KÜNYESİ (Aşama 2)
-Aşama 1'in lockup altyapısı taşınır. Defterin ilk ve son iç sayfasına gömülü marka künyesi:
-- Lockup + karekodun TAM ALTINA **www.bianibirak.com** (düz yazı, wordmark'ı sarmaz)
-- **Otomatik tema kancası** (sayfa fon rengine göre açık/koyu)
-- **Flatten ile çıkarılamaz gömme** (kompozisyona kaynar)
-- `DefterDerleyici`'ye cerrahi entegrasyon (paralel yapı YASAK)
+### FAZ 3 — DAVETLİ EKRANI PREMIUM `[satış motoru]`
+Davetlilerin **%100'ünün** gördüğü tek ekran. Ürünün gerçek vitrini.
 
-### 3.5 ▶ DIŞ KAPAKLAR (Aşama 3) — en büyük iş
-- Kalın materyal ön + arka dış kapak (iç sayfadan ayrı)
-- **Kapak fotoğrafı: EŞLER SEÇER** (akıllı varsayılanla)
-- **Kapaklar AYRI PDF** (ciltli albüm akışı: sırt payı, taşma/wrap farklı)
-- **Sırt (spine) ilk sürümden enterprise**
-- **Arka dış kapak = marka künyesi**
-- Kapak-PDF akışı matbaa deneme baskısında netleşir
+**3.1 Davetiye görseli** `[ONAYLANDI]`
+Çift, matbaadan bastırdığı davetiyenin görselini yükler ("Davetiyeni Ekle" adımı).
+Davetli ekranında isimlerin üstünde **küçük, okunabilir önizleme** + *"Davetiyeyi tam ekran
+görmek için dokun"* → açılır tam ekran görünüm.
 
-### 3.6 ▶ ÖDEME AKTİVASYONU `[hukuki statü netleşince]`
-Kod hazır (havale, inert — `odeme_ayarlari` 0 satır → herkes indirir).
-1. `odeme_ayarlari` satırı (IBAN + fiyat + Aktif=true)
-2. **İki kanal stratejisi:** web = havale/kart · mağaza = IAP (mağazalar dijital içerikte
-   kendi ödemesini ZORUNLU kılar; fiziksel baskı satışı ayrı ve serbest)
-3. İleride iyzico/PayTR karşılaştırması
+**3.2 Etkinlik sonrası kutlama** `[ONAYLANDI — ayrıntı kararı bekliyor]`
+Sayaç sıfırlanınca yerine türe özel kutlama kartı geçer:
+- Düğün → *"1 Eylül 2026 tarihinde dünya evine girdik"*
+- Nişan → *"…nişanlandık"* · Nikâh → *"…nikâhımız kıyıldı"*
+- Alt satır: *"Dileğini bırakmak için hâlâ vakit var"* (geç gelen davetli "geç kaldım" hissetmesin)
+- **AÇIK KARAR:** konfeti **tek seferlik** (~2,5 sn, önerilen) mi, **sürekli döngü** mü?
+  Not: sürekli döngü dikkati dilek alanından çalar ve pil maliyeti üretir.
+- `prefers-reduced-motion` açık cihazlarda animasyon çalışmaz (erişilebilirlik standardı).
 
-### 3.7 ▶ KİŞİSELLEŞTİRME MOTORU `[Musa vurguladı — yol haritasında YOKTU]`
-"Anı defteri üzerinde **binlerce düzenleme ve kişiselleştirme**" hedefi. Dış kapaklardan sonra,
-tanıtım sitesinden önce. Kapsam netleştirilecek: tipografi seçenekleri, sayfa düzeni varyantları,
-renk/tema paletleri, bölüm başlıkları, dilek yerleşimi, kapak kompozisyonu.
-**Karar bekliyor:** ne kadarı ücretsiz, ne kadarı premium?
+**3.3 Sıralı karşılama (staged reveal)** `[AÇIK KARAR]`
+Ekran açılınca sırayla belirir: davetiye → isimler → tarih → sayaç → dilek alanı (~260 ms
+aralık, toplam ~1,3 sn). Okuma sırası tasarımı; mevcut `sayfa-girisi` animasyonunun ardışık
+hali, yeni kütüphane yok.
 
-### 3.8 ▶ TANITIM SİTESİ + SATIŞ MOTORU `[ödeme çalıştıktan sonra]`
-`www.bianibirak.com` kök + `/demo` + tüm public sayfalar:
-- Görsel zenginlik, animasyonlar, ürün içi gerçek ekran görüntüleri/videolar (gerekirse AI üretimi)
-- Tüm özelliklerin net anlatımı, satış motoru (dönüşüm odaklı)
-- **Teşekkür/dilek blogu** — kullanıcılar düğün sonrası deneyimlerini yazar
-- **Push ile teşvik:** düğün sonrası duygusal ve ikna edici dille blog'a davet
-- SEO, sosyal paylaşım kartları, hız
+**3.4 Gönderim sonrası teşekkür ekranı** `[ONAYLANDI]`
+*"Bıraktığın anı defterlerine eklendi"* + defterden bir kare + **"Sen de bir defter aç"**.
+Ayrıca **"Bir yakınına öner"** adımı. Davetli → müşteri dönüşümünün tek doğal noktası;
+premium bir tanıtım sayfası hissiyle kurulacak.
+
+**REDDEDİLDİ:** yazarken canlı önizleme · fotoğraf kalite güvencesi rozeti
+
+> **Not:** Bu fazın tasarımı, gerçek fotoğraf akışı ve gerçek davetiye görseliyle **eksiksiz
+> önizlenip** onaylandıktan sonra kodlanacak.
 
 ---
 
-## 4. DEĞERLENDİRME AŞAMASINDA — karar bekliyor
+### FAZ 4 — E-POSTA ALTYAPISI
+Şifre yenileme akışı için. Sağlayıcı seçimi (Resend/Postmark/Brevo/SMTP), marka lockup'lı
+responsive HTML şablon, token + süre + tek kullanım + audit, **SPF/DKIM/DMARC**.
+**Sınır:** yalnız **işlemsel** mail — İYS/6563 gereği pazarlama maili YOK.
 
-| Konu | Not | Durum |
+---
+
+### FAZ 5 — ESER
+
+**5.1 Defter künyesi (Aşama 2)** — lockup + karekodun altına `www.bianibirak.com`, otomatik
+tema, flatten ile çıkarılamaz gömme, `DefterDerleyici`'ye cerrahi entegrasyon.
+
+**5.2 Dış kapaklar (Aşama 3)** — en büyük iş. Kalın ön/arka kapak, **eşler kapak fotoğrafını
+seçer**, ayrı PDF, sırt (spine), arka kapak = marka künyesi.
+**KARAR:** Makul varsayılanlarla kurulur; matbaa deneme baskısından sonra ince ayar yapılır.
+
+**5.3 Kişiselleştirme motoru** — "binlerce düzenleme": tipografi seçenekleri, sayfa düzeni
+varyantları, renk/tema paletleri, bölüm başlıkları, dilek yerleşimi, kapak kompozisyonu.
+**AÇIK KARAR:** ne kadarı ücretsiz, ne kadarı premium?
+
+---
+
+### FAZ 6 — TİCARET
+
+**6.1 Ödeme aktivasyonu** `[hukuki statü netleşince]` — `odeme_ayarlari` satırı (IBAN + fiyat
++ Aktif). **İki kanal:** web = havale/kart · mağaza = IAP (mağazalar dijital içerikte kendi
+ödemesini zorunlu kılar; fiziksel baskı ayrı ve serbest).
+
+**6.2 Tanıtım sitesi + satış motoru** — kök sayfa, `/demo`, tüm public sayfalar. Görsel
+zenginlik, animasyonlar, ürün içi gerçek görseller/videolar, **teşekkür/dilek blogu**,
+düğün sonrası push ile blog'a davet, SEO.
+
+---
+
+### BAKIM KALEMLERİ — en sonda, sırası gelince değerlendirilir
+
+| # | Konu | Not |
 |---|---|---|
-| **Dijital Arşiv ZIP** | Orijinal çözünürlüklü fotoğraflar + defter, ayrı indirme. "Telefon galerisi kalitesi"nin doğru yeri baskı PDF'i değil burasıdır. Satılabilir katma değer. | Öneri sunuldu, karar yok |
-| **notlar-backend 5,11 GB** | Dockerfile tek aşamalı → SDK imajı final katmanda. Multi-stage build ile **~4,5 GB kazanç**. Yalnız Notlar'ın Dockerfile'ı değişir, kod değişmez, risk yok. | Musa "çözebiliyorsak çözelim" dedi — YAPILACAK |
-| **Hetzner Volume** | Medyayı ayrı diske al: sistem diski dolmaz, canlıyken büyür, kod değişmez. Şu an gerekmiyor (25 GB boş, hedef ~10 düğün/6 ay). Disk gözcüsü %75'te uyarınca yapılır. | Tetikleyici bekliyor |
-| **jspdf 2 → 4 yükseltme** | `dompurify` güvenlik advisory'si (jspdf bağımlılığı). Bizde `doc.html()` kullanılmıyor → risk yolu kapalı. `npm audit fix --force` major atlama, PDF üretimini kırabilir. | Bakım turunda, test ederek |
-| **Uluslararasılaşma** | Farklı dil/ülke mağazaları. Mimari hazır (tenant metinleri). Engeller: çeviri + her ülkenin veri koruma rejimi (GDPR ayrı metin) + mağaza vergi/fatura. | Ayrı oturumda |
-| **B2B2C organizatör katmanı** | Fotoğrafçı/salon/organizasyon şirketi white-label. `UstOrganizatorId` nullable ile additive. | Lansman sonrası |
-| **Sağlık ucu** (`/api/saglik`) | Tek satır JSON: DB erişilebilir mi, disk %, son imha görevi. "Sistem ayakta mı?" sorusunu ölçümle yanıtlar. ~30 satır, mimariye dokunmaz. | Öneri sunuldu 2026-07-20 |
-| **Deneme defteri (seed)** | Tek komutla gerçekçi dolu defter (dilekler, fotoğraflar, farklı evreler). Her özelliği elle veri girmeden test etmeyi sağlar. | Öneri sunuldu 2026-07-20 |
-| **Test bildirimi düğmesi** | Süper panelde "Bana test bildirimi gönder". Bildirim teşhisini dakikalara indirir. ~20 satır. | Öneri sunuldu 2026-07-20 |
-| **Hata görünürlüğü** | Süper panelde "son 20 hata" (mesaj + zaman + uç). 500'ler için SSH gerekmez. | Öneri sunuldu 2026-07-20 |
-| **GitHub token temizliği** | `omniasistan-cli` (classic, `repo` kapsamı) 7 gün içinde doluyor. Geniş yetkili, projelerimize ait değil. Kullanılmıyorsa **revoke**; yeni token gerekiyorsa **fine-grained**. Önce `git remote -v` ile deploy'un SSH mi HTTPS mi kullandığı doğrulanmalı. | Karar bekliyor 2026-07-20 |
-| **CMYK dönüşümü** | Matbaaya sorulacak: dosyayı CMYK ister misiniz? Şu an RGB. | Matbaa cevabı bekliyor |
-| **EPS gradyan çizgi** | PostScript'te alfa yok → uçları sönen yaldız çizgi EPS'te düz renk. Matbaa geri bildirimi bekleniyor. | İzleniyor |
-| **Kaynak foto 3200 → daha yüksek?** | 3200'e çıkıldı. Daha ötesi Volume + PDF boyutu sorunu getirir. | Deneme baskısı sonrası |
+| B1 | **Matbaa deneme baskısı** | + **CMYK sorusu** (RGB gönderiyoruz, dönüşümü siz mi yapıyorsunuz?) + **EPS gradyan çizgi kontrolü** (PostScript saydamlık desteklemez; çizgi uçları sert bitiyor — göze batıyorsa her formatta düz yapılır) |
+| B2 | **Hetzner Volume** | Medya ayrı diske. Fotoğraf kalitesi + eşzamanlı defter kapasitesi için. Yeri gelince değerlendirilir. |
+| B3 | **notlar-backend multi-stage** | ~4,5 GB kazanç. Yalnız Notlar'ın Dockerfile'ı değişir, risk yok. |
+| B4 | **jspdf 2 → 4** | `dompurify` advisory'si; bizde `doc.html()` kullanılmadığı için **risk yolu kapalı**. Major sürüm atlaması vektör PDF/EPS'i kırabilir — yapıldığında çıktılar yeniden doğrulanır. |
+| B5 | **Uluslararasılaşma** | Çeviri + her ülkenin veri koruma rejimi (GDPR ayrı metin) + mağaza vergi/fatura. Ayrı oturum. |
 
 ---
+
+### KAPSAM DIŞI — kalıcı kararlar
+
+- **B2B2C organizatör katmanı** — İSTENMİYOR. Sistem kalıcı olarak **B2C: tenant = etkinlik**;
+  çift doğrudan satın alır ve defteri kendi yönetir.
+- **Dijital Arşiv ZIP** (orijinal çözünürlüklü fotoğraflar) — İSTENMİYOR.
+- **Sabit fiyat kaydı** — kodda tutulmayacak; süper panelden girilir.
+- **Test bildirimi düğmesi** — gerek görülmedi (bildirim sorunu çözüldü).
+
+## 4. AÇIK KARARLAR — cevap bekliyor
+
+| Konu | Karar gereken | Nerede |
+|---|---|---|
+| **Konfeti** | Tek seferlik (~2,5 sn, önerilen) mi, sürekli döngü mü? | Faz 3.2 |
+| **Sıralı karşılama** | Yapılsın mı? Önizleme sunuldu, karar Faz 3'e bırakıldı | Faz 3.3 |
+| **Kişiselleştirme kapsamı** | Ne kadarı ücretsiz, ne kadarı premium? | Faz 5.3 |
+| **Hukuki statü** | Şirket kuruluşu (1-2 ay) — ödemenin ön şartı | Faz 6.1 |
+| **GitHub token** | `omniasistan-cli` (classic, `repo`) doluyor. Revoke mu, fine-grained yeni token mı? Önce `git remote -v` ile deploy bağımlılığı doğrulanmalı | Altyapı |
 
 ## 5. İŞ / ÖLÇÜM PLANI `[referans]`
 - 8 Türkçe rakip: **hepsi toplayıcı** → kürasyon/baskı gerçek fark
