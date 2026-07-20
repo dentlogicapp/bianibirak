@@ -31,6 +31,8 @@ public static class SuperUclari
         app.MapPost("/api/super/defter/{id:guid}/goruntule", Goruntule).RequireAuthorization();
         app.MapPost("/api/super/goruntule/bitir", GoruntulemeBitir).RequireAuthorization();
         app.MapPost("/api/super/defter/{id:guid}/dondur", Dondur).RequireAuthorization();
+        // Deneme defteri: gercekci veriyle dolu defter uretir (yalniz super admin).
+        app.MapPost("/api/super/deneme-defteri", DenemeUret).RequireAuthorization();
         app.MapDelete("/api/super/defter/{id:guid}", DefterCopeAt).RequireAuthorization();
         app.MapPost("/api/super/defter/{id:guid}/geri-al", DefterGeriAl).RequireAuthorization();
         app.MapPost("/api/super/defter/{id:guid}/kalici-sil", DefterKaliciSil).RequireAuthorization();
@@ -934,4 +936,28 @@ public static class SuperUclari
 
         return Results.Json(new { ok = true });
     }
+    // DENEME DEFTERI URET.
+    //
+    // Uretilen defter NORMAL bir defterdir - ayni yasam dongusune, ayni imha takvimine
+    // tabidir. Ayri bir "test modu" YOKTUR: test verisi gercek yoldan gecmezse test
+    // etmis sayilmayiz. Evre secimi yalnizca ozel gunu geriye alarak calisir.
+    private static async Task<IResult> DenemeUret(
+        HttpContext ctx, BiAniBirakDbContext db, DenemeIstek istek, CancellationToken ct)
+    {
+        var (ok, kullanici) = await SuperAdminMi(ctx, db);
+        if (!ok || kullanici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var evre = (istek.Evre ?? "toplaniyor").Trim();
+        var id = await DenemeDefteri.UretAsync(db, kullanici.Id, evre, ct);
+
+        await Denetim(db, id, kullanici.Id, "DENEME_DEFTERI_URETILDI",
+            "etkinlikler", id, new { evre });
+        await db.SaveChangesAsync(ct);
+
+        return Results.Ok(new { ok = true, etkinlik_id = id, evre });
+    }
+
 }
+
+public record DenemeIstek(string? Evre);

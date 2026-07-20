@@ -1,6 +1,7 @@
 // BiAniBirak.Api - giris noktasi.
 // Asama 4: kimlik cekirdegi (JwtBearer + host-scoped cerez okuma) + servis kayitlari.
 using System.Text;
+using BiAniBirak.Api;            // Sabitler (yasam dongusu gun sayilari)
 using BiAniBirak.Api.Data;
 using BiAniBirak.Api.Entities;
 using BiAniBirak.Api.Kimlik;
@@ -177,12 +178,99 @@ app.SuperOdemeUclariniEkle();    // Super: odeme onayla/reddet, IBAN+fiyat ayarl
 app.CopUclariniEkle();           // Cop kutusu: reddedilen dilekler, geri al, kalici sil
 app.DestekUclariniEkle();        // Destek: kullanici <-> super yonetici konusmasi
 
-// Saglik ucu (anonim)
-app.MapGet("/api/saglik", () => Results.Ok(new
+// SAGLIK UCU
+//
+// Anonim cagrida yalniz "ayakta miyim" bilgisi doner - bu, dis izleme araclarinin
+// (uptime monitor) gormesi gereken tek seydir ve hicbir ic bilgi sizdirmaz.
+//
+// SUPER ADMIN cagirdiginda AYRINTI acilir: veritabani gercekten yanit veriyor mu,
+// disk ne durumda, imha gorevi calisiyor mu, gecikmis is var mi. Boylece "sistem
+// ayakta mi?" sorusu TAHMINLE degil OLCUMLE yanitlanir - ve bunun icin sunucuya
+// SSH atmak gerekmez.
+//
+// Ayri bir uc ACILMADI: tek adres, iki derinlik. Iki uc olsaydi biri gunceltilir,
+// digeri unutulur ve ikisi farkli sey soylerdi.
+app.MapGet("/api/saglik", async (HttpContext ctx, BiAniBirakDbContext db, DepolamaServisi depo) =>
 {
-    durum = "ayakta",
-    servis = "BiAniBirak.Api",
-    zaman = DateTimeOffset.UtcNow
-}));
+    var temel = new
+    {
+        durum = "ayakta",
+        servis = "BiAniBirak.Api",
+        zaman = DateTimeOffset.UtcNow,
+    };
+
+    // Super admin mi? Degilse temel yanit yeter.
+    Guid.TryParse(ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+        out var kid);
+    var superMi = kid != Guid.Empty && await db.Kullanicilar.AsNoTracking()
+        .AnyAsync(k => k.Id == kid && k.SuperAdmin && k.DeletedAt == null);
+    if (!superMi) return Results.Ok(temel);
+
+    // --- AYRINTI ---
+    var simdi = DateTimeOffset.UtcNow;
+
+    // Veritabani GERCEKTEN yanit veriyor mu - baglanti havuzu "acik" gorunup sorgu
+    // takilabilir. Bir sorgu calistirmadan "iyi" demek, olcum degil varsayimdir.
+    bool dbTamam;
+    long dbMs = 0;
+    try
+    {
+        var sayac = System.Diagnostics.Stopwatch.StartNew();
+        _ = await db.Etkinlikler.AsNoTracking().CountAsync();
+        sayac.Stop();
+        dbMs = sayac.ElapsedMilliseconds;
+        dbTamam = true;
+    }
+    catch { dbTamam = false; }
+
+    // Disk - DiskGozcusu ile AYNI olcum kaynagi.
+    int diskYuzde = 0;
+    string diskBos = "-";
+    try
+    {
+        var yol = Path.GetFullPath(depo.Kok);
+        DriveInfo? enIyi = null;
+        foreach (var d in DriveInfo.GetDrives())
+        {
+            if (!d.IsReady) continue;
+            if (!yol.StartsWith(d.RootDirectory.FullName, StringComparison.Ordinal)) continue;
+            if (enIyi == null || d.RootDirectory.FullName.Length > enIyi.RootDirectory.FullName.Length)
+                enIyi = d;
+        }
+        if (enIyi != null)
+        {
+            diskYuzde = (int)Math.Round((enIyi.TotalSize - enIyi.AvailableFreeSpace) * 100.0 / enIyi.TotalSize);
+            diskBos = $"{Math.Round(enIyi.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0, 1)} GB";
+        }
+    }
+    catch { /* olculemezse "-" gorunur */ }
+
+    // IMHA GOREVI CALISIYOR MU?
+    // "Suresi dolmus ama hala duran" defter varsa gorev ya durmustur ya hata aliyordur.
+    // Bu, sessizce birikip diski dolduran en tehlikeli arizadir - fark edilmesi gerekir.
+    var imhaGecikmis = await db.Etkinlikler.CountAsync(e =>
+        !e.ImhaEdildi && !e.SilindiMi &&
+        e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi);
+    var sonImha = await db.Etkinlikler.AsNoTracking()
+        .Where(e => e.ImhaZamani != null)
+        .OrderByDescending(e => e.ImhaZamani)
+        .Select(e => e.ImhaZamani)
+        .FirstOrDefaultAsync();
+
+    return Results.Ok(new
+    {
+        temel.durum,
+        temel.servis,
+        temel.zaman,
+        veritabani = new { tamam = dbTamam, yanit_ms = dbMs },
+        disk = new { yuzde = diskYuzde, bos = diskBos },
+        imha = new { gecikmis = imhaGecikmis, son_calisma = sonImha },
+        bekleyen = new
+        {
+            destek = await db.DestekTalepleri.CountAsync(t => t.Durum == "acik"),
+            odeme = await db.Odemeler.CountAsync(o => o.Durum == "bekliyor"),
+        },
+    });
+});
 
 app.Run();

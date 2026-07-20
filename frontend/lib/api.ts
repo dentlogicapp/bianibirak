@@ -631,6 +631,11 @@ export const api = {
     istek<{ ok: boolean }>(`/api/super/defter/${id}`, { method: "DELETE" }),
   superDefterGeriAl: (id: string) =>
     istek<{ ok: boolean }>(`/api/super/defter/${id}/geri-al`, { method: "POST" }),
+  superDenemeDefteri: (evre: string) =>
+    istek<{ ok: boolean; etkinlik_id: string; evre: string }>("/api/super/deneme-defteri", {
+      method: "POST",
+      body: JSON.stringify({ Evre: evre }),
+    }),
   superDefterKaliciSil: (id: string, teyit: string) =>
     istek<{ ok: boolean }>(`/api/super/defter/${id}/kalici-sil`, {
       method: "POST",

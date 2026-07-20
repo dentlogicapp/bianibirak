@@ -267,6 +267,33 @@ function DefterlerSekmesi() {
         className="w-full rounded-xl border border-ayrac bg-yuzey px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
       />
 
+      {/* DENEME DEFTERI - gelistirme ve dogrulama araci.
+          Uretilen defter NORMAL bir defterdir; secilen evrede dogar. Boylece
+          "indirme penceresi" ya da "son saatler" ekranlari gunlerce beklemeden
+          gorulebilir - canlida yakalanan hatalarin cogu bu yuzden kacmisti. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-ayrac bg-parsomen px-4 py-3">
+        <span className="font-govde text-xs text-ikincil">Deneme defteri üret:</span>
+        {[
+          { kod: "toplaniyor", ad: "Toplanıyor" },
+          { kod: "son-gunler", ad: "Özel gün geçti" },
+          { kod: "indirme", ad: "İndirme penceresi" },
+          { kod: "sonlaniyor", ad: "Son saatler" },
+        ].map((e) => (
+          <button
+            key={e.kod}
+            onClick={async () => {
+              const c = await api.superDenemeDefteri(e.kod);
+              if (!c.ok) { toast.error(c.mesaj); return; }
+              toast.success(`Deneme defteri üretildi (${e.ad}).`);
+              void cek();
+            }}
+            className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+          >
+            {e.ad}
+          </button>
+        ))}
+      </div>
+
       {yukleniyor ? (
         <p className="mt-6 text-center font-govde text-sm text-ikincil">Yükleniyor...</p>
       ) : defterler.length === 0 ? (
