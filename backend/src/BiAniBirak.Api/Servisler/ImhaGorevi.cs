@@ -135,6 +135,23 @@ public sealed class ImhaGorevi : BackgroundService
         var uyeler = await db.EtkinlikUyelikleri.AsNoTracking()
             .Where(u => u.EtkinlikId == id).Select(u => u.KullaniciId).ToListAsync(ct);
 
+        // HATIRLATMA IZI - defter silinmeden once hesaba yazilir.
+        //
+        // Defterin kendisi birazdan tumuyle yok olacak. Yil donumu hatirlatmasi
+        // gonderebilmek icin gereken TEK sey "ozel gun ne zamandi ve turu neydi"
+        // bilgisidir; bu ikisi hesaba tasinir. Isim, dilek, fotograf HICBIRI
+        // saklanmaz - KVKK metninde bu istisna acikca yazilidir.
+        var ozelGun = e.EtkinlikTarihi;
+        var etkinlikTuru = e.Tur;
+        foreach (var kid in uyeler)
+        {
+            var k = await db.Kullanicilar.FirstOrDefaultAsync(x => x.Id == kid, ct);
+            if (k == null) continue;
+            k.SonOzelGun = ozelGun;
+            k.SonEtkinlikTuru = etkinlikTuru;
+            k.HatirlatmaGonderilen = null; // yeni donem basliyor
+        }
+
         // Kurasyon zinciri (FK sirasi: cocuktan ebeveyne)
         var kurasyonIdler = await db.Kurasyonlar
             .Where(k => k.EtkinlikId == id).Select(k => k.Id).ToListAsync(ct);

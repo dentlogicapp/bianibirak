@@ -238,6 +238,12 @@ public static class SemaKurucu
         ALTER TABLE destek_talepleri ADD COLUMN IF NOT EXISTS "YoneticiOkuduZamani" timestamptz NULL;
         ALTER TABLE destek_talepleri ADD COLUMN IF NOT EXISTS "KapanmaZamani" timestamptz NULL;
 
+        -- HATIRLATMA: defter imha edilse de hesapta kalan iki bilgi (KVKK'da aciklandi).
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SonOzelGun" timestamptz NULL;
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "SonEtkinlikTuru" text NULL;
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "HatirlatmaGonderilen" text NULL;
+        CREATE INDEX IF NOT EXISTS ix_kullanicilar_son_ozel_gun ON kullanicilar ("SonOzelGun");
+
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
         -- NOT: kolon adi super_admin (snake_case) - DbContext eslemesi boyle. PascalCase DEGIL.

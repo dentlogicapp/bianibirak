@@ -105,11 +105,15 @@ Veri Sorumlusu: www.bianibirak.com
 
 Çift (hesap sahibi) için: ad, e-posta adresi, şifre özeti (hash), etkinlik bilgileri, yüklenen görseller, IP adresi ve oturum kayıtları.
 
+Ayrıca hesabınızla ilişkili son etkinlik tarihi ve türü (defteriniz imha edildikten sonra da saklanır - ayrıntısı 3. maddededir).
+
 Davetli için: bıraktığı ad (isteğe bağlı), ilişki bilgisi, dilek metni, varsa fotoğraf ve iletişim bilgisi (isteğe bağlı). Davetlinin hesap açması veya kimlik bilgisi vermesi ZORUNLU DEĞİLDİR.
 
 2. İŞLEME AMACI VE HUKUKİ SEBEBİ
 
 Veriler; anı defterinin oluşturulması, dileklerin toplanması ve baskıya hazır esere dönüştürülmesi amacıyla işlenir.
+
+Bunlara ek olarak, özel gününüzün yıl dönümlerinde (3, 6, 9 ve 12. ay) size hatırlatma bildirimi gönderilir. Bu bildirimler yalnızca uygulama içi ve anlık bildirim olarak iletilir; e-posta veya SMS gönderilmez. Bildirim metinlerinde adınız, eşinizin adı ya da defter içeriğinden hiçbir bilgi yer almaz - defteriniz ve içindeki tüm veriler söz verildiği gibi kalıcı olarak silinmiştir.
 
 Hukuki sebep: sözleşmenin kurulması ve ifası (KVKK m.5/2-c) ile açık rıza (m.5/1). Davetlinin verisi, açık rızasına dayanılarak işlenir.
 
@@ -119,6 +123,8 @@ Veriler, etkinlik tarihinden itibaren en fazla 20 gün saklanır. Bu sürenin so
   - Tüm dilekler, fotoğraflar, iletişim bilgileri ve ilgili kayıtlar KALICI OLARAK İMHA EDİLİR.
   - İmha geri alınamaz; imha edilen veri hiçbir şekilde geri getirilemez.
   - Yalnızca ""bir defter vardı ve şu tarihte imha edildi"" bilgisi (kişisel veri içermeyen) hukuki kanıt olarak saklanır.
+
+Bu imhanın tek istisnası, hesabınıza bağlı olarak saklanan son etkinlik tarihi ve türüdür. Bu iki bilgi defter verisi DEĞİLDİR; yalnızca 2. maddede açıklanan hatırlatma bildirimini gönderebilmek için tutulur ve hesabınızı sildiğinizde bunlar da silinir.
 
 Bu, KVKK m.7 ve m.4/2-d (""gerektiğinden uzun süre saklamama"") ilkesinin gereğidir. Verinizi sonsuza dek saklamıyoruz - saklamak için meşru bir sebebimiz yok.
 

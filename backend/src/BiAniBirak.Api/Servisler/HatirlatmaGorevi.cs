@@ -54,8 +54,14 @@ public sealed class HatirlatmaGorevi : BackgroundService
     // FAZ 1 - gunluk sayim gunleri (1 .. ToplamaGun-1). Her biri sabah 10:00.
     // ToplamaGun'un kendisi Faz 2'nin ilk adimidir (120 saat kala = toplama kapanisi),
     // bu yuzden burada YOKTUR - ayni gun iki bildirim gitmez.
+    // GUN 1 YOK: o gun SABAH OZETI gonderilir (kac dilek birakildi).
+    // Ayni saatte iki bildirim gondermek yerine, o gun icin ANLAMLI olani secildi.
+    // Geri sayim gun 2'den baslar.
     public static readonly int[] GunlukGunler =
-        Enumerable.Range(1, Sabitler.ToplamaGun - 1).ToArray();
+        Enumerable.Range(2, Sabitler.ToplamaGun - 2).ToArray();
+
+    // Yil donumu hatirlatma esikleri (ay). Defter imha edildikten SONRA calisir.
+    public static readonly int[] HatirlatmaAylar = { 3, 6, 9, 12 };
 
     // FAZ 2 - imhaya KALAN SAAT esikleri. 120 saat = tam 5 gun = toplama kapanisi.
     public static readonly int[] SonSaatler = { 120, 96, 72, 48, 24, 12, 3 };
@@ -90,7 +96,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         var defterler = await db.Etkinlikler.AsNoTracking()
             .Where(e => !e.ImhaEdildi && !e.SilindiMi && !e.Donduruldu)
-            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi })
+            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi, e.Tur })
             .ToListAsync(ct);
 
         if (defterler.Count == 0) return;
@@ -127,6 +133,52 @@ public sealed class HatirlatmaGorevi : BackgroundService
             // IMHA ANI - tek dogruluk kaynagi. Faz 2 esikleri bu ana gore hesaplanir.
             var imhaAn = new DateTimeOffset(
                 d.EtkinlikTarihi.Date.AddDays(Sabitler.ToplamGun), TimeSpan.Zero);
+
+            // ---- GUN 0: OZEL GUN KUTLAMASI ----
+            // Bugun onlarin gunu. Teknik hicbir sey soylenmez ("defterinizi indirin"
+            // demek bugun yakisiksiz olurdu) - yalniz tebrik ve "biz topluyoruz" guvencesi.
+            {
+                var hedef = d.EtkinlikTarihi.Date
+                    .AddHours(Sabitler.BildirimSabahSaat - Sabitler.TurkiyeSaatFarki);
+                var hedefUtc = new DateTimeOffset(hedef, TimeSpan.Zero);
+                var anahtar = GunAnahtari(0);
+                if (simdi >= hedefUtc && simdi <= hedefUtc.AddHours(6)
+                    && !gonderilmis.Contains($"{d.Id}:{anahtar}"))
+                {
+                    await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
+                        KutlamaMetni(d.Tur, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
+                        new { olay = "kutlama" }, ct);
+                    gonderilen++;
+                }
+            }
+
+            // ---- GUN 1: SABAH OZETI ----
+            // Duygusal doruk noktasi: "dun ne yazildi?" Cift uygulamaya ILK KEZ
+            // okumak icin gelir. Dilek YOKSA gonderilmez - "0 dilek birakildi"
+            // demek kirici olur.
+            {
+                var hedef = d.EtkinlikTarihi.Date.AddDays(1)
+                    .AddHours(Sabitler.BildirimSabahSaat - Sabitler.TurkiyeSaatFarki);
+                var hedefUtc = new DateTimeOffset(hedef, TimeSpan.Zero);
+                var anahtar = GunAnahtari(1);
+                if (simdi >= hedefUtc && simdi <= hedefUtc.AddHours(6)
+                    && !gonderilmis.Contains($"{d.Id}:{anahtar}"))
+                {
+                    var dilekSayisi = await db.Katkilar
+                        .CountAsync(k => k.EtkinlikId == d.Id && !k.SilindiMi, ct);
+                    if (dilekSayisi > 0)
+                    {
+                        await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
+                            (
+                                "Anı defteriniz dolmaya başladı",
+                                $"{d.Es1Ad} & {d.Es2Ad}, anı defterinize {dilekSayisi} dilek "
+                                + "bırakıldı. Okumaya hazır mısınız?",
+                                $"Anı defterinize {dilekSayisi} dilek bırakıldı."
+                            ), anahtar, new { olay = "sabah_ozeti", dilek = dilekSayisi }, ct);
+                        gonderilen++;
+                    }
+                }
+            }
 
             // ---- FAZ 1: gunluk sayim (indirene GITMEZ) ----
             if (!indirenler.Contains(d.Id))
@@ -178,6 +230,10 @@ public sealed class HatirlatmaGorevi : BackgroundService
             await db.SaveChangesAsync(ct);
             _log.LogInformation("Indirme hatirlatmasi: {Sayi} bildirim.", gonderilen);
         }
+
+        // Yil donumu hatirlatmalari - defteri IMHA EDILMIS hesaplar icin.
+        // Ayni gorevin icinde: tum bildirimler TEK yerden yonetilir.
+        await HatirlatmalariGonderAsync(db, push, simdi, ct);
     }
 
     // Gun numarasindan deterministik GUID: ayni gun icin her zaman ayni anahtar.
@@ -238,6 +294,88 @@ public sealed class HatirlatmaGorevi : BackgroundService
             SistemEylemi = true,
             CreatedAt = DateTimeOffset.UtcNow,
         });
+    }
+
+    // ---- OZEL GUN KUTLAMASI ----
+    //
+    // Bugun teknik konusulmaz. Cift bugun uygulamaya bakmayacak bile olabilir - ve
+    // bakarsa gordugu sey bir hatirlatma degil, bir TEBRIK olmali. Metin bilincli
+    // olarak "biz topluyoruz, siz gununuzu yasayin" guvencesiyle biter.
+    private static (string Baslik, string Govde, string PushGovde) KutlamaMetni(
+        string tur, string ciftAdi)
+    {
+        var ortak =
+            $"Sevdikleriniz anı defterinize yazmaya devam ederken - biz de onları sizin "
+            + "için topluyoruz! Siz sadece bu unutulmaz günün tadını çıkarın 🎉";
+        var push = "Bugün o gün — Mutluluklar! Sevdikleriniz defterinize yazmaya devam ediyor.";
+
+        if (tur == "nisan")
+            return ("❤️ Bugün o gün — Mutluluklar!",
+                $"{ciftAdi}, bugün birbirinize verdiğiniz söz için buradayız. BiAnıBırak "
+                + $"ailesi olarak nişanınızı kutluyor, güzel bir hayat yolculuğu diliyoruz 🙏🏻. {ortak}",
+                push);
+
+        if (tur == "nikah")
+            return ("❤️ Bugün o gün — Mutluluklar!",
+                $"{ciftAdi}, bugün resmen bir aile oldunuz. BiAnıBırak ailesi olarak yeni "
+                + $"yuvanıza sağlık, mutluluk ve bereket diliyoruz 🙏🏻. {ortak}",
+                push);
+
+        return ("❤️ Bugün o gün — Mutluluklar!",
+            $"{ciftAdi}, bugün hayatınızın en güzel gününü yaşıyorsunuz. BiAnıBırak ailesi "
+            + $"olarak size ömür boyu sürecek bir mutluluk diliyoruz 🙏🏻. {ortak}",
+            push);
+    }
+
+    // ---- YIL DONUMU HATIRLATMALARI (3/6/9/12 ay) ----
+    //
+    // Defter imha edildikten SONRA calisir. Elimizde yalniz iki bilgi vardir:
+    // ozel gun tarihi ve turu (hesaba bagli, KVKK metninde acikca yazili).
+    // Metin ISIMSIZDIR - isimler silindigi icin zaten olamaz; bu, verdigimiz sozun
+    // tutuldugunun da kanitidir.
+    private static async Task HatirlatmalariGonderAsync(
+        BiAniBirakDbContext db, PushGonderici push, DateTimeOffset simdi, CancellationToken ct)
+    {
+        // Ozel gunu gecmis ve hatirlatma penceresindeki hesaplar.
+        var enEski = simdi.AddMonths(-13);
+        var adaylar = await db.Kullanicilar
+            .Where(k => k.DeletedAt == null && k.SonOzelGun != null && k.SonOzelGun > enEski)
+            .ToListAsync(ct);
+
+        foreach (var k in adaylar)
+        {
+            var gonderilen = (k.HatirlatmaGonderilen ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+
+            foreach (var ay in HatirlatmaAylar)
+            {
+                if (gonderilen.Contains(ay.ToString())) continue;
+
+                var hedef = k.SonOzelGun!.Value.Date.AddMonths(ay)
+                    .AddHours(Sabitler.BildirimSabahSaat - Sabitler.TurkiyeSaatFarki);
+                var hedefUtc = new DateTimeOffset(hedef, TimeSpan.Zero);
+
+                if (simdi < hedefUtc) continue;
+                if (simdi > hedefUtc.AddDays(2)) { gonderilen.Add(ay.ToString()); continue; }
+
+                var sure = ay == 12 ? "Bir yıl" : $"{(ay == 3 ? "Üç" : ay == 6 ? "Altı" : "Dokuz")} ay";
+                await push.GonderAsync(
+                    k.Id,
+                    $"{sure} önce bugün",
+                    $"{sure} önce bugün özel gününüzdü. O günü hatırlıyor musunuz? "
+                    + "Yeni bir defter açmak ya da bir yakınınıza önermek isterseniz buradayız.",
+                    "/etkinliklerim", null,
+                    sessizSaateTabi: true, ct,
+                    pushGovde: $"{sure} önce bugün özel gününüzdü. O günü hatırlıyor musunuz?");
+
+                gonderilen.Add(ay.ToString());
+            }
+
+            var yeni = string.Join(",", gonderilen.OrderBy(x => int.Parse(x)));
+            if (yeni != (k.HatirlatmaGonderilen ?? "")) k.HatirlatmaGonderilen = yeni;
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     // ---- FAZ 1 METNI: gunluk sayim ----

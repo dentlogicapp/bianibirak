@@ -27,5 +27,22 @@ public class Kullanici
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    // HATIRLATMA BILDIRIMI ICIN - defter imha edildikten SONRA da saklanir.
+    //
+    // Defter ve icindeki her sey 20. gunde tamamen silinir; isimler, dilekler,
+    // fotograflar hicbiri kalmaz. Ama "bu kullanicinin bir ozel gunu vardi ve ne
+    // zamandi" bilgisi hesaba bagli olarak durur - yil donumlerinde (3/6/9/12 ay)
+    // hatirlatma gonderebilmek icin.
+    //
+    // KVKK metninde ACIKCA yazilidir: bu iki alan DEFTER VERISI DEGILDIR, yalniz
+    // bildirim icin kullanilir ve hesap silindiginde birlikte silinir. Bildirim
+    // metinlerinde isim ya da defter icerigi YER ALMAZ - zaten silinmislerdir.
+    public DateTimeOffset? SonOzelGun { get; set; }
+    public string? SonEtkinlikTuru { get; set; }
+
+    // Hangi hatirlatma esikleri gonderildi (3,6,9,12) - virgullu liste. Tekrar
+    // gonderimi engeller; ayri tablo acmaya degmeyecek kadar kucuk bir izdir.
+    public string? HatirlatmaGonderilen { get; set; }
+
     public DateTimeOffset? DeletedAt { get; set; }
 }

@@ -48,6 +48,9 @@ public class BiAniBirakDbContext : DbContext
         // ---- kullanicilar ----
         model.Entity<Kullanici>(e =>
         {
+            e.Property(x => x.SonOzelGun).HasColumnName("SonOzelGun");
+            e.Property(x => x.SonEtkinlikTuru).HasColumnName("SonEtkinlikTuru");
+            e.Property(x => x.HatirlatmaGonderilen).HasColumnName("HatirlatmaGonderilen");
             e.ToTable("kullanicilar");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("Id");
