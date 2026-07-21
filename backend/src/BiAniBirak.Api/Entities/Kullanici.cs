@@ -25,6 +25,25 @@ public class Kullanici
     public string? SessizSaatBaslangic { get; set; } // "22:00"
     public string? SessizSaatBitis { get; set; } // "08:00"
 
+    // AKTIF DEFTER - CIHAZLAR ARASI SENKRONUN TEK DOGRULUK KAYNAGI.
+    //
+    // NEDEN BURAYA TASINDI:
+    // Aktif defter bugune kadar YALNIZCA JWT claim'inde (aktif_etkinlik_id)
+    // yasiyordu; yani her cihazin kendi cerezinde muhurlu duruyordu. Web'de
+    // defter degistirildiginde web kendine yeni bir muhur yaziyor, telefonun
+    // muhrune kimse dokunmuyordu. Telefon sunucuya "ben hangi defterdeyim" diye
+    // sorsa bile sunucunun verecegi bir cevap YOKTU - bilgi orada durmuyordu.
+    // Ne kadar sik sorulursa sorulsun senkron IMKANSIZDI.
+    //
+    // Artik dogruluk kaynagi burasi, JWT ise onun ONBELLEGI. Tenant guard
+    // (AktifTenant) hala CLAIM'e bakar - izolasyon disiplini degismedi; bu kolon
+    // yalnizca "hangi deftere gecilmeli" sorusunu yanitlar.
+    //
+    // Yabanci anahtar YOK: defter kalici silinebilir ve o an bu alan olu bir
+    // kimlige isaret eder. Cozum kisitlama degil DOGRULAMA - /api/durum bu degeri
+    // bildirmeden once uyeligi kontrol eder, yoksa null doner.
+    public Guid? AktifEtkinlikId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     // HATIRLATMA BILDIRIMI ICIN - defter imha edildikten SONRA da saklanir.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MarkaKilidi } from "@/components/marka/MarkaKilidi";
@@ -9,6 +9,7 @@ import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
 import { GoruntulemeBandi } from "@/components/site/GoruntulemeBandi";
 import { OnayKapisi } from "@/components/site/OnayKapisi";
 import { useSwOdakDinleyici } from "@/lib/odak";
+import { useSenkron, useSenkronDinle } from "@/lib/senkron";
 import { api } from "@/lib/api";
 
 // Uygulama kabugu: TEK navigasyon noktasi = avatar menusu + baglamsal ust bar.
@@ -32,6 +33,14 @@ const HIYERARSI: Record<string, Sayfa> = {
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  // SENKRON - cihazlar arasi sinyal. Panelin HER sayfasinda calismali, bu yuzden
+  // burada. Damga tabanli: veri tasimaz, "degisti" der; hangi ekranin ne zaman
+  // tazelenecegine o ekran karar verir (useSenkronDinle).
+  //
+  // Tek otomatik eylemi aktif defter uzlasmasidir ve o da modulun kendi icinde:
+  // baska bir cihazda defter degistirildiyse bu cihaz JWT'sini tazeler ve yenilenir.
+  useSenkron();
+
   // DONDURULMUS DEFTER BANDI - her sayfada gorunur.
   //
   // Onceden super admin defteri dondurunca cift HICBIR SEY gormuyordu: davetliler
@@ -39,13 +48,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // uygulandigi kisiye ANLATILMADIKCA yaptirim degil, arizadir.
   const [donduruldu, setDonduruldu] = useState(false);
 
-  useEffect(() => {
+  const durumuCek = useCallback(() => {
     let iptal = false;
     void api.etkinlikAktif().then((c) => {
       if (!iptal && c.ok) setDonduruldu(Boolean(c.veri.donduruldu));
     });
     return () => { iptal = true; };
   }, []);
+
+  useEffect(() => durumuCek(), [durumuCek]);
+
+  // SENKRON TUKETICISI - "ayar" damgasi degisince bandi tazele.
+  //
+  // Dondurma/cozme bir yonetici eylemidir ve etkinlik satirina dokunur. Onceden
+  // yalnizca sayfa yuklenirken okunuyordu: yonetici defteri dondurdugunde cift
+  // bir sonraki tam yenilemeye kadar hicbir sey gormuyor, o arada yaptigi her
+  // islem sessizce reddediliyordu. Artik saniyeler icinde gorunur.
+  useSenkronDinle("ayar", durumuCek);
 
   const yol = usePathname();
 

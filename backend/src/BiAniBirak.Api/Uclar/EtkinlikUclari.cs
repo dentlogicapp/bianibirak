@@ -34,6 +34,14 @@ public static class EtkinlikUclari
         app.MapGet("/api/etkinlik/aktif/katki/{id:guid}", AktifKatkiDurum).RequireAuthorization();
         app.MapPost("/api/katki/{id}/onayla", KatkiOnayla).RequireAuthorization();
         app.MapPost("/api/katki/{id}/reddet", KatkiReddet).RequireAuthorization();
+
+        // SENKRON DAMGASI - cihazlar arasi "bir sey degisti mi?" sorusu.
+        //
+        // Buraya kondu, ayri bir dosyaya DEGIL: sordugu sorularin cogu tenant
+        // cekirdegine ait (aktif defter, kuyruk, ortak defter, ayar) ve bu dosyanin
+        // AktifTenant/KullaniciKimligi yardimcilarini kullanir. Ayri dosya acmak,
+        // ayni yardimcilarin ikinci bir kopyasini dogururdu.
+        app.MapGet("/api/durum", Durum).RequireAuthorization();
     }
 
     private static IResult Hata(int durum, string kod, string mesaj)
@@ -49,6 +57,12 @@ public static class EtkinlikUclari
 
     // Tenant guard: aktif_etkinlik_id claim'i + kullanicinin o etkinlige UYELIGI.
     // Defense in depth: claim yok -> ERISIM_YOK; uye degil -> ERISIM_YOK (sizinti yok).
+    //
+    // DIKKAT: kaynak hala CLAIM'dir. Kullanici.AktifEtkinlikId eklendi ama tenant
+    // guard'i ona BAGLANMADI - baglansaydi, gecici goruntuleme (impersonation) JWT'si
+    // ile DB degeri catisir ve yetki siniri belirsizlesirdi. Kolonun tek isi
+    // "hangi deftere gecilmeli" sorusunu yanitlamaktir; "hangi deftere erisilebilir"
+    // sorusunun cevabi DEGISMEDI.
     private static async Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
         HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
     {
@@ -376,6 +390,14 @@ public static class EtkinlikUclari
         etkinlik.SilinmeZamani = simdi;
         etkinlik.UpdatedAt = simdi;
 
+        // SENKRON: silinen defter birinin AKTIF defteriyse, o kaydin uzerinde
+        // birakmak digerlerini olu bir kimlige gondermek olurdu. Temizlenir;
+        // /api/durum null bildirir ve cihazlar kendi listelerinden secer.
+        var aktifTutanlar = await db.Kullanicilar
+            .Where(k => k.AktifEtkinlikId == etkinlikId)
+            .ToListAsync();
+        foreach (var k in aktifTutanlar) k.AktifEtkinlikId = null;
+
         db.DenetimGunlukleri.Add(new DenetimGunlugu
         {
             Id = Guid.NewGuid(),
@@ -407,10 +429,24 @@ public static class EtkinlikUclari
         if (uyelik == null)
             return Hata(403, "ERISIM_YOK", "Bu etkinlige uye degilsiniz.");
 
-        var kullanici = await db.Kullanicilar.AsNoTracking()
+        // AsNoTracking KALDIRILDI: bu kayit artik GUNCELLENIYOR.
+        var kullanici = await db.Kullanicilar
             .FirstOrDefaultAsync(k => k.Id == kullaniciId && k.DeletedAt == null);
         if (kullanici == null)
             return Hata(401, "ERISIM_YOK", "Kullanici bulunamadi.");
+
+        // SUNUCU TARAFI DURUM - senkronun temeli.
+        //
+        // Bu satir olmadan cihazlar arasi defter senkronu IMKANSIZ: aktif defter
+        // yalnizca JWT'de dursaydi, telefonun sunucuya soracagi bir soru olmazdi.
+        // Yalnizca degistiyse yazilir - her aktif-yap cagrisinda gereksiz UPDATE
+        // uretmemek icin (menuden ayni deftere tekrar tiklamak sik bir davranis).
+        if (kullanici.AktifEtkinlikId != etkinlikId)
+        {
+            kullanici.AktifEtkinlikId = etkinlikId;
+            kullanici.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+        }
 
         // JWT'yi aktif_etkinlik_id dolu olarak yeniden uret + cerezi guncelle.
         var token = jwtServisi.Uret(kullanici, etkinlikId);
@@ -437,6 +473,167 @@ public static class EtkinlikUclari
 
         return Results.Json(EtkinlikYaniti(etkinlik, rol));
     }
+
+    // ---------------- SENKRON DAMGASI (/api/durum) ----------------
+    //
+    // SALT OKUNUR ve ICERIKSIZ. Doner: her kapsam icin "kac tane . en son ne zaman"
+    // biciminde kisa bir damga. Isim, dilek metni, e-posta, telefon - hicbiri YOK.
+    // Istemci damgalari elindekiyle karsilastirir; degisen kapsamin verisini KENDI
+    // mevcut ucundan ceker. Boylece yeni bir okuma yolu acilmaz: tenant filtresi,
+    // uyelik ve KaynakEs izolasyonu nerede kuruluysa orada kalir.
+    //
+    // IZOLASYON BURADA DA GECERLI:
+    //   kuyruk -> KISIYE OZEL (KaynakEs == rol). Esin kuyrugu senin damgani
+    //             degistirmez; cift-link izolasyonu sinyal duzeyinde de korunur.
+    //   defter -> ORTAK (onayli katkilar). Ikisi de gormeye zaten yetkili.
+    //
+    // MALIYET: dort sorgu. Ucu toplulastirilmis (GroupBy) - satirlar istemciye
+    // TASINMAZ, sayim ve en-son damgasi veritabaninda hesaplanir. Sekme
+    // gorunmuyorken istemci hic sormaz.
+    private static async Task<IResult> Durum(
+        HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+
+        // GORUNTULEME MODU - senkron BU OTURUMDA calismaz.
+        //
+        // Super yonetici baska bir deftere salt-okunur girdiginde JWT gecicidir
+        // (1 saat) ve DB'ye YAZILMAZ. Uzlasma calissaydi yoneticiyi inceledigi
+        // defterden aninda disari atardi: teshis araci kendi kendini kapatirdi.
+        // Bu yuzden claim'in gordugu deger doner - istemci fark GORMEZ.
+        var goruntulemeModu = ctx.User.FindFirstValue("goruntuleme_modu") == "true";
+
+        Guid? aktifId;
+        if (goruntulemeModu)
+        {
+            aktifId = Guid.TryParse(ctx.User.FindFirstValue("aktif_etkinlik_id"), out var g)
+                ? g : null;
+        }
+        else
+        {
+            aktifId = await db.Kullanicilar.AsNoTracking()
+                .Where(k => k.Id == kullaniciId && k.DeletedAt == null)
+                .Select(k => k.AktifEtkinlikId)
+                .FirstOrDefaultAsync(ct);
+
+            // UYELIK DOGRULAMASI - sonsuz dongu korumasi.
+            //
+            // Defter kalici silinmis ya da uyelik kalkmis olabilir. Dogrulamadan
+            // bildirseydik istemci aktif-yap'i cagirir, 403 alir, bir sonraki turda
+            // ayni degeri gorur ve AYNI TURU SONSUZA DEK tekrarlardi.
+            if (aktifId.HasValue)
+            {
+                var uyeMi = await db.EtkinlikUyelikleri.AsNoTracking()
+                    .AnyAsync(u => u.KullaniciId == kullaniciId && u.EtkinlikId == aktifId.Value, ct);
+                if (!uyeMi) aktifId = null;
+            }
+        }
+
+        // ---- DEFTER LISTESI ----
+        // Kullanicinin uye oldugu defterlerin sayisi + en son degisimi. Yeni defter,
+        // ad/tarih degisimi, cope tasima ve geri alma - hepsi UpdatedAt'e dokunur.
+        // Satir sayisi bir kullanicida birkac tanedir; toplulastirma icin
+        // materialize etmek guvenli ve sorgusu basit kalir.
+        var defterZamanlari = await (
+            from u in db.EtkinlikUyelikleri.AsNoTracking()
+            join e in db.Etkinlikler.AsNoTracking() on u.EtkinlikId equals e.Id
+            where u.KullaniciId == kullaniciId
+            select e.UpdatedAt).ToListAsync(ct);
+
+        var defterlerDamga = DamgaUret(
+            defterZamanlari.Count,
+            defterZamanlari.Count == 0 ? null : defterZamanlari.Max());
+
+        // ---- BILDIRIMLER ----
+        // Okundu/okunmadi ayri gruplanir: rozet sayisi da damgaya girsin. Bir
+        // bildirimi baska cihazda okumak burayi degistirir ve rozet senkronlanir.
+        var bildirimOzet = await db.Bildirimler.AsNoTracking()
+            .Where(b => b.KullaniciId == kullaniciId)
+            .GroupBy(b => b.OkunduMu)
+            .Select(g => new { Okundu = g.Key, Sayi = g.Count(), Son = g.Max(x => x.CreatedAt) })
+            .ToListAsync(ct);
+
+        var bildirimSayi = bildirimOzet.Sum(x => x.Sayi);
+        var okunmamis = bildirimOzet.Where(x => !x.Okundu).Sum(x => x.Sayi);
+        DateTimeOffset? bildirimSon =
+            bildirimOzet.Count == 0 ? null : bildirimOzet.Max(x => x.Son);
+        var bildirimDamga = $"{okunmamis}.{DamgaUret(bildirimSayi, bildirimSon)}";
+
+        // Aktif defter yoksa kalan kapsamlarin anlami da yok - sabit damga doner.
+        var kuyrukDamga = "-";
+        var defterDamga = "-";
+        var ayarDamga = "-";
+
+        if (aktifId.HasValue)
+        {
+            // Rol: kuyruk damgasinin KISIYE OZEL olmasi buna bagli.
+            var rol = await db.EtkinlikUyelikleri.AsNoTracking()
+                .Where(u => u.KullaniciId == kullaniciId && u.EtkinlikId == aktifId.Value)
+                .Select(u => u.Rol)
+                .FirstOrDefaultAsync(ct);
+
+            // TEK SORGU, IKI DAMGA: durum + kaynak es kirilimi.
+            var katkiOzet = await db.Katkilar.AsNoTracking()
+                .Where(k => k.EtkinlikId == aktifId.Value && !k.SilindiMi)
+                .GroupBy(k => new { k.Durum, k.KaynakEs })
+                .Select(g => new
+                {
+                    g.Key.Durum,
+                    g.Key.KaynakEs,
+                    Sayi = g.Count(),
+                    Son = g.Max(x => x.UpdatedAt),
+                })
+                .ToListAsync(ct);
+
+            // KUYRUK - yalniz BENIM tarafim, yalniz beklemede.
+            var kuyruk = katkiOzet
+                .Where(x => x.Durum == "beklemede" && x.KaynakEs == rol)
+                .ToList();
+            kuyrukDamga = DamgaUret(
+                kuyruk.Sum(x => x.Sayi),
+                kuyruk.Count == 0 ? null : kuyruk.Max(x => x.Son));
+
+            // DEFTER - ortak, onayli.
+            var defter = katkiOzet.Where(x => x.Durum == "onayli").ToList();
+            defterDamga = DamgaUret(
+                defter.Sum(x => x.Sayi),
+                defter.Count == 0 ? null : defter.Max(x => x.Son));
+
+            // AYAR - etkinlik ve ayar satirlarinin en son degisimi. Ad, tarih,
+            // karsilama metni, sayac, dondurma - hepsi buradan gorunur.
+            var etkinlikZaman = await db.Etkinlikler.AsNoTracking()
+                .Where(e => e.Id == aktifId.Value)
+                .Select(e => (DateTimeOffset?)e.UpdatedAt)
+                .FirstOrDefaultAsync(ct);
+            var ayarZaman = await db.EtkinlikAyarlari.AsNoTracking()
+                .Where(a => a.EtkinlikId == aktifId.Value)
+                .Select(a => (DateTimeOffset?)a.UpdatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            DateTimeOffset? ayarSon =
+                etkinlikZaman.HasValue && ayarZaman.HasValue
+                    ? (etkinlikZaman > ayarZaman ? etkinlikZaman : ayarZaman)
+                    : etkinlikZaman ?? ayarZaman;
+            ayarDamga = DamgaUret(1, ayarSon);
+        }
+
+        return Results.Json(new
+        {
+            aktif_etkinlik_id = aktifId,
+            goruntuleme_modu = goruntulemeModu,
+            defterler = defterlerDamga,
+            bildirim = bildirimDamga,
+            kuyruk = kuyrukDamga,
+            defter = defterDamga,
+            ayar = ayarDamga,
+        });
+    }
+
+    // Damga: "sayi.tick". Karsilastirilir, cozumlenmez - istemci icin opak bir dize.
+    // Sayi da girer cunku bir SILME zamani ileri tasimaz ama sayiyi dusurur.
+    private static string DamgaUret(int sayi, DateTimeOffset? enSon)
+        => $"{sayi}.{(enSon?.UtcTicks ?? 0)}";
 
     // Aktif etkinligin cift-linkleri (es1/es2 token + public URL).
     private static async Task<IResult> AktifLinkler(HttpContext ctx, BiAniBirakDbContext db)

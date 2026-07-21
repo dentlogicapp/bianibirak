@@ -244,6 +244,24 @@ public static class SemaKurucu
         ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "HatirlatmaGonderilen" text NULL;
         CREATE INDEX IF NOT EXISTS ix_kullanicilar_son_ozel_gun ON kullanicilar ("SonOzelGun");
 
+        -- SENKRON: AKTIF DEFTER ARTIK SUNUCU TARAFI DURUMDUR.
+        --
+        -- Aktif defter bugune kadar yalnizca JWT claim'inde yasiyordu; yani her
+        -- cihazin kendi cerezinde muhurlu duruyordu. Web'de defter degistirildiginde
+        -- telefonun muhrune kimse dokunmuyor, telefon sunucuya sorsa bile sunucunun
+        -- verecegi bir cevap OLMUYORDU. Cihazlar arasi senkron, ne kadar sik
+        -- sorulursa sorulsun IMKANSIZDI.
+        --
+        -- Bu kolon o cevabi verir. JWT claim'i kalir ve tenant guard'i HALA claim'e
+        -- bakar (izolasyon disiplini degismedi); kolonun tek isi "hangi deftere
+        -- gecilmeli" sorusunu yanitlamaktir.
+        --
+        -- YABANCI ANAHTAR YOK - bilincli: defter kalici silinebilir ve bu alan o an
+        -- olu bir kimlige isaret eder. Kisitlama koymak silme zincirini (DefterImha)
+        -- kirardi. Cozum dogrulamadir: /api/durum degeri bildirmeden once uyeligi
+        -- kontrol eder, uyelik yoksa null doner.
+        ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS "AktifEtkinlikId" uuid NULL;
+
         -- ================= SUPER PANEL =================
         -- Sistem yoneticisi yetkisi (filtreli index: yalniz super adminler)
         -- NOT: kolon adi super_admin (snake_case) - DbContext eslemesi boyle. PascalCase DEGIL.
