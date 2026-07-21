@@ -458,8 +458,8 @@ public static class SuperUclari
     }
 
     // KALICI SIL - geri alinamaz. Uc katmanli kaza korumasi (planlama deseni):
-    //  - Once cope atilmis olmali
-    //  - Cift adi teyidi ("Ayse & Musa" birebir yazilmali)
+    //  - Once cope atilmis olmali (ISTISNA: imha edilmis defter - asagida)
+    //  - Teyit cipasi birebir yazilmali (TeyitCipasi servisi - tek dogruluk kaynagi)
     //  - Super admin kendi AKTIF defterini kalici silemez (oturum bozulmasin)
     private static async Task<IResult> DefterKaliciSil(
         Guid id, KaliciSilIstek istek, HttpContext ctx, BiAniBirakDbContext db,
@@ -473,13 +473,26 @@ public static class SuperUclari
         if (defter == null)
             return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadı.");
 
-        // Koruma - once cope atilmali
-        if (!defter.SilindiMi)
+        // Koruma - once cope atilmali.
+        //
+        // ISTISNA: imha edilmis defter. Imha cop kutusundan GECMEZ - ImhaGorevi
+        // dogrudan isaretler ve icerigi yok eder; SilindiMi hicbir zaman true olmaz.
+        // Istisna olmasaydi imha arsivi hicbir zaman temizlenemezdi: yonetici once
+        // "cope at" demek zorunda kalirdi, ki iceriksiz bir kabugu cope atmak
+        // anlamsizdir.
+        if (!defter.SilindiMi && !defter.ImhaEdildi)
             return Hata(400, "ONCE_COPE_AT", "Kalıcı silmeden önce defter çöp kutusuna atılmalı.");
 
-        // Koruma - cift adi teyidi
-        var beklenen = $"{defter.Es1Ad} & {defter.Es2Ad}";
-        if (!string.Equals(istek.Teyit?.Trim(), beklenen, StringComparison.Ordinal))
+        // Koruma - teyit cipasi. TEK KAYNAK: TeyitCipasi servisi.
+        //
+        // Eski hali burada kaliba gomuluydu ve iki ayri sekilde kiriliyordu:
+        //  - Gelen metin Trim ediliyor, BEKLENEN metin edilmiyordu; adin sonundaki
+        //    tek bir bosluk teyidi imkansiz kiliyordu.
+        //  - Imha edilmis defterde adlar bosaltilir (KVKK); kalip o zaman " & "
+        //    uretiyordu - yazilamaz bir cipa, kalici silme sonsuza dek 400.
+        // Artik ekranda GOSTERILEN ile KARSILASTIRILAN ayni fonksiyondan gelir.
+        var beklenen = TeyitCipasi.Uret(defter);
+        if (!TeyitCipasi.Esles(istek.Teyit, defter))
             return Hata(400, "TEYIT_ESLESMEDI",
                 $"Teyit eşleşmedi. Silmek için tam olarak şunu yaz: {beklenen}");
 
@@ -489,7 +502,7 @@ public static class SuperUclari
             return Hata(400, "AKTIF_DEFTER_SILINEMEZ",
                 "Şu an açık olan defteri kalıcı silemezsin. Önce başka bir deftere geç.");
 
-        var adlar = $"{defter.Es1Ad} & {defter.Es2Ad}";
+        var adlar = beklenen;
 
         // TEK ZINCIR: DefterImha servisinden gecer. Buraya ikinci bir zincir
         // yazilsaydi ikisi kacinilmaz olarak ayrisirdi - daha once tam olarak bu oldu
@@ -550,18 +563,47 @@ public static class SuperUclari
         var (ok, _) = await SuperAdminMi(ctx, db);
         if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
-        var defterler = await db.Etkinlikler.AsNoTracking()
-            .Where(e => e.SilindiMi)
+        // COP: gercekten GERI ALINABILIR defterler. Imha edilmisler buraya girmez.
+        //
+        // Ikisi tek listede karisiyordu ve imha edilmis defter "Geri yükle" butonuyla
+        // gorunuyordu: icerigi yok edilmis bir kabuga kurtarma vaadi. Butona basan
+        // yonetici bos bir defter geri getirirdi.
+        //
+        // Projeksiyon BELLEKTE yapilir: TeyitCipasi.Uret bir C# fonksiyonudur, EF Core
+        // onu SQL'e ceviremez. Liste super panel olcegindedir - materialize etmek
+        // kabul edilebilir.
+        var copHam = await db.Etkinlikler.AsNoTracking()
+            .Where(e => e.SilindiMi && !e.ImhaEdildi)
             .OrderByDescending(e => e.SilinmeZamani)
-            .Select(e => new
-            {
-                id = e.Id,
-                es1_ad = e.Es1Ad,
-                es2_ad = e.Es2Ad,
-                tur = e.Tur,
-                silinme_zamani = e.SilinmeZamani,
-            })
             .ToListAsync();
+
+        var defterler = copHam.Select(e => new
+        {
+            id = e.Id,
+            es1_ad = e.Es1Ad,
+            es2_ad = e.Es2Ad,
+            tur = e.Tur,
+            silinme_zamani = e.SilinmeZamani,
+            // Teyit kutusunun bekledigi metin. Frontend'in kalibi yeniden uretmesi
+            // YASAK: kalip iki yerde yasarsa bir gun ayrisir ve teyit yine kirilir.
+            teyit_cipasi = TeyitCipasi.Uret(e),
+        }).ToList();
+
+        // IMHA ARSIVI: icerigi yok edilmis, yalniz KVKK kaniti olarak duran satirlar.
+        // GERI ALINAMAZ - ayri liste, ayri dil, "Geri yükle" butonu YOK.
+        var imhaHam = await db.Etkinlikler.AsNoTracking()
+            .Where(e => e.ImhaEdildi)
+            .OrderByDescending(e => e.ImhaZamani)
+            .ToListAsync();
+
+        var imhaArsivi = imhaHam.Select(e => new
+        {
+            id = e.Id,
+            tur = e.Tur,
+            imha_zamani = e.ImhaZamani,
+            silinme_zamani = e.SilinmeZamani,
+            teyit_cipasi = TeyitCipasi.Uret(e),
+        }).ToList();
 
         var dilekler = await db.Katkilar.AsNoTracking()
             .Where(k => k.SilindiMi)
@@ -577,7 +619,7 @@ public static class SuperUclari
             })
             .ToListAsync();
 
-        return Results.Json(new { defterler, dilekler });
+        return Results.Json(new { defterler, imha_arsivi = imhaArsivi, dilekler });
     }
 
     // ---------------- KULLANICILAR ----------------
