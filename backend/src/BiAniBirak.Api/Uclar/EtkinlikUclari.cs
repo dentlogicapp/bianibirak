@@ -55,28 +55,19 @@ public static class EtkinlikUclari
         return Guid.TryParse(ham, out id);
     }
 
-    // Tenant guard: aktif_etkinlik_id claim'i + kullanicinin o etkinlige UYELIGI.
-    // Defense in depth: claim yok -> ERISIM_YOK; uye degil -> ERISIM_YOK (sizinti yok).
+    // Tenant guard - ARTIK TEK KAYNAKTAN: Kimlik/TenantErisim.
     //
-    // DIKKAT: kaynak hala CLAIM'dir. Kullanici.AktifEtkinlikId eklendi ama tenant
-    // guard'i ona BAGLANMADI - baglansaydi, gecici goruntuleme (impersonation) JWT'si
-    // ile DB degeri catisir ve yetki siniri belirsizlesirdi. Kolonun tek isi
-    // "hangi deftere gecilmeli" sorusunu yanitlamaktir; "hangi deftere erisilebilir"
-    // sorusunun cevabi DEGISMEDI.
-    private static async Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
+    // Mantik buradan cikarildi cunku ayni kod dort uc dosyasinda kopyalanmisti ve
+    // birine eklenen kural digerlerine ULASMIYORDU. Nitekim super yonetici uye
+    // olmadigi bir defteri goruntuledigunde her uc 403 donuyordu: teshis araci
+    // hicbir ise yaramiyordu, cunku istisna hicbir kopyada yoktu.
+    //
+    // Cozulen iki yol ve neyi getirdikleri TenantErisim'de ayrintili yazili:
+    //   uyelik   -> rol "es1"/"es2" (izolasyonun temeli, DEGISMEDI)
+    //   inceleme -> rol "inceleme"  (super yonetici, salt-okunur, uc katman koruma)
+    private static Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
         HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
-    {
-        var ham = ctx.User.FindFirstValue("aktif_etkinlik_id");
-        if (!Guid.TryParse(ham, out var etkinlikId))
-            return (false, Guid.Empty, string.Empty);
-
-        var uyelik = await db.EtkinlikUyelikleri.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
-        if (uyelik == null)
-            return (false, Guid.Empty, string.Empty);
-
-        return (true, etkinlikId, uyelik.Rol);
-    }
+        => TenantErisim.CozAsync(ctx, db, kullaniciId);
 
     private static object EtkinlikYaniti(Etkinlik e, string? rol = null)
         => new
@@ -273,7 +264,8 @@ public static class EtkinlikUclari
         if (!Guid.TryParse(id, out var etkinlikId))
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz etkinlik kimligi.");
 
-        // Uyelik dogrulamasi (izolasyon)
+        // Uyelik dogrulamasi (izolasyon). Salt-okunur inceleme burada GECERLI DEGIL:
+        // bu bir yazim ucudur ve inceleme rolu hicbir yazim yapamaz.
         var uye = await db.EtkinlikUyelikleri.AsNoTracking()
             .AnyAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
         if (!uye)
@@ -359,7 +351,7 @@ public static class EtkinlikUclari
         return Results.Json(EtkinlikYaniti(etkinlik));
     }
 
-    // Etkinlik sil (soft-delete: DeletedAt). Uyelik zorunlu.
+    // Etkinlik sil (cope tasi). Uyelik zorunlu.
     private static async Task<IResult> EtkinlikSil(
         string id, HttpContext ctx, BiAniBirakDbContext db)
     {
@@ -460,7 +452,7 @@ public static class EtkinlikUclari
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
 
-        // Tenant guard: aktif claim + uyelik.
+        // Tenant guard: aktif claim + uyelik (ya da salt-okunur inceleme).
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
@@ -567,7 +559,9 @@ public static class EtkinlikUclari
 
         if (aktifId.HasValue)
         {
-            // Rol: kuyruk damgasinin KISIYE OZEL olmasi buna bagli.
+            // Rol: kuyruk damgasinin KISIYE OZEL olmasi buna bagli. Inceleme
+            // oturumunda uyelik yoktur; rol null kalir ve kuyruk BOS damga uretir -
+            // yoneticinin cift-link izolasyonuna sinyal duzeyinde de dokunmamasi icin.
             var rol = await db.EtkinlikUyelikleri.AsNoTracking()
                 .Where(u => u.KullaniciId == kullaniciId && u.EtkinlikId == aktifId.Value)
                 .Select(u => u.Rol)
@@ -647,6 +641,10 @@ public static class EtkinlikUclari
         // IZOLASYON: her es YALNIZ kendi baglantisini gorur. Esinin baglantisini
         // yanlislikla paylasmasi, gelen katkilarin yanlis kuyruga dusmesine yol acar.
         // Bu yuzden filtre backend'de - UI'da gizlemek yeterli DEGIL.
+        //
+        // INCELEME ROLU: "inceleme" hicbir Es degeriyle eslesmez -> BOS liste.
+        // Yonetici ciftin davetli token'ini gormez; teshis icin gerekli degildir ve
+        // sizmasi halinde defterin kapisini acar.
         var linkler = await db.PaylasimBaglantilari.AsNoTracking()
             .Where(p => p.EtkinlikId == etkinlikId && p.Es == rol)
             .OrderBy(p => p.Es)
@@ -683,9 +681,15 @@ public static class EtkinlikUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        // YAZIM: inceleme rolu buradan gecemez. Program.cs'teki global write-guard
+        // zaten 403 doner; bu ikinci katman (defense in depth) - guard bir gun
+        // degisirse bu satir ayakta kalir.
+        if (TenantErisim.IncelemeMi(rol))
+            return Hata(403, "GORUNTULEME_MODU", "Salt okunur inceleme oturumunda değişiklik yapılamaz.");
 
         var ayar = await db.EtkinlikAyarlari
             .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlikId);
@@ -870,6 +874,10 @@ public static class EtkinlikUclari
     // Onay kuyrugu: YALNIZ oturumdaki esin rolune ait bekleyen katkilar (izolasyon).
     // Belge 04: WHERE EtkinlikId=@e AND KaynakEs=@rol AND Durum='beklemede'.
     // Bir es digerinin kuyrugunu ASLA cekemez (wedge - birlesim-oncesi izolasyon).
+    //
+    // INCELEME ROLU: "inceleme" hicbir KaynakEs ile eslesmez -> BOS liste. Bir esin
+    // onaysiz kuyrugu, esinin bile goremedigi alandir; yoneticiye acmak sistemin en
+    // sert kuralini ilk zorlandigi yerde bukmek olurdu.
     private static async Task<IResult> AktifKuyruk(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
@@ -928,6 +936,10 @@ public static class EtkinlikUclari
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya uye degilsiniz.");
+
+        // YAZIM: inceleme rolu buradan gecemez (write-guard'a ek ikinci katman).
+        if (TenantErisim.IncelemeMi(rol))
+            return Hata(403, "GORUNTULEME_MODU", "Salt okunur inceleme oturumunda değişiklik yapılamaz.");
 
         // DONDURULMUS DEFTER SALT OKUNUR - moderasyon da bir yazimdir.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
