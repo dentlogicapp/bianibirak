@@ -80,6 +80,28 @@ public static class SuperUclari
         return (true, k);
     }
 
+    // AKTIF DEFTERI SUNUCUYA YAZ - senkronun catisma noktasi.
+    //
+    // CANLIDA OGRENILDI: aktif defter DB'ye tasindiktan (Kullanici.AktifEtkinlikId)
+    // sonra "Goruntule" kirildi. Sebep: Goruntule JWT'yi yeni deftere cevirip
+    // DB'yi ELLEMIYORDU. Yonetici UYE OLDUGU bir defteri goruntuledi mi
+    // goruntuleme_modu bayragi YANMAZ (normal yetkiyle girer) - ve o an claim
+    // ile DB ayrisir. Senkron katmani bu ayrismayi "baska cihazda defter
+    // degistirilmis" sanip yoneticiyi ESKI deftere geri firlatiyordu.
+    //
+    // Kural: JWT'nin aktif defteri KALICI olarak degistigi her yerde DB de
+    // yazilir. Gecici (salt-okunur, 1 saatlik) impersonation bunun DISINDADIR -
+    // orada kalici tercih bozulmamalidir.
+    private static async Task AktifDefteriYaz(
+        BiAniBirakDbContext db, Guid kullaniciId, Guid? etkinlikId)
+    {
+        var kayit = await db.Kullanicilar.FirstOrDefaultAsync(k => k.Id == kullaniciId);
+        if (kayit == null || kayit.AktifEtkinlikId == etkinlikId) return;
+        kayit.AktifEtkinlikId = etkinlikId;
+        kayit.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
     // DENETIM (super panel) - HER KAYIT SISTEM EYLEMIDIR.
     //
     // SistemEylemi = true SABITTIR, parametre DEGILDIR. Bilerek boyle:
@@ -335,6 +357,20 @@ public static class SuperUclari
 
         CerezYardimcisi.Yaz(yanit, token, jwt.GecerlilikGun);
 
+        // AKTIF DEFTERI SUNUCUYA YAZ - YALNIZ UYEYSE.
+        //
+        // Uye ise bu islem gercekten bir DEFTER DEGISIMIDIR: JWT kalicidir,
+        // goruntuleme_modu bayragi yanmaz, yonetici o defterde normal yetkiyle
+        // calisir. DB yazilmazsa claim ile DB ayrisir ve senkron katmani bunu
+        // "baska cihazda degistirilmis" sanip yoneticiyi ESKI deftere geri
+        // firlatir - canlida tam olarak bu oldu ve Goruntule kullanilamaz hale
+        // geldi.
+        //
+        // Uye DEGILSE yazilmaz: o oturum gecici (1 saat) ve salt-okunurdur.
+        // Kalici tercihi bozmak, yoneticinin kendi defterini kaybetmesi demektir.
+        // Orada goruntuleme_modu bayragi yandigi icin senkron zaten uzlasma yapmaz.
+        if (uyeMi) await AktifDefteriYaz(db, kullanici.Id, id);
+
         await Denetim(db, id, kullanici.Id, "DEFTER_GORUNTULEME_BASLADI", "etkinlikler", id,
             new { uye_mi = uyeMi, goruntuleme_modu = !uyeMi });
 
@@ -355,16 +391,39 @@ public static class SuperUclari
         if (!ok || kullanici == null)
             return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
-        // Kendi uyeliklerinden birine don (varsa); yoksa tenant'siz JWT
-        var kendiUyelik = await db.EtkinlikUyelikleri.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.KullaniciId == kullanici.Id);
+        // NEREYE DONULECEK: once SUNUCUDAKI kalici tercih (AktifEtkinlikId).
+        //
+        // Gecici goruntuleme sirasinda bu deger DEGISTIRILMEDI; yani yoneticinin
+        // impersonation'a girmeden ONCE bulundugu defter hala orada duruyor.
+        // "Kaldigin yere don" davranisinin tek dogru kaynagi budur.
+        //
+        // Uyelik yeniden dogrulanir: o defter bu arada silinmis ya da uyelik
+        // kalkmis olabilir. Gecersizse ilk uyelige dusulur; o da yoksa
+        // tenant'siz JWT uretilir.
+        Guid? hedef = kullanici.AktifEtkinlikId;
+        if (hedef.HasValue)
+        {
+            var gecerli = await db.EtkinlikUyelikleri.AsNoTracking()
+                .AnyAsync(u => u.KullaniciId == kullanici.Id && u.EtkinlikId == hedef.Value);
+            if (!gecerli) hedef = null;
+        }
+        if (!hedef.HasValue)
+        {
+            var kendiUyelik = await db.EtkinlikUyelikleri.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.KullaniciId == kullanici.Id);
+            hedef = kendiUyelik?.EtkinlikId;
+        }
 
-        var token = jwt.Uret(kullanici, kendiUyelik?.EtkinlikId);
+        var token = jwt.Uret(kullanici, hedef);
         CerezYardimcisi.Yaz(yanit, token, jwt.GecerlilikGun);
+
+        // Claim ile DB'yi hizala: ikisi ayrisirsa senkron katmani sonsuz bir
+        // uzlasma turuna girer.
+        await AktifDefteriYaz(db, kullanici.Id, hedef);
 
         await Denetim(db, null, kullanici.Id, "DEFTER_GORUNTULEME_BITTI", "sistem", null);
 
-        return Results.Json(new { ok = true, aktif_etkinlik_id = kendiUyelik?.EtkinlikId });
+        return Results.Json(new { ok = true, aktif_etkinlik_id = hedef });
     }
 
     // DONDUR / COZ - dondurulmus defter SALT OKUNURDUR (bkz. DondurmaGuard):
@@ -385,6 +444,10 @@ public static class SuperUclari
             return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadı.");
 
         defter.Donduruldu = !defter.Donduruldu;
+        // UpdatedAt'e dokunulur: senkron "ayar" damgasi buradan beslenir ve
+        // ciftin acik ekranindaki dondurma bandi saniyeler icinde belirir.
+        // Onceden yalnizca tam sayfa yenilemede gorunuyordu.
+        defter.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
         await Denetim(db, id, kullanici.Id,
@@ -431,6 +494,15 @@ public static class SuperUclari
 
         defter.SilindiMi = true;
         defter.SilinmeZamani = DateTimeOffset.UtcNow;
+        defter.UpdatedAt = DateTimeOffset.UtcNow;
+
+        // Bu defteri AKTIF tutan herkesin isareti temizlenir - yoksa cihazlari
+        // olu bir kimlige gonderilir. (EtkinlikUclari.EtkinlikSil'de ayni kural.)
+        var aktifTutanlar = await db.Kullanicilar
+            .Where(k => k.AktifEtkinlikId == id)
+            .ToListAsync();
+        foreach (var k in aktifTutanlar) k.AktifEtkinlikId = null;
+
         await db.SaveChangesAsync();
 
         await Denetim(db, id, kullanici.Id, "DEFTER_COPE_ATILDI", "etkinlikler", id,
@@ -451,6 +523,7 @@ public static class SuperUclari
 
         defter.SilindiMi = false;
         defter.SilinmeZamani = null;
+        defter.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
         await Denetim(db, id, kullanici.Id, "DEFTER_GERI_ALINDI", "etkinlikler", id);
@@ -504,6 +577,18 @@ public static class SuperUclari
 
         var adlar = beklenen;
 
+        // Bu defteri AKTIF tutan herkesin isareti temizlenir. Satir birazdan
+        // veritabanindan silinecek; kalirsa o kullanicilarin cihazlari olu bir
+        // kimlige gonderilirdi.
+        var aktifTutanlar = await db.Kullanicilar
+            .Where(k => k.AktifEtkinlikId == id)
+            .ToListAsync();
+        if (aktifTutanlar.Count > 0)
+        {
+            foreach (var k in aktifTutanlar) k.AktifEtkinlikId = null;
+            await db.SaveChangesAsync();
+        }
+
         // TEK ZINCIR: DefterImha servisinden gecer. Buraya ikinci bir zincir
         // yazilsaydi ikisi kacinilmaz olarak ayrisirdi - daha once tam olarak bu oldu
         // ve uc tablo eksik kaldigi icin kalici silme 500 veriyordu.
@@ -530,6 +615,7 @@ public static class SuperUclari
         katki.SilindiMi = true;
         katki.SilinmeZamani = DateTimeOffset.UtcNow;
         katki.SilenKullaniciId = kullanici.Id;
+        katki.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
         await Denetim(db, katki.EtkinlikId, kullanici.Id, "DILEK_MODERASYONLA_KALDIRILDI",
@@ -551,6 +637,7 @@ public static class SuperUclari
         katki.SilindiMi = false;
         katki.SilinmeZamani = null;
         katki.SilenKullaniciId = null;
+        katki.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
         await Denetim(db, katki.EtkinlikId, kullanici.Id, "DILEK_GERI_ALINDI", "katkilar", id);

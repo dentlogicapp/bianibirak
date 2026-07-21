@@ -23,10 +23,30 @@ import { useEffect, useRef } from "react";
 // DEGISTIRMEZ - cift-link izolasyonu sinyal katmaninda da tanimlidir.
 // "defter" damgasi ORTAKTIR: ortak deftere onaylanan dilek ikinize de duser.
 //
+// ===================== DAYANIKLILIK (canlida ogrenildi) =====================
+//
+// Ilk surumde uc kirilma noktasi vardi; ucu de burada kapatildi:
+//
+//  1. ODAK GURULTUSU. "focus" olayi her pencere tiklamasinda ANINDA kontrol
+//     tetikliyordu; sekmeye uc kez tiklamak uc istek demekti. Artik son
+//     kontrolden ANLIK_ARA_MS gecmediyse anlik tetikleyiciler yok sayilir.
+//     Zamanlayici zinciri zaten korunuyordu, sorun yalniz anlik tetiklerdeydi.
+//
+//  2. CEVRIMDISI YANLIS UZLASMA. Ucak modunda /api/etkinlik/aktif dusuyor,
+//     "yerel aktif defter" null kaliyordu. Ag geri geldiginde sunucu bir kimlik
+//     donuyor, null ile eslesmiyor sanilip GEREKSIZ bir aktif-yap + tam yenileme
+//     tetikleniyordu - kullanici ag oynakken giris ekranina dusuyordu.
+//     Artik yerel deger ancak KESIN bir yanitla (200 ya da 403) ogrenilmis
+//     sayilir; ag hatasinda ogrenilmemis kalir ve tekrar denenir.
+//
+//  3. OTURUM DUSTUGUNDE ISRAR. /api/durum 401 donerse dongu tamamen durur.
+//     Oturum gercekten bittiyse saniyede bir kapiyi calmanin anlami yok.
+//
 // ===================== YUK =====================
 //
 // - Sekme gorunmuyorken sorgu DURUR (visibilitychange). Telefon cebindeyken
-//   sifir istek. Geri donuldugunde ANINDA bir kontrol yapilir.
+//   sifir istek. Geri donuldugunde bir kontrol yapilir (kisitlamaya tabi).
+// - navigator.onLine false iken hic sorulmaz; "online" olayinda hemen sorulur.
 // - setTimeout zinciri kullanilir, setInterval DEGIL: yavas bir yanit
 //   geldiginde istekler ust uste binmez.
 // - Ayni tarayicinin ikinci sekmesi BroadcastChannel ile ANINDA haberdar olur -
@@ -45,6 +65,8 @@ import { useEffect, useRef } from "react";
 
 const YOL = "/api/durum";
 const ARALIK_MS = 5000;
+// Anlik tetikleyiciler (odak, gorunurluk, sekme mesaji, ag donusu) icin en kisa ara.
+const ANLIK_ARA_MS = 2000;
 const KANAL_ADI = "bianibirak-senkron";
 
 export type SenkronAlan = "defterler" | "bildirim" | "kuyruk" | "defter" | "ayar";
@@ -64,6 +86,12 @@ const ALANLAR: SenkronAlan[] = ["defterler", "bildirim", "kuyruk", "defter", "ay
 // Olay adi: "bianibirak-senkron:bildirim" gibi.
 function olayAdi(alan: SenkronAlan): string {
   return `${KANAL_ADI}:${alan}`;
+}
+
+// Cevrimdisi mi? navigator.onLine desteklenmeyen ortamda "cevrimici" varsayilir -
+// yanlis pozitif yuzunden senkronu kapatmaktansa bir istek fazla atmak yeglenir.
+function cevrimdisiMi(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,38 +127,72 @@ export function useSenkron() {
   // sonsuz doner, kullanici sayfayi hic goremezdi.
   const gecisHedefi = useRef<string | null>(null);
   const durduruldu = useRef(false);
+  const sonKontrol = useRef(0);
 
   useEffect(() => {
     durduruldu.current = false;
     let zaman: number | undefined;
     let kanal: BroadcastChannel | null = null;
 
-    // Bu cihazin CLAIM'deki aktif defterini ogren. Sunucunun DB'deki degeriyle
-    // karsilastirilacak olan budur. 403 = aktif defter yok (yeni giris).
-    async function yereliOgren() {
+    // Bu cihazin CLAIM'deki aktif defterini ogren.
+    //
+    // DONUS: ogrenildi mi? KESIN yanit (200 / 403 / 404) -> evet.
+    // Ag hatasi ya da 5xx -> HAYIR; deger ogrenilmemis kalir ve bir sonraki
+    // turda tekrar denenir. Bu ayrim onemli: "cevap alamadim" ile "aktif
+    // defterin yok" ayni sey DEGILDIR ve karistirildiginda ag geri geldiginde
+    // sahte bir uyusmazlik dogar.
+    async function yereliOgren(): Promise<boolean> {
+      if (cevrimdisiMi()) return false;
       try {
-        const y = await fetch("/api/etkinlik/aktif", { credentials: "include" });
+        const y = await fetch("/api/etkinlik/aktif", {
+          credentials: "include",
+          cache: "no-store",
+        });
         if (y.ok) {
           const g = await y.json();
-          yerelAktif.current = typeof g.id === "string" ? g.id : null;
-        } else {
-          yerelAktif.current = null;
+          yerelAktif.current = typeof g?.id === "string" ? g.id : null;
+          yerelHazir.current = true;
+          return true;
         }
+        if (y.status === 401) {
+          // Oturum yok - senkronun yapacagi bir sey kalmadi.
+          durduruldu.current = true;
+          return false;
+        }
+        if (y.status === 403 || y.status === 404) {
+          // Aktif defter yok ya da erisilemiyor: KESIN bilgi.
+          yerelAktif.current = null;
+          yerelHazir.current = true;
+          return true;
+        }
+        return false; // 5xx - kesin degil, tekrar dene
       } catch {
-        yerelAktif.current = null;
+        return false; // ag hatasi - kesin degil, tekrar dene
       }
-      yerelHazir.current = true;
     }
 
     async function kontrol() {
       if (durduruldu.current) return;
       if (document.visibilityState === "hidden") return;
-      if (!yerelHazir.current) return;
+      if (cevrimdisiMi()) return;
+
+      sonKontrol.current = Date.now();
+
+      if (!yerelHazir.current) {
+        const ogrenildi = await yereliOgren();
+        if (!ogrenildi) return;
+      }
 
       let d: Damgalar;
       try {
         const y = await fetch(YOL, { credentials: "include", cache: "no-store" });
-        if (!y.ok) return; // oturum yok / gecici hata - sessizce gec, bir sonraki tur dener
+        if (y.status === 401) {
+          // Oturum dustu: israr etmenin anlami yok. Kullaniciyi biz
+          // yonlendirmeyiz - bunu sayfalarin kendi akisi yapar.
+          durduruldu.current = true;
+          return;
+        }
+        if (!y.ok) return; // gecici hata - sessizce gec, bir sonraki tur dener
         d = (await y.json()) as Damgalar;
       } catch {
         return; // ag hatasi: sessiz. Kullaniciya "baglanti yok" diye bagirmayiz.
@@ -141,10 +203,15 @@ export function useSenkron() {
 
       // ---- AKTIF DEFTER UZLASMASI ----
       //
-      // GORUNTULEME MODU HARIC: super yonetici baska bir deftere SALT-OKUNUR
-      // girdiginde JWT gecici (1 saat) ve DB'ye YAZILMAZ. Uzlasma calissaydi
-      // yoneticiyi inceledigi defterden ANINDA disari atardi - teshis araci
-      // kendi kendini kapatirdi.
+      // GORUNTULEME MODU HARIC: super yonetici UYE OLMADIGI bir deftere
+      // salt-okunur girdiginde JWT gecici (1 saat) ve DB'ye YAZILMAZ. Uzlasma
+      // calissaydi yoneticiyi inceledigi defterden aninda disari atardi.
+      //
+      // NOT: yonetici UYE OLDUGU bir defteri goruntuledigunde bu bayrak
+      // YANMAZ - o durumda islem gercekten bir defter degisimidir ve
+      // SuperUclari.Goruntule artik AktifEtkinlikId'yi de yazar. Yazmasaydi
+      // claim ile DB ayrisir, buradaki uzlasma yoneticiyi geri firlatirdi -
+      // canlida tam olarak bu oldu.
       if (
         !d.goruntuleme_modu &&
         d.aktif_etkinlik_id &&
@@ -184,6 +251,15 @@ export function useSenkron() {
       }
     }
 
+    // ANLIK TETIKLEYICI - kisitlamali.
+    // Odak, gorunurluk, sekme mesaji ve ag donusu hep buradan gecer; boylece
+    // pencereye ust uste tiklamak istek yagmuru uretmez.
+    function anindaKontrol() {
+      if (durduruldu.current) return;
+      if (Date.now() - sonKontrol.current < ANLIK_ARA_MS) return;
+      void kontrol();
+    }
+
     function zamanla() {
       window.clearTimeout(zaman);
       // setTimeout ZINCIRI - setInterval degil. Yavas bir yanit geldiginde
@@ -196,29 +272,35 @@ export function useSenkron() {
 
     function gorunurluk() {
       if (document.visibilityState === "visible") {
-        // Uygulamaya donuldugu AN kontrol - "actigimda guncel olsun".
-        void kontrol();
+        anindaKontrol();
         zamanla();
       } else {
         window.clearTimeout(zaman);
       }
     }
 
+    function agGeldi() {
+      // Ag geri geldiginde yerel deger ogrenilmemis olabilir (cevrimdisiyken
+      // ogrenilemedi). Bir sonraki kontrol onu da tazeler.
+      anindaKontrol();
+      zamanla();
+    }
+
     void (async () => {
-      await yereliOgren();
       await kontrol();
       zamanla();
     })();
 
     document.addEventListener("visibilitychange", gorunurluk);
     window.addEventListener("focus", gorunurluk);
+    window.addEventListener("online", agGeldi);
 
     // AYNI TARAYICI, IKINCI SEKME - sunucuya ugramadan anlik.
     // Bir sekme defter degistirdiginde digeri 5 saniye beklemez.
     try {
       kanal = new BroadcastChannel(KANAL_ADI);
       kanal.onmessage = () => {
-        void kontrol();
+        anindaKontrol();
       };
     } catch {
       /* BroadcastChannel yoksa (eski Safari) yalnizca polling calisir - kayip yok */
@@ -229,6 +311,7 @@ export function useSenkron() {
       window.clearTimeout(zaman);
       document.removeEventListener("visibilitychange", gorunurluk);
       window.removeEventListener("focus", gorunurluk);
+      window.removeEventListener("online", agGeldi);
       kanal?.close();
     };
   }, []);
