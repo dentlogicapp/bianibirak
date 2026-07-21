@@ -146,9 +146,19 @@ export function defterDurumu(e: EvreGirdisi): DefterDurum {
 }
 
 // Rozet icin gorsel siniflar - ton dili TEK yerde tanimli.
+//
+// "uyari" satiri ham Tailwind kehribarindan (amber-400/500/600) TOKEN'a tasindi.
+// Ham renk sabit hex'tir ve html.dark ile degismez; bu rozet acik temada koyu
+// tema sarabina benzeyen parlak bir sari olarak cikiyordu. Artik --uyari
+// degiskeninden gelir ve tema ile birlikte doner.
+//
+// HEDEF BICIM BUDUR: yeni yazilan her kod "uyari" token'ini kullanir.
+// Kalan dosyalardaki "amber-*" cagrilari tailwind.config'teki gecici kopru
+// sayesinde ayni rengi gosterir; o dosyalar baska bir is icin acildikca
+// buradaki bicime cevrilir.
 export function durumTonSinif(ton: DefterDurum["ton"]): string {
   if (ton === "kritik") return "border-sarap/40 bg-sarap/10 text-sarap";
-  if (ton === "uyari") return "border-amber-400/50 bg-amber-500/10 text-amber-600";
+  if (ton === "uyari") return "border-uyari/45 bg-uyari/10 text-uyari";
   if (ton === "olumlu") return "border-yaldiz/40 bg-yaldiz/10 text-yaldiz";
   return "border-ayrac bg-yuzeyKoyu text-ikincil";
 }

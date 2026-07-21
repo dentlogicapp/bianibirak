@@ -14,6 +14,26 @@
   --yaldiz: #a8823c; /* imza aksani */
   --yaldiz-acik: #c4a25e; /* yaldiz vurgu */
 
+  /* UYARI - palette'in eksik halkasi.
+     ==========================================================================
+     Uyari gostermek gerektiginde kod bugune kadar HAM Tailwind kehribarina
+     dusuyordu (amber-400/500/600). Ham renkler sabit hex'tir: html.dark ile
+     DEGISMEZLER. Sonuc: acik temada, koyu temanin --sarap'ina (#c17a4a) cok
+     yakin duran parlak bir sari - marka dilinden kopuk, parsomen uzerinde
+     okunurlugu zayif.
+
+     RGB KANAL olarak yazilir (virgul yok, "154 90 30").
+     Sebep: Tailwind opacity modifier'i (bg-uyari/10) ancak renk
+     "rgb(var(--x) / <alpha-value>)" seklinde tanimliysa calisir. Duz hex
+     degiskeninde modifier SESSIZCE gecersiz olur ve Tailwind varsayilan
+     MAVI'ye duser - bu dosyada film seridi notunda ayni tuzak zaten yazili.
+
+     TON SECIMI: yaldiz (#a8823c) SARI tarafta, sarap (#6e2438) SARAP tarafta.
+     Uyari ikisinin ARASINDA, yanmis kehribar: hem yaldizla karismaz hem
+     saraba benzemez. Uc renk yan yana geldiginde ayirt edilebilir olmali -
+     yoksa renk dili bilgi tasimayi birakir. */
+  --uyari: 154 90 30; /* #9a5a1e - yanmis kehribar */
+
   /* Film seridi - SICAK KOYU kahve. Siyah degil: sayfayi kesmez, parsomenin
      ailesinden gelir. Delikler ve cerceve zeminden yumusakca ayrilir. */
   --film: #3a2e24;
@@ -34,6 +54,11 @@ html.dark {
   --yaldiz: #d4af6a; /* imza aksani (koyuda parlak yaldiz) */
   --yaldiz-acik: #e6c988; /* yaldiz vurgu */
   --ayrac: #3a2f24; /* ince cizgi (koyu) */
+
+  /* Koyuda uyari DAHA DOYGUN turuncuya kacar. Gece zemininde sarap
+     (#c17a4a, mat terracotta) ile yaldiz (#d4af6a, altin) birbirine yakin
+     durur; uyari ikisinden de ayrilabilmek icin daha canli olmak zorunda. */
+  --uyari: 232 145 58; /* #e8913a - canli kehribar */
 }
 
 @layer base {
@@ -454,18 +479,6 @@ html.dark .rozet-nabiz { animation: rozetNabizKoyu 1.8s ease-in-out infinite; }
 }
 .premium-vurgu:disabled::after {
   display: none;
-}
-
-/* ERISILEBILIRLIK: hareket hassasiyeti olan kullanicilar (vestibuler bozukluk,
-   migren, epilepsi) icin animasyon TAMAMEN kapanir. Devler bunu atlamaz; biz de
-   atlamayiz. Buton yine calisir, yalniz kimildamaz. */
-@media (prefers-reduced-motion: reduce) {
-  .premium-vurgu {
-    animation: none;
-  }
-  .premium-vurgu::after {
-    display: none;
-  }
 }
 
 /* ============ DAVETIYE KAREKODUM - kullanici yonlendirme ipuclari ============

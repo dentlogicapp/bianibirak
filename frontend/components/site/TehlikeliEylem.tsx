@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 
 // TEHLIKELI EYLEM ONAYI - harekat merkezinin emniyet mandali.
 //
@@ -22,6 +23,29 @@ import { useEffect, useState } from "react";
 //   bilgi    - geri alinabilir, dusuk etki (ornek: dondurmayi coz)
 //   uyari    - anlamli etki ama geri alinabilir (ornek: dondur, cope at)
 //   kritik   - GERI ALINAMAZ; ad yazarak teyit zorunlu (ornek: kalici sil)
+//
+// ---------------------------------------------------------------------------
+// BU SURUMDE IKI DUZELTME
+//
+// A) KABUK ARTIK TamEkranKatman.
+//    Onceden yalnizca "fixed inset-0" vardi ve pencere DOM'da nerede
+//    render edildiyse orada aciliyordu. Avatar menusunden acildiginda -
+//    yani header'in icinde, ki o header'da backdrop-blur var - pencere
+//    ekranin ustune tasip %80'i gorunmez oldu. Portal kurali projede
+//    ZATEN yaziliydi (Portal.tsx), bu bilesende uygulanmamisti.
+//    Kabukla birlikte scroll kilidi, odak tuzagi ve odak iadesi de geldi.
+//
+// B) ONAY BUTONU ARTIK HER ZAMAN SARAP.
+//    Onceden buton rengi siddete gore degisiyordu: bilgi->yaldiz,
+//    uyari->kehribar, kritik->sarap. Sonuc, ayni uygulamada uc farkli renkte
+//    onay butonu ve ikisi marka disi - acik temada "uyari" butonu, KOYU
+//    temanin sarabina benzeyen parlak bir sari olarak cikiyordu.
+//
+//    Siddet kaybolmadi, YER DEGISTIRDI: ust seritteki renk ve etiket tasiyor
+//    ("Onay gerekiyor" / "Geri alinamaz islem"), kritikte ustune metin yazma
+//    zorunlulugu biniyor. Eylem rengi ise markanin eylem rengidir - Stripe ve
+//    Linear'in ayni dersi. Kullanici "onay butonu" refleksini TEK renkte
+//    ogrenir; "Ac", "Goruntule", "Etkinligi olustur" ile ayni.
 
 export type EylemSiddet = "bilgi" | "uyari" | "kritik";
 
@@ -43,24 +67,26 @@ export type TehlikeliEylemProps = {
   onKapat: () => void;
 };
 
-const TON: Record<EylemSiddet, { cerceve: string; zemin: string; vurgu: string; buton: string }> = {
+// TON - yalnizca SERIT ve VURGU. Buton bu tabloda YOK; o her zaman sarap.
+// Hepsi token: ham Tailwind rengi kullanilmaz, yoksa tema degisince donmez.
+const TON: Record<EylemSiddet, { cerceve: string; zemin: string; vurgu: string; nokta: string }> = {
   bilgi: {
     cerceve: "border-yaldiz/40",
     zemin: "bg-yaldiz/10",
     vurgu: "text-yaldiz",
-    buton: "bg-yaldiz text-murekkep hover:bg-yaldiz/85",
+    nokta: "bg-yaldiz",
   },
   uyari: {
-    cerceve: "border-amber-400/50",
-    zemin: "bg-amber-500/10",
-    vurgu: "text-amber-600",
-    buton: "bg-amber-500 text-murekkep hover:bg-amber-500/85",
+    cerceve: "border-uyari/45",
+    zemin: "bg-uyari/10",
+    vurgu: "text-uyari",
+    nokta: "bg-uyari",
   },
   kritik: {
     cerceve: "border-sarap/50",
     zemin: "bg-sarap/10",
     vurgu: "text-sarap",
-    buton: "bg-sarap text-parsomen hover:bg-sarapKoyu",
+    nokta: "bg-sarap",
   },
 };
 
@@ -88,28 +114,13 @@ export function TehlikeliEylem({
     if (acik) setYazilan("");
   }, [acik]);
 
-  // ESC ile kapanir; ENTER ile ONAYLANMAZ (kaza riski).
-  useEffect(() => {
-    if (!acik) return;
-    const dinle = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onKapat();
-    };
-    window.addEventListener("keydown", dinle);
-    return () => window.removeEventListener("keydown", dinle);
-  }, [acik, onKapat]);
-
-  if (!acik) return null;
-
+  // ESC, odak tuzagi, scroll kilidi ve zemine tiklama ARTIK KABUKTA.
+  // Burada tekrarlanmaz - iki yerde yasayan davranis bir gun ayrisir.
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-murekkep/70 p-4 backdrop-blur-sm"
-      onClick={onKapat}
-      role="dialog"
-      aria-modal="true"
-    >
+    <TamEkranKatman acik={acik} onKapat={onKapat} etiket={baslik}>
       <div
-        className="w-full max-w-md overflow-hidden rounded-3xl border border-ayrac bg-yuzey shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="mx-auto w-full max-w-md overflow-hidden rounded-3xl border border-ayrac bg-yuzey shadow-2xl"
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className={`border-b ${ton.cerceve} ${ton.zemin} px-6 py-4`}>
           <p className={`font-govde text-[0.62rem] uppercase tracking-etiket ${ton.vurgu}`}>
@@ -128,7 +139,11 @@ export function TehlikeliEylem({
           <ul className="mt-2 space-y-1.5">
             {etkiler.map((e, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${ton.vurgu.replace("text-", "bg-")}`} aria-hidden />
+                {/* Madde imi rengi TON tablosundan gelir. Onceden
+                    vurgu.replace("text-","bg-") ile turetiliyordu; calisiyordu
+                    ama bir gun sinif adi degisince sessizce kirilacak turden
+                    bir baglantiydi. Artik acikca yazili. */}
+                <span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${ton.nokta}`} aria-hidden />
                 <span className="metin-yasli font-govde text-sm leading-relaxed text-murekkep">{e}</span>
               </li>
             ))}
@@ -177,12 +192,12 @@ export function TehlikeliEylem({
           <button
             onClick={onOnay}
             disabled={!onayAcik}
-            className={`rounded-full px-5 py-2.5 font-govde text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${ton.buton}`}
+            className="rounded-full bg-sarap px-5 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:cursor-not-allowed disabled:opacity-40"
           >
             {yukleniyor ? "İşleniyor..." : onayEtiket}
           </button>
         </div>
       </div>
-    </div>
+    </TamEkranKatman>
   );
 }
