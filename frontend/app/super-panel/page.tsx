@@ -765,6 +765,14 @@ function CopSekmesi() {
                     PASIF duruyordu: gorunuyor ama calismiyor - kullanici icin bu
                     "bozuk buton"dur. Bir eylem, ancak YAPILABILIR oldugu yerde
                     gosterilmelidir. Cop kutusundaki defter zaten silinmeye hazirdir. */}
+                {/* KALICI SILINMEYE KALAN SURE - cop kutusundaki defter 5 gun sonra
+                    otomatik silinir. Sayac, geri alma penceresinin daraldigini
+                    gorunur kilar. */}
+                <span className="shrink-0 self-center rounded-full bg-yuzeyKoyu px-2.5 py-1 font-govde text-[0.6rem] text-ikincil">
+                  {d.silinme_zamani
+                    ? `silinmeye ${Math.max(0, 5 - Math.floor((Date.now() - new Date(d.silinme_zamani).getTime()) / 86400000))} gün`
+                    : "silinmeye 5 gün"}
+                </span>
                 <button
                   onClick={() => setKaliciHedef(d)}
                   className="shrink-0 rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
@@ -783,38 +791,17 @@ function CopSekmesi() {
         </section>
       )}
 
-      {cop!.dilekler.length > 0 && (
-        <section>
-          <p className="mb-3 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-            Moderasyonla kaldırılan dilekler
-          </p>
-          <div className="space-y-2">
-            {cop!.dilekler.map((k) => (
-              <div key={k.id} className="min-w-0 rounded-2xl border border-ayrac bg-yuzey p-4">
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-govde text-xs uppercase tracking-etiket text-ikincil">
-                      {k.davetli_ad}
-                    </p>
-                    <p className="metin-yasli mt-1 font-govde text-sm text-ikincil line-through">
-                      {k.mesaj}
-                    </p>
-                    <p className="mt-1 font-govde text-xs text-ikincil">
-                      Kaldırıldı: {tarihKisa(k.silinme_zamani)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => dilekGeriAl(k.id)}
-                    className="shrink-0 rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                  >
-                    Geri yükle
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* CIFTIN REDDETTIGI DILEKLER BURADA GOSTERILMEZ.
+          //
+          // Bu, ciftin KENDI karari ve KENDI verisidir. Sistemimizde bir es, digerinin
+          // onaylamadigi kuyrugu bile goremez - bu kadar siki bir izolasyon kurulmusken
+          // super yoneticiye o dilekleri OKUMA, SILME ve GERI ALMA yetkisi vermek
+          // dogrudan celiskidir. Ustelik icerigi okumak, silmekten daha agir bir
+          // ihlaldir.
+          //
+          // Yoneticinin destekte ihtiyaci olan tek sey SAYI duzeyinde bilgidir
+          // ("bu defterde copte kac dilek var") - o da defter teshis ekraninda,
+          // iceriksiz ve eylemsiz olarak durur. */}
 
       <TehlikeliEylem
         acik={kaliciHedef !== null}

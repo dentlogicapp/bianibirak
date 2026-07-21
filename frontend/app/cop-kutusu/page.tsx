@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api, type CopDilek } from "@/lib/api";
+import { api, type CopDilek, type CopDefter } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
+import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 
 // COP KUTUSU (cift tarafi)
 //
@@ -14,12 +15,15 @@ import { AppShell } from "@/components/site/AppShell";
 export default function CopKutusuSayfasi() {
   const router = useRouter();
   const [dilekler, setDilekler] = useState<CopDilek[]>([]);
+  const [defterler, setDefterler] = useState<CopDefter[]>([]);
+  const [defterSilHedef, setDefterSilHedef] = useState<CopDefter | null>(null);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
   const [islenen, setIslenen] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const c = await api.copListe();
+      const [c, d] = await Promise.all([api.copListe(), api.copDefterler()]);
+      if (d.ok) setDefterler(d.veri.defterler);
       if (!c.ok) {
         if (c.durum === 401) router.replace("/giris");
         else setDurum("yok");
@@ -68,14 +72,85 @@ export default function CopKutusuSayfasi() {
     );
   }
 
+  async function defterGeriAl(id: string) {
+    const c = await api.copDefterGeriAl(id);
+    if (!c.ok) { toast.error(c.mesaj); return; }
+    setDefterler((o) => o.filter((x) => x.id !== id));
+    toast.success("Defter geri alındı.");
+  }
+
+  async function defterKaliciSil() {
+    if (!defterSilHedef) return;
+    const c = await api.copDefterKaliciSil(defterSilHedef.id);
+    if (!c.ok) { toast.error(c.mesaj); return; }
+    setDefterler((o) => o.filter((x) => x.id !== defterSilHedef.id));
+    setDefterSilHedef(null);
+    toast.success("Defter kalıcı olarak silindi.");
+  }
+
   return (
     <AppShell>
       <div className="mx-auto max-w-2xl">
         <p className="metin-yasli font-govde text-sm leading-relaxed text-ikincil">
-          Reddettiğin dilekler burada bekler. İstersen <span className="font-medium text-murekkep">geri alıp</span> tekrar
-          onay kuyruğuna gönderebilirsin. Buradan silinen bir dilek <span className="font-medium text-murekkep">geri alınamaz</span> ve
-          çöp kutusundaki dilekler 30 gün sonra otomatik olarak kalıcı silinir.
+          Silinen defterler ve reddettiğin dilekler burada bekler. İstersen{" "}
+          <span className="font-medium text-murekkep">geri alabilirsin</span>. Buradan kalıcı
+          silinen hiçbir şey <span className="font-medium text-murekkep">geri getirilemez</span>.
+          Defterler <span className="font-medium text-murekkep">5 gün</span>, dilekler{" "}
+          <span className="font-medium text-murekkep">30 gün</span> sonra otomatik olarak kalıcı silinir.
         </p>
+
+        {/* SILINEN DEFTERLER - dileklerden AYRI bolme.
+            Ayri durmalari sart: sureleri farkli (5 gun / 30 gun) ve kaybin agirligi
+            farkli. Tek listede karistirmak, kullanicinin hangi sayacin neye ait
+            oldugunu anlamasini zorlastirirdi. */}
+        {defterler.length > 0 && (
+          <section className="mt-8">
+            <p className="mb-3 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+              Silinen defterler
+            </p>
+            <div className="space-y-2">
+              {defterler.map((d) => {
+                const kalan = d.silinme_zamani
+                  ? Math.max(0, 5 - Math.floor((Date.now() - new Date(d.silinme_zamani).getTime()) / 86400000))
+                  : 5;
+                return (
+                  <div key={d.id} className="rounded-2xl border border-ayrac bg-yuzey px-5 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-display text-base text-murekkep">
+                          {d.es1_ad} &amp; {d.es2_ad}
+                        </p>
+                        <p className="mt-0.5 font-govde text-xs text-ikincil">
+                          {d.dilek_sayisi} dilek · kalıcı silinmeye {kalan} gün
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          onClick={() => defterGeriAl(d.id)}
+                          className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                        >
+                          Geri al
+                        </button>
+                        <button
+                          onClick={() => setDefterSilHedef(d)}
+                          className="rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
+                        >
+                          Kalıcı sil
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {defterler.length > 0 && dilekler.length > 0 && (
+          <p className="mt-8 mb-3 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            Reddedilen dilekler
+          </p>
+        )}
 
         {dilekler.length === 0 ? (
           <div className="mt-10 rounded-3xl border border-ayrac bg-yuzey py-16 text-center">
@@ -98,6 +173,23 @@ export default function CopKutusuSayfasi() {
           </div>
         )}
       </div>
+
+      <TehlikeliEylem
+        acik={defterSilHedef !== null}
+        siddet="kritik"
+        baslik={`Kalıcı sil: ${defterSilHedef?.es1_ad} & ${defterSilHedef?.es2_ad}`}
+        etkilenen="Defterin tamamı"
+        etkiler={[
+          "Defter, tüm dilekler ve fotoğraflar veritabanından silinir.",
+          "Yüklenen medya dosyaları diskten silinir.",
+          "Davetlilerin bıraktığı hiçbir şey geri getirilemez.",
+        ]}
+        geriDonus={null}
+        teyitMetni={defterSilHedef ? `${defterSilHedef.es1_ad} & ${defterSilHedef.es2_ad}` : undefined}
+        onayEtiket="Kalıcı olarak sil"
+        onOnay={() => { void defterKaliciSil(); }}
+        onKapat={() => setDefterSilHedef(null)}
+      />
     </AppShell>
   );
 }

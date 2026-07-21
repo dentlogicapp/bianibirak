@@ -3,7 +3,9 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
+import { toast } from "sonner";
 import { AppShell } from "@/components/site/AppShell";
+import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 import { defterDurumu, durumTonSinif } from "@/lib/durum";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
@@ -126,6 +128,7 @@ function EtkinlikListesi({
   const router = useRouter();
   const [secilenId, setSecilenId] = useState<string | null>(null);
   const [silId, setSilId] = useState<string | null>(null);
+  const [silHedef, setSilHedef] = useState<Etkinlik | null>(null);
 
   async function ac(e: Etkinlik) {
     setSecilenId(e.id);
@@ -134,12 +137,24 @@ function EtkinlikListesi({
     if (cevap.ok) router.push("/gelen-dilekler");
   }
 
+  // COPE TASI - kalici silme DEGIL. Onay penceresi bunu acikca soyler.
   async function sil(e: Etkinlik) {
     if (silId) return;
     setSilId(e.id);
     const cevap = await api.etkinlikSil(e.id);
     setSilId(null);
-    if (cevap.ok) onSilindi(e.id);
+    if (!cevap.ok) { toast.error(cevap.mesaj); return; }
+
+    onSilindi(e.id);
+    toast.success("Defter çöp kutusuna taşındı.");
+
+    // AKILLI GECIS: silinen defter AKTIF defterse kullanici bosluga dusmemeli.
+    // Baska defteri varsa ona gecilir; yoksa liste ekraninda kalir.
+    const kalanlar = etkinlikler.filter((x) => x.id !== e.id);
+    if (kalanlar.length > 0) {
+      const c = await api.etkinlikAktifYap(kalanlar[0].id);
+      if (c.ok) router.push("/gelen-dilekler");
+    }
   }
 
   return (
@@ -185,7 +200,13 @@ function EtkinlikListesi({
               >
                 {secilenId === e.id ? "Açılıyor..." : "Aç"}
               </button>
-              <SilButonu onay={() => sil(e)} bekliyor={silId === e.id} />
+              <button
+                onClick={() => setSilHedef(e)}
+                disabled={silId === e.id}
+                className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
+              >
+                Sil
+              </button>
             </div>
           </div>
         ))}

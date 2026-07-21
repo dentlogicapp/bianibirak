@@ -17,7 +17,7 @@ public sealed class CopTemizlemeGorevi : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CopTemizlemeGorevi> _log;
     private static readonly TimeSpan Aralik = TimeSpan.FromHours(6);
-    private const int CopGun = 30;
+    private const int CopGun = Sabitler.CopDilekGun;
     private const int UyariGun = 3; // silinmeye 3 gun kala haber ver
 
     public CopTemizlemeGorevi(IServiceScopeFactory scopeFactory, ILogger<CopTemizlemeGorevi> log)
@@ -114,7 +114,44 @@ public sealed class CopTemizlemeGorevi : BackgroundService
             });
             await db.SaveChangesAsync(ct);
         }
-    }
+    
+        // ---- SILINEN DEFTERLER (5 gun) ----
+        //
+        // Cift ya da super yonetici tarafindan cope tasinan defter, 5 gun sonra
+        // KALICI silinir. Uyari bildirimi GONDERILMEZ: defter bilincli bir kararla
+        // cope atilmistir; "kurtar sunu" cagrisi yapmak kullaniciyi rahatsiz eder.
+        // (20 gunluk otomatik imha uyarilari bundan ayridir - onlar sistemin takvimi.)
+        var defterEsigi = simdi.AddDays(-Sabitler.CopDefterGun);
+        var silinecekDefterler = await db.Etkinlikler.AsNoTracking()
+            .Where(e => e.SilindiMi && !e.ImhaEdildi
+                        && e.SilinmeZamani != null && e.SilinmeZamani < defterEsigi)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+
+        foreach (var defterId in silinecekDefterler)
+        {
+            db.DenetimGunlukleri.Add(new Entities.DenetimGunlugu
+            {
+                Id = Guid.NewGuid(),
+                EtkinlikId = null,
+                KullaniciId = null,
+                Eylem = "ETKINLIK_COPTEN_KALICI_SILINDI",
+                Varlik = "etkinlikler",
+                VarlikId = defterId,
+                DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(
+                    new { gun = Sabitler.CopDefterGun }),
+                SistemEylemi = true,
+                CreatedAt = simdi,
+            });
+            await db.SaveChangesAsync(ct);
+
+            // TEK ZINCIR - copteki dilekler dahil her sey ayni islemde gider.
+            await DefterImha.KaliciSilAsync(db, depo, defterId, ct);
+        }
+
+        if (silinecekDefterler.Count > 0)
+            _log.LogInformation("Cop: {Sayi} defter kalici silindi", silinecekDefterler.Count);
+}
 
     // katkiId + ek'ten deterministik GUID (idempotent bildirim).
     private static Guid DeterministikId(Guid katkiId, string ek)

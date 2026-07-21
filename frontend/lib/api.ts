@@ -154,6 +154,16 @@ export type SuperDestekKonusma = {
   mesajlar: DestekMesaj[];
 };
 
+export type CopDefter = {
+  id: string;
+  es1_ad: string;
+  es2_ad: string;
+  tur: string;
+  etkinlik_tarihi: string;
+  silinme_zamani: string | null;
+  dilek_sayisi: number;
+};
+
 export type CopDilek = {
   id: string;
   davetliAd: string;
@@ -851,6 +861,12 @@ export const api = {
       }),
     }),
 
+  copDefterler: () =>
+    istek<{ defterler: CopDefter[]; kalici_silme_gun: number }>("/api/cop/defterler"),
+  copDefterGeriAl: (id: string) =>
+    istek<{ ok: boolean }>(`/api/cop/defter/${id}/geri-al`, { method: "POST" }),
+  copDefterKaliciSil: (id: string) =>
+    istek<{ ok: boolean }>(`/api/cop/defter/${id}/kalici-sil`, { method: "POST" }),
   copeat: (id: string) =>
     istek<{ copeAtildi: boolean }>(`/api/katki/${id}/copeat`, { method: "POST" }),
 

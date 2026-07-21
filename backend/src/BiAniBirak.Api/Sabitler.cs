@@ -167,6 +167,14 @@ public static class Sabitler
     // AYNI sayiyi soyler; ayri hesap yapan ikinci bir yer YOKTUR.
     public const int SaklamaGun = IndirmeGun;
 
+    // COP KUTUSU SURELERI - iki farkli saat, tek cop kutusu.
+    //
+    // DILEK 30 gun: tek bir dilegin kaybi sinirlidir; bolca dusunme payi verilir.
+    // DEFTER 5 gun: tum eser soz konusudur ama sonsuza kadar tutmak "silinir"
+    // sozunu curutur. 5 gun, pismanlik icin yeterli, disk icin kabul edilebilir.
+    public const int CopDilekGun = 30;
+    public const int CopDefterGun = 5;
+
     // Bildirim saatleri (Turkiye saati, UTC+3). Sabah ve aksam - insanin telefonuna
     // baktigi saatler.
     public const int BildirimSabahSaat = 10;

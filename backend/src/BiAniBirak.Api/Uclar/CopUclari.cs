@@ -31,6 +31,11 @@ public static class CopUclari
     public static void CopUclariniEkle(this WebApplication app)
     {
         app.MapGet("/api/etkinlik/aktif/cop", CopListe).RequireAuthorization();
+        // SILINEN DEFTERLER - ciftin kendi coplugu. Dileklerden AYRI listelenir
+        // cunku sureleri farklidir (defter 5 gun, dilek 30 gun).
+        app.MapGet("/api/cop/defterler", CopDefterler).RequireAuthorization();
+        app.MapPost("/api/cop/defter/{id:guid}/geri-al", DefterGeriAl).RequireAuthorization();
+        app.MapPost("/api/cop/defter/{id:guid}/kalici-sil", DefterKaliciSil).RequireAuthorization();
         app.MapPost("/api/katki/{id}/geri-al", GeriAl).RequireAuthorization();
         app.MapPost("/api/katki/{id}/kalici-sil", KaliciSil).RequireAuthorization();
         app.MapPost("/api/katki/{id}/copeat", CopeAt).RequireAuthorization();
@@ -234,4 +239,88 @@ public static class CopUclari
 
         return Results.Ok(new { copeAtildi = true });
     }
+    // ---- SILINEN DEFTERLER (ciftin coplugu) ----
+
+    // Yalniz KULLANICININ UYESI OLDUGU silinmis defterler. Baskasinin defteri
+    // gorunmez - cop kutusu da tenant izolasyonuna tabidir.
+    private static async Task<IResult> CopDefterler(
+        HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        if (!KullaniciKimligi(ctx, out var kid)) return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+
+        var idler = await db.EtkinlikUyelikleri.AsNoTracking()
+            .Where(u => u.KullaniciId == kid).Select(u => u.EtkinlikId).ToListAsync(ct);
+
+        var defterler = await db.Etkinlikler.AsNoTracking()
+            .Where(e => idler.Contains(e.Id) && e.SilindiMi && !e.ImhaEdildi)
+            .OrderByDescending(e => e.SilinmeZamani)
+            .Select(e => new
+            {
+                id = e.Id,
+                es1_ad = e.Es1Ad,
+                es2_ad = e.Es2Ad,
+                tur = e.Tur,
+                etkinlik_tarihi = e.EtkinlikTarihi,
+                silinme_zamani = e.SilinmeZamani,
+                dilek_sayisi = db.Katkilar.Count(k => k.EtkinlikId == e.Id),
+            })
+            .ToListAsync(ct);
+
+        return Results.Ok(new { defterler, kalici_silme_gun = Sabitler.CopDefterGun });
+    }
+
+    private static async Task<IResult> DefterGeriAl(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
+    {
+        if (!KullaniciKimligi(ctx, out var kid)) return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!await UyeMi(db, kid, id, ct)) return Hata(403, "ERISIM_YOK", "Bu deftere uye degilsiniz.");
+
+        var e = await db.Etkinlikler.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (e == null || !e.SilindiMi) return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadi.");
+
+        e.SilindiMi = false;
+        e.SilinmeZamani = null;
+        e.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(), EtkinlikId = id, KullaniciId = kid,
+            Eylem = "ETKINLIK_GERI_ALINDI", Varlik = "etkinlikler", VarlikId = id,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new { ok = true });
+    }
+
+    // Cift kendi defterini kalici siler. Ayni zincir (DefterImha) - copteki
+    // dilekler dahil her sey ayni islemde gider.
+    private static async Task<IResult> DefterKaliciSil(
+        Guid id, HttpContext ctx, BiAniBirakDbContext db, DepolamaServisi depo,
+        CancellationToken ct)
+    {
+        if (!KullaniciKimligi(ctx, out var kid)) return Hata(401, "ERISIM_YOK", "Oturum bulunamadi.");
+        if (!await UyeMi(db, kid, id, ct)) return Hata(403, "ERISIM_YOK", "Bu deftere uye degilsiniz.");
+
+        var e = await db.Etkinlikler.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (e == null) return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadi.");
+        if (!e.SilindiMi)
+            return Hata(400, "ONCE_COPE_AT", "Kalici silmeden once defter cop kutusuna tasinmali.");
+
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(), EtkinlikId = null, KullaniciId = kid,
+            Eylem = "ETKINLIK_KALICI_SILINDI", Varlik = "etkinlikler", VarlikId = id,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+
+        await DefterImha.KaliciSilAsync(db, depo, id, ct);
+        return Results.Ok(new { ok = true });
+    }
+
+    private static async Task<bool> UyeMi(
+        BiAniBirakDbContext db, Guid kullaniciId, Guid etkinlikId, CancellationToken ct)
+        => await db.EtkinlikUyelikleri.AsNoTracking()
+            .AnyAsync(u => u.KullaniciId == kullaniciId && u.EtkinlikId == etkinlikId, ct);
+
 }

@@ -364,8 +364,16 @@ public static class EtkinlikUclari
         if (etkinlik == null)
             return Hata(404, "ETKINLIK_BULUNAMADI", "Etkinlik bulunamadi.");
 
+        // TEK MEKANIZMA: SilindiMi + SilinmeZamani.
+        //
+        // Onceden burada DeletedAt yaziliyordu; oysa cop kutusu (hem ciftin hem super
+        // panelin) SilindiMi bayragina bakiyor. Iki paralel yumusak-silme mekanizmasi
+        // vardi ve birbirlerini GORMUYORLARDI: kullanicinin sildigi defter hicbir
+        // yerde gorunmuyor, hicbir gorev de temizlemiyordu - gorunmez bir hayalet
+        // olarak sonsuza kadar duruyordu.
         var simdi = DateTimeOffset.UtcNow;
-        etkinlik.DeletedAt = simdi;
+        etkinlik.SilindiMi = true;
+        etkinlik.SilinmeZamani = simdi;
         etkinlik.UpdatedAt = simdi;
 
         db.DenetimGunlukleri.Add(new DenetimGunlugu
@@ -373,7 +381,7 @@ public static class EtkinlikUclari
             Id = Guid.NewGuid(),
             EtkinlikId = etkinlikId,
             KullaniciId = kullaniciId,
-            Eylem = "ETKINLIK_SILINDI",
+            Eylem = "ETKINLIK_COPE_TASINDI",
             Varlik = "etkinlikler",
             VarlikId = etkinlikId,
             DegisenAlanlar = null,
@@ -381,7 +389,7 @@ public static class EtkinlikUclari
         });
         await db.SaveChangesAsync();
 
-        return Results.Json(new { durum = "silindi" });
+        return Results.Json(new { durum = "cope_tasindi" });
     }
 
     private static async Task<IResult> AktifYap(
