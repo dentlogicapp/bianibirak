@@ -146,6 +146,7 @@ function EtkinlikListesi({
     if (!cevap.ok) { toast.error(cevap.mesaj); return; }
 
     onSilindi(e.id);
+    setSilHedef(null);
     toast.success("Defter çöp kutusuna taşındı.");
 
     // AKILLI GECIS: silinen defter AKTIF defterse kullanici bosluga dusmemeli.
@@ -156,6 +157,11 @@ function EtkinlikListesi({
       if (c.ok) router.push("/gelen-dilekler");
     }
   }
+
+  // SON DEFTER UYARISI - engellemek DEGIL, soylemek.
+  // Kullanicinin kendi verisidir; karari o verir. Ama "bu son defterindi" bilgisi
+  // karari degistirebilecek turdendir ve pencereden SONRA ogrenilmemelidir.
+  const sonDefter = etkinlikler.length === 1;
 
   return (
     <section className="mt-8">
@@ -211,41 +217,32 @@ function EtkinlikListesi({
           </div>
         ))}
       </div>
-    </section>
-  );
-}
 
-// Iki adimli sil (yanlislikla silmeyi onler)
-function SilButonu({ onay, bekliyor }: { onay: () => void; bekliyor: boolean }) {
-  const [emin, setEmin] = useState(false);
-  if (bekliyor) {
-    return <span className="font-govde text-xs text-ikincil">Siliniyor...</span>;
-  }
-  if (!emin) {
-    return (
-      <button
-        onClick={() => setEmin(true)}
-        className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-      >
-        Sil
-      </button>
-    );
-  }
-  return (
-    <span className="flex items-center gap-1">
-      <button
-        onClick={onay}
-        className="rounded-full bg-sarap px-3 py-2 font-govde text-xs font-medium text-parsomen"
-      >
-        Eminim
-      </button>
-      <button
-        onClick={() => setEmin(false)}
-        className="rounded-full border border-ayrac px-3 py-2 font-govde text-xs text-ikincil"
-      >
-        Vazgeç
-      </button>
-    </span>
+      {/* ONAY PENCERESI - butonun ASIL karsiligi.
+          Onceden bu bilesen import edilmis ama JSX'e HIC konmamisti: "Sil" hedefi
+          isaretliyor, ekranda ise hicbir sey olmuyordu. Kullanici acisindan bu
+          "bozuk buton"dur - bir eylem, ya calisir ya hic gosterilmez. */}
+      <TehlikeliEylem
+        acik={silHedef !== null}
+        siddet="uyari"
+        baslik={`Çöp kutusuna taşı: ${silHedef?.es1_ad} & ${silHedef?.es2_ad}`}
+        etkilenen="Bu defter ve davetlileri"
+        etkiler={[
+          "Defter listenden kaybolur; menüde artık görünmez.",
+          "Davetli bağlantıları çalışmaz - yeni dilek gelmez.",
+          "Dilekler ve fotoğraflar SİLİNMEZ, çöp kutusunda bekler.",
+          "Baskıya hazır nüsha indirilemez.",
+          ...(sonDefter
+            ? ["Bu senin tek defterin - silersen elinde açık defter kalmaz."]
+            : []),
+        ]}
+        geriDonus="Çöp Kutusu'ndan geri alınabilir. 5 gün sonra kalıcı olarak silinir."
+        onayEtiket="Çöp kutusuna taşı"
+        yukleniyor={silId !== null}
+        onOnay={() => { const e = silHedef; if (e) void sil(e); }}
+        onKapat={() => setSilHedef(null)}
+      />
+    </section>
   );
 }
 

@@ -689,11 +689,28 @@ function KullanicilarSekmesi() {
 }
 
 // ---------------- COP KUTUSU ----------------
+//
+// KALICI SILME HEDEFI - TEK TIP, IKI KAYNAK.
+//
+// Cop listesindeki defter ile imha arsivindeki kabuk AYNI uca gider ve AYNI onaydan
+// gecer; farklari yalnizca gosterilen metindir. Iki ayri hedef tipi tutsaydik iki
+// ayri onay akisi dogar, ikisi zamanla ayrisirdi.
+//
+// teyit_cipasi BACKEND'DEN gelir. Frontend'in "{es1} & {es2}" kalibini yeniden
+// uretmesi YASAK: imha edilmis defterde adlar bosaltilmistir ve o kalip " & "
+// uretir - yazilamaz bir cipa, sonsuza dek 400 TEYIT_ESLESMEDI.
+type SilmeHedefi = {
+  id: string;
+  baslik: string;
+  teyitCipasi: string;
+  imha: boolean;
+};
+
 function CopSekmesi() {
-  // Kalici silme hedefi - onay ayni TehlikeliEylem bileseniyle (panelde TEK dil).
-  const [kaliciHedef, setKaliciHedef] = useState<{ id: string; es1_ad: string; es2_ad: string } | null>(null);
+  const [kaliciHedef, setKaliciHedef] = useState<SilmeHedefi | null>(null);
   const [cop, setCop] = useState<CopKutusu | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [siliniyor, setSiliniyor] = useState(false);
 
   const cek = useCallback(async () => {
     setYukleniyor(true);
@@ -716,13 +733,19 @@ function CopSekmesi() {
     void cek();
   }
 
-  async function dilekGeriAl(id: string) {
-    const c = await api.superKatkiGeriAl(id);
+  async function kaliciSil() {
+    if (!kaliciHedef || siliniyor) return;
+    setSiliniyor(true);
+    const c = await api.superDefterKaliciSil(kaliciHedef.id, kaliciHedef.teyitCipasi);
+    setSiliniyor(false);
     if (!c.ok) {
       toast.error(c.mesaj);
       return;
     }
-    toast.success("Dilek geri yüklendi.");
+    toast.success(
+      kaliciHedef.imha ? "İmha kaydı arşivden kaldırıldı." : "Defter kalıcı olarak silindi."
+    );
+    setKaliciHedef(null);
     void cek();
   }
 
@@ -730,7 +753,9 @@ function CopSekmesi() {
     return <p className="text-center font-govde text-sm text-ikincil">Yükleniyor...</p>;
   }
 
-  const bos = !cop || (cop.defterler.length === 0 && cop.dilekler.length === 0);
+  const imhaArsivi = cop?.imha_arsivi ?? [];
+  const bos =
+    !cop || (cop.defterler.length === 0 && imhaArsivi.length === 0 && cop.dilekler.length === 0);
   if (bos) {
     return (
       <p className="rounded-2xl border border-dashed border-ayrac bg-parsomen px-6 py-12 text-center font-display text-lg italic text-ikincil">
@@ -774,7 +799,14 @@ function CopSekmesi() {
                     : "silinmeye 5 gün"}
                 </span>
                 <button
-                  onClick={() => setKaliciHedef(d)}
+                  onClick={() =>
+                    setKaliciHedef({
+                      id: d.id,
+                      baslik: `${d.es1_ad} & ${d.es2_ad}`,
+                      teyitCipasi: d.teyit_cipasi,
+                      imha: false,
+                    })
+                  }
                   className="shrink-0 rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
                 >
                   Kalıcı sil
@@ -784,6 +816,61 @@ function CopSekmesi() {
                   className="shrink-0 rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
                 >
                   Geri yükle
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* IMHA ARSIVI - AYRI BOLME, AYRI DIL, GERI YUKLEME YOK.
+          //
+          // Bu satirlar defter DEGIL, defterin kanitidir: icerik (dilekler, fotograflar,
+          // es adlari) ImhaGorevi tarafindan yok edilmistir; geriye "bir defter vardi ve
+          // su tarihte imha edildi" bilgisi kalmistir - KVKK karsiligimiz budur.
+          //
+          // Onceden bunlar silinen defterler listesinde "Geri yükle" butonuyla
+          // duruyordu: iceriksiz bir kabuga kurtarma vaadi. Butona basan yonetici bos
+          // bir defter geri getirir, ne oldugunu anlamazdi. Ayrildilar. */}
+      {imhaArsivi.length > 0 && (
+        <section>
+          <p className="mb-1 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+            İmha arşivi
+          </p>
+          <p className="metin-yasli mb-3 font-govde text-xs leading-relaxed text-ikincil">
+            İçeriği saklama takvimi dolduğu için yok edilmiş defterler. Geri
+            <span className="text-murekkep"> yüklenemez</span> - yalnızca imhanın
+            gerçekleştiğine dair kayıt olarak durur. Kişisel veri içermez.
+          </p>
+          <div className="space-y-2">
+            {imhaArsivi.map((d) => (
+              <div
+                key={d.id}
+                className="flex min-w-0 items-center gap-3 rounded-2xl border border-dashed border-ayrac bg-parsomen p-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-govde text-sm text-ikincil">
+                    {d.teyit_cipasi}
+                  </p>
+                  <p className="font-govde text-xs text-ikincil">
+                    {turEtiketi(d.tur)} · imha: {tarihKisa(d.imha_zamani)}
+                  </p>
+                </div>
+                <span className="shrink-0 self-center rounded-full bg-yuzeyKoyu px-2.5 py-1 font-govde text-[0.6rem] uppercase tracking-etiket text-ikincil">
+                  İmha edildi
+                </span>
+                <button
+                  onClick={() =>
+                    setKaliciHedef({
+                      id: d.id,
+                      baslik: d.teyit_cipasi,
+                      teyitCipasi: d.teyit_cipasi,
+                      imha: true,
+                    })
+                  }
+                  className="shrink-0 rounded-full border border-sarap/40 px-4 py-2 font-govde text-xs text-sarap transition-colors hover:bg-sarap/10"
+                >
+                  Kaydı sil
                 </button>
               </div>
             ))}
@@ -806,26 +893,35 @@ function CopSekmesi() {
       <TehlikeliEylem
         acik={kaliciHedef !== null}
         siddet="kritik"
-        baslik={`Kalıcı sil: ${kaliciHedef?.es1_ad} & ${kaliciHedef?.es2_ad}`}
-        etkilenen="Çift, davetliler ve tüm defter içeriği"
-        etkiler={[
-          "Defter, dilekler, fotoğraflar, bağlantılar ve üyelikler veritabanından silinir.",
-          "Yüklenen tüm medya dosyaları diskten silinir.",
-          "Çift bir daha bu deftere erişemez; kurtarma yolu yoktur.",
-          "Denetim kayıtları adli iz olarak korunur (kişisel veri içermez).",
-        ]}
+        baslik={
+          kaliciHedef?.imha
+            ? `İmha kaydını sil: ${kaliciHedef?.baslik}`
+            : `Kalıcı sil: ${kaliciHedef?.baslik}`
+        }
+        etkilenen={
+          kaliciHedef?.imha
+            ? "Yalnızca imha kaydı (içerik zaten yok edildi)"
+            : "Çift, davetliler ve tüm defter içeriği"
+        }
+        etkiler={
+          kaliciHedef?.imha
+            ? [
+                "İmha edilmiş defterin kalan satırı veritabanından silinir.",
+                "Bu satır kişisel veri içermez; imhanın kaydıdır.",
+                "Denetim kayıtları adli iz olarak korunur.",
+              ]
+            : [
+                "Defter, dilekler, fotoğraflar, bağlantılar ve üyelikler veritabanından silinir.",
+                "Yüklenen tüm medya dosyaları diskten silinir.",
+                "Çift bir daha bu deftere erişemez; kurtarma yolu yoktur.",
+                "Denetim kayıtları adli iz olarak korunur (kişisel veri içermez).",
+              ]
+        }
         geriDonus={null}
-        teyitMetni={kaliciHedef ? `${kaliciHedef.es1_ad} & ${kaliciHedef.es2_ad}` : undefined}
-        onayEtiket="Kalıcı olarak sil"
-        onOnay={async () => {
-          if (!kaliciHedef) return;
-          const c = await api.superDefterKaliciSil(
-            kaliciHedef.id, `${kaliciHedef.es1_ad} & ${kaliciHedef.es2_ad}`);
-          if (!c.ok) { toast.error(c.mesaj); return; }
-          toast.success("Defter kalıcı olarak silindi.");
-          setKaliciHedef(null);
-          void cek();
-        }}
+        teyitMetni={kaliciHedef?.teyitCipasi}
+        onayEtiket={kaliciHedef?.imha ? "Kaydı sil" : "Kalıcı olarak sil"}
+        yukleniyor={siliniyor}
+        onOnay={() => { void kaliciSil(); }}
         onKapat={() => setKaliciHedef(null)}
       />
     </div>
@@ -949,6 +1045,8 @@ function eylemMetni(eylem: string): string {
     DEFTER_COPE_ATILDI: "defteri çöpe attı",
     DEFTER_GERI_ALINDI: "defteri geri yükledi",
     DEFTER_KALICI_SILINDI: "bir defteri kalıcı sildi",
+    DEFTER_IMHA_EDILDI: "bir defter imha edildi",
+    ETKINLIK_COPTEN_KALICI_SILINDI: "çöpteki bir defter otomatik silindi",
     DILEK_MODERASYONLA_KALDIRILDI: "bir dileği kaldırdı",
     DILEK_GERI_ALINDI: "bir dileği geri yükledi",
     SUPER_ADMIN_ATANDI: "yönetici yetkisi verdi",

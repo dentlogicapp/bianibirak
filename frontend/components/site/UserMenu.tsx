@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { api, type Kullanici, type Bildirim, type Etkinlik } from "@/lib/api";
 import { useTema } from "@/lib/tema";
 import { ProfilimModal } from "@/components/site/ProfilimModal";
 import { DestekModal } from "@/components/site/DestekModal";
+import { KaydirSil } from "@/components/site/KaydirSil";
+import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 
 // Avatar menusu: bolumlu dropdown (Planlama Defteri tenant deseninin defter karsiligi).
 // A) Baslik: isim + mail + ACIK DEFTER (baglam her zaman gorunur)
@@ -41,6 +44,15 @@ export function UserMenu() {
   const [destekAcik, setDestekAcik] = useState(false);
   // Bildirimden mi gelindi - modal "sonlanmis yazisma" ekranini buna gore gosterir.
   const [destekBildirimden, setDestekBildirimden] = useState(false);
+
+  // DEFTER SILME - kaydirmali panel + web (x), ikisi de AYNI onaya cikar.
+  //
+  // Hangi satirin eylem paneli acik: TEK satir. Durum burada tutulur, satirin
+  // icinde degil - yoksa uc defteri arka arkaya kaydiran kullanicinin ekraninda
+  // uc panel birden acik kalirdi.
+  const [kaydirAcik, setKaydirAcik] = useState<string | null>(null);
+  const [silHedef, setSilHedef] = useState<Etkinlik | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
 
   // BILDIRIMDEN DESTEK MODALINI AC.
   // Destek bir sayfa degil modaldir; bu yuzden bildirim "?destek=1" ile gelir.
@@ -116,6 +128,12 @@ export function UserMenu() {
     return () => document.removeEventListener("mousedown", disari);
   }, [acik]);
 
+  // Menu kapaninca acik kalan eylem paneli de kapanir. Yoksa menu tekrar
+  // acildiginda kullanici, birakti unuttugu bir "Sil" butonuyla karsilasirdi.
+  useEffect(() => {
+    if (!acik) setKaydirAcik(null);
+  }, [acik]);
+
   // Bildirim cekme (planlama deseni): 15sn polling + pencere odaginda tazele.
   useEffect(() => {
     if (oturum !== "var") return;
@@ -163,6 +181,35 @@ export function UserMenu() {
         setGecis(false);
       }
     });
+  }
+
+  // SILME NIYETI - menuyu KAPATIR, onayi acar.
+  //
+  // Profilim ve Destek ile ayni desen. Menu acik kalsaydi, onay penceresine
+  // tiklamak "menu disina tiklama" sayilip menuyu kapatir, kapanan menu ile
+  // birlikte pencere de yok olurdu - kullanici hicbir sey olmadigini gorurdu.
+  function silNiyeti(e: Etkinlik) {
+    setKaydirAcik(null);
+    setAcik(false);
+    setTimeout(() => setSilHedef(e), 50);
+  }
+
+  // COPE TASI - kalici silme DEGIL. Onay penceresi bunu acikca soyler.
+  // Yalniz PASIF defterler bu yoldan silinir (acik defter listede yer almaz),
+  // bu yuzden defter degistirme gerekmez: kullanicinin bulundugu baglam bozulmaz.
+  async function defterSil() {
+    const e = silHedef;
+    if (!e || siliniyor) return;
+    setSiliniyor(true);
+    const c = await api.etkinlikSil(e.id);
+    setSiliniyor(false);
+    if (!c.ok) {
+      toast.error(c.mesaj);
+      return;
+    }
+    setEtkinlikler((o) => o.filter((x) => x.id !== e.id));
+    setSilHedef(null);
+    toast.success("Defter çöp kutusuna taşındı.");
   }
 
   function bildirimeTikla(b: Bildirim) {
@@ -285,7 +332,14 @@ export function UserMenu() {
 
             {/* ICINDE BULUNULAN DEFTER - "neredeyim?" sorusu menuyu acar acmaz yanitlanir.
                 Cok defterli kullanicida yanlis deftere islem yapmanin tek panzehiri
-                baglami HER ZAMAN gorunur kilmaktir. */}
+                baglami HER ZAMAN gorunur kilmaktir.
+
+                ACIK DEFTER SILINEMEZ - bilincli.
+                Silme eylemi yalniz PASIF defterlerde durur. Icinde bulundugun defteri
+                menuden silmek, ayagin bastigi dali kesmektir: silme aninda tum ekran
+                baglamsiz kalir, JWT'deki aktif_etkinlik_id olu bir kimlige isaret eder.
+                Acik defteri silmenin dogru yeri Etkinliklerim ekranidir - orada silme
+                sonrasi hangi deftere gecilecegi de yonetilir. */}
             {aktifEtkinlik && (
               <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-yuzeyKoyu px-3 py-2">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yaldiz" aria-hidden />
@@ -303,7 +357,10 @@ export function UserMenu() {
 
           {/* DIGER DEFTERLER - yalniz 2+ defter varsa; icinde bulunulan HARIC.
               Konum bilincli: baglamin (acik defter) HEMEN ALTINDA. Tiklayinca gecis
-              kendiliginden yapilir, ara sayfa yok. */}
+              kendiliginden yapilir, ara sayfa yok.
+
+              SILME: mobilde sola kaydir, masaustunde adin solundaki (x). Ikisi de
+              AYNI onaya cikar - iki ayri akis kurmak, iki ayri davranis demektir. */}
           {digerEtkinlikler.length > 0 && (
             <div className="border-b border-ayrac p-1.5">
               {/* YENI DEFTER - liste basinda. Cok defterli kullanicida "yeni ac"
@@ -323,23 +380,49 @@ export function UserMenu() {
                 Diğer defterlerin
               </p>
               {digerEtkinlikler.map((e) => (
-                <button
+                <KaydirSil
                   key={e.id}
-                  disabled={gecis}
-                  onClick={() => etkinlikDegistir(e.id)}
-                  className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep transition-colors hover:bg-yuzeyKoyu disabled:opacity-50"
+                  acikMi={kaydirAcik === e.id}
+                  onAc={() => setKaydirAcik(e.id)}
+                  onKapat={() => setKaydirAcik(null)}
+                  onSil={() => silNiyeti(e)}
                 >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
-                    <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
-                    <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
-                  </svg>
-                  <span className="min-w-0 flex-1 truncate">
-                    {e.es1_ad} &amp; {e.es2_ad} - {turKisa(e.tur)}
-                  </span>
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-ikincil" aria-hidden>
-                    <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </svg>
-                </button>
+                  <div className="group flex w-full min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-yuzeyKoyu">
+                    {/* KAPAT (x) - MASAUSTU YOLU.
+                        Adin SOLUNDA durur ve yalniz satirin uzerine gelinince
+                        belirir; bildirim (x)'i ile ayni gorsel dil. Tek farki:
+                        bildirim tek tikla gider, defter GITMEZ - once onay.
+                        Bildirim bir kayittir, defter bir mirastir. */}
+                    <button
+                      type="button"
+                      onClick={(ev) => { ev.stopPropagation(); silNiyeti(e); }}
+                      aria-label={`${e.es1_ad} & ${e.es2_ad} defterini sil`}
+                      className="ml-1.5 hidden shrink-0 rounded-full p-1 text-ikincil opacity-0 transition-opacity hover:text-sarap focus-visible:opacity-100 group-hover:opacity-100 sm:block"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+                      </svg>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={gecis}
+                      onClick={() => etkinlikDegistir(e.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-left font-govde text-sm text-murekkep disabled:opacity-50"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ikincil" aria-hidden>
+                        <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth={1.6} fill="none" />
+                        <path d="M4 9h16M8 3v4M16 3v4" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" />
+                      </svg>
+                      <span className="min-w-0 flex-1 truncate">
+                        {e.es1_ad} &amp; {e.es2_ad} - {turKisa(e.tur)}
+                      </span>
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-ikincil" aria-hidden>
+                        <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      </svg>
+                    </button>
+                  </div>
+                </KaydirSil>
               ))}
             </div>
           )}
@@ -609,6 +692,28 @@ export function UserMenu() {
           </div>
         </div>
       )}
+
+      {/* DEFTER SILME ONAYI - COPE TASI, kalici silme DEGIL.
+          Siddet "uyari": islem geri alinabilir ve pencere bunu acikca soyler.
+          Kritik seviye (ad yazarak teyit) yalnizca KALICI silmeye ayrildi; her
+          seyi kritik yapmak, kritigi anlamsizlastirir. */}
+      <TehlikeliEylem
+        acik={silHedef !== null}
+        siddet="uyari"
+        baslik={`Çöp kutusuna taşı: ${silHedef?.es1_ad} & ${silHedef?.es2_ad}`}
+        etkilenen="Bu defter ve davetlileri"
+        etkiler={[
+          "Defter listenden kaybolur; menüde artık görünmez.",
+          "Davetli bağlantıları çalışmaz - yeni dilek gelmez.",
+          "Dilekler ve fotoğraflar SİLİNMEZ, çöp kutusunda bekler.",
+          "Baskıya hazır nüsha indirilemez.",
+        ]}
+        geriDonus="Çöp Kutusu'ndan geri alınabilir. 5 gün sonra kalıcı olarak silinir."
+        onayEtiket="Çöp kutusuna taşı"
+        yukleniyor={siliniyor}
+        onOnay={() => { void defterSil(); }}
+        onKapat={() => setSilHedef(null)}
+      />
 
       <DestekModal
         acik={destekAcik}

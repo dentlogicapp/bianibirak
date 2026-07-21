@@ -294,6 +294,17 @@ export type KvkkTalep = {
   created_at: string;
 };
 
+// COP KUTUSU (super panel).
+//
+// UC AYRI LISTE, UC AYRI ANLAM:
+//   defterler   - cope atilmis, GERI ALINABILIR defterler
+//   imha_arsivi - icerigi yok edilmis, geri ALINAMAZ kabuklar (KVKK kaniti)
+//   dilekler    - moderasyonla kaldirilmis dilekler
+//
+// teyit_cipasi BACKEND'DEN gelir ve kalici silme onayinda BIREBIR kullanilir.
+// Frontend'in "{es1} & {es2}" kalibini yeniden uretmesi YASAK: kalip iki yerde
+// yasarsa bir gun ayrisir - nitekim ayristi ve imha edilmis defterde adlar bos
+// oldugu icin cipa " & " olup teyit sonsuza dek 400 donuyordu.
 export type CopKutusu = {
   defterler: {
     id: string;
@@ -301,6 +312,14 @@ export type CopKutusu = {
     es2_ad: string;
     tur: string;
     silinme_zamani: string;
+    teyit_cipasi: string;
+  }[];
+  imha_arsivi: {
+    id: string;
+    tur: string;
+    imha_zamani: string | null;
+    silinme_zamani: string | null;
+    teyit_cipasi: string;
   }[];
   dilekler: {
     id: string;
