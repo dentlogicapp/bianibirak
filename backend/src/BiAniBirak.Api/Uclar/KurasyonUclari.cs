@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using BiAniBirak.Api.Data;
 using BiAniBirak.Api.Entities;
+using BiAniBirak.Api.Kimlik;
 using BiAniBirak.Api.Modeller;
 using BiAniBirak.Api.Servisler;
 using Microsoft.EntityFrameworkCore;
@@ -53,9 +54,25 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        // INCELEME OTURUMUNDA INDIRME KAPALIDIR - VE BU BIR YETKI MESELESI DEGIL.
+        //
+        // Bu uc GET'tir; global write-guard onu KESMEZ. Ama iki yazim yapar:
+        // kurasyon_ciktilari'na bir kayit dusurur ve "ESER_INDIRILDI" denetimi yazar.
+        // Hatirlatma gorevi tam olarak o kayda bakip "bu cift eserini indirmis"
+        // der ve HATIRLATMA GONDERMEYI KESER.
+        //
+        // Yani bir yoneticinin teshis icin indirmesi, ciftin hatirlatmalarini
+        // susturur - ve cift, 20. gunde mirasini kaybeder. Teshis araci, korumasi
+        // gereken seyi yok edemez.
+        //
+        // Yoneticinin teshis icin ihtiyaci olan onizlemedir (96 DPI, asagida acik).
+        if (TenantErisim.IncelemeMi(rol))
+            return Hata(403, "GORUNTULEME_MODU",
+                "Salt okunur incelemede baskıya hazır nüsha indirilemez. Önizlemeyi kullan.");
 
         // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
         // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
@@ -149,6 +166,8 @@ public static class KurasyonUclari
     // ---------------- ONIZLEME (goruntu) ----------------
 
     // Kac sayfa, hangi cozunurlukte - goruntuleyici bunu bilerek yuklenir.
+    // OKUMA - inceleme oturumunda ACIKTIR: "defterim bozuk cikiyor" diyen bir cifte,
+    // defterin nasil ciktigini GORMEDEN yardim edilemez.
     private static async Task<IResult> OnizlemeBilgi(
         HttpContext ctx, BiAniBirakDbContext db, IWebHostEnvironment ortam,
         DepolamaServisi depo)
@@ -231,17 +250,22 @@ public static class KurasyonUclari
         return Guid.TryParse(ham, out id);
     }
 
-    private static async Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
+    // TENANT COZUMU - ARTIK TEK KAYNAKTAN: Kimlik/TenantErisim.
+    //
+    // Bu dosyada AYRI bir kopya vardi ve yalniz uyelik tanıyordu. Sonuc: super
+    // yonetici bir defteri salt-okunur inceledigunde Baskiya Hazir Defter ve
+    // onizleme ekranlari 403 donuyordu - yani "defterim bozuk cikiyor" diyen bir
+    // cifte, defterin nasil ciktigini gormeden yanit vermek gerekiyordu.
+    private static Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
         HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
-    {
-        var claim = ctx.User.FindFirstValue("aktif_etkinlik_id");
-        if (!Guid.TryParse(claim, out var etkinlikId))
-            return (false, Guid.Empty, "");
-        var uyelik = await db.EtkinlikUyelikleri.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
-        if (uyelik == null) return (false, Guid.Empty, "");
-        return (true, etkinlikId, uyelik.Rol);
-    }
+        => TenantErisim.CozAsync(ctx, db, kullaniciId);
+
+    // Salt-okunur inceleme oturumunda yazim reddi - tek cumle, tek yerde.
+    private static IResult? IncelemeReddi(string rol)
+        => TenantErisim.IncelemeMi(rol)
+            ? Hata(403, "GORUNTULEME_MODU",
+                "Salt okunur inceleme oturumunda değişiklik yapılamaz.")
+            : null;
 
     private static async Task Denetim(
         BiAniBirakDbContext db, Guid etkinlikId, Guid kullaniciId,
@@ -258,6 +282,7 @@ public static class KurasyonUclari
             DegisenAlanlar = degisen == null ? null : JsonSerializer.Serialize(degisen),
             CreatedAt = DateTimeOffset.UtcNow,
         });
+        await Task.CompletedTask;
     }
 
     // Kurasyonu getir (yoksa TURE GORE varsayilanlarla olustur) + onayli dilekleri SENKRONIZE et.
@@ -265,9 +290,14 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        // BU UC BIR "GET" AMA YAZIM YAPAR: kurasyon yoksa OLUSTURUR, yeni onaylanan
+        // dilekleri oge olarak EKLER, dusenleri SILER. Inceleme oturumunda bunlarin
+        // hicbiri olmamali - yonetici bakmakla ciftin verisini degistirmemeli.
+        var inceleme = TenantErisim.IncelemeMi(rol);
 
         var etkinlik = await db.Etkinlikler.AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == etkinlikId);
@@ -279,6 +309,13 @@ public static class KurasyonUclari
 
         if (kurasyon == null)
         {
+            // Inceleme oturumunda OLUSTURULMAZ: cift henuz studyoyu acmadiysa, o
+            // bosluk bir BULGUDUR. Yoneticinin bakmasi onu doldurup gercegi
+            // gizlerse, teshis kendi olcumunu bozmus olur.
+            if (inceleme)
+                return Hata(404, "KURASYON_BULUNAMADI",
+                    "Bu defterde kürasyon henüz başlatılmamış. Salt okunur incelemede başlatılamaz.");
+
             var v = Sabitler.KurasyonVarsayilan(etkinlik.Tur, etkinlik.Es1Ad, etkinlik.Es2Ad,
                 etkinlik.EtkinlikTarihi);
             kurasyon = new Kurasyon
@@ -302,45 +339,49 @@ public static class KurasyonUclari
         }
 
         // SENKRONIZASYON: onayli + silinmemis dilekler oge olarak var mi?
-        var onayliKatkilar = await db.Katkilar.AsNoTracking()
-            .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli" && !k.SilindiMi)
-            .OrderBy(k => k.CreatedAt)
-            .ToListAsync();
-
-        var mevcutOgeler = await db.KurasyonOgeleri
-            .Where(o => o.KurasyonId == kurasyon.Id)
-            .ToListAsync();
-
-        var mevcutKatkiIdler = mevcutOgeler.Select(o => o.KatkiId).ToHashSet();
-        var onayliIdler = onayliKatkilar.Select(k => k.Id).ToHashSet();
-
-        var degisti = false;
-        var siraSayaci = mevcutOgeler.Count == 0 ? 0 : mevcutOgeler.Max(o => o.Sira) + 1;
-
-        // Yeni onaylananlari ekle (kayip imkansiz)
-        foreach (var k in onayliKatkilar.Where(k => !mevcutKatkiIdler.Contains(k.Id)))
+        // Inceleme oturumunda ATLANIR - okumak yazmayi tetiklememeli.
+        if (!inceleme)
         {
-            db.KurasyonOgeleri.Add(new KurasyonOgesi
+            var onayliKatkilar = await db.Katkilar.AsNoTracking()
+                .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli" && !k.SilindiMi)
+                .OrderBy(k => k.CreatedAt)
+                .ToListAsync();
+
+            var mevcutOgeler = await db.KurasyonOgeleri
+                .Where(o => o.KurasyonId == kurasyon.Id)
+                .ToListAsync();
+
+            var mevcutKatkiIdler = mevcutOgeler.Select(o => o.KatkiId).ToHashSet();
+            var onayliIdler = onayliKatkilar.Select(k => k.Id).ToHashSet();
+
+            var degisti = false;
+            var siraSayaci = mevcutOgeler.Count == 0 ? 0 : mevcutOgeler.Max(o => o.Sira) + 1;
+
+            // Yeni onaylananlari ekle (kayip imkansiz)
+            foreach (var k in onayliKatkilar.Where(k => !mevcutKatkiIdler.Contains(k.Id)))
             {
-                Id = Guid.NewGuid(),
-                KurasyonId = kurasyon.Id,
-                KatkiId = k.Id,
-                Dahil = true,
-                Sira = siraSayaci++,
-                CreatedAt = simdi,
-            });
-            degisti = true;
-        }
+                db.KurasyonOgeleri.Add(new KurasyonOgesi
+                {
+                    Id = Guid.NewGuid(),
+                    KurasyonId = kurasyon.Id,
+                    KatkiId = k.Id,
+                    Dahil = true,
+                    Sira = siraSayaci++,
+                    CreatedAt = simdi,
+                });
+                degisti = true;
+            }
 
-        // Artik onayli olmayan (geri alinan / moderasyonla kaldirilan) ogeleri dusur
-        var dusecekler = mevcutOgeler.Where(o => !onayliIdler.Contains(o.KatkiId)).ToList();
-        if (dusecekler.Count > 0)
-        {
-            db.KurasyonOgeleri.RemoveRange(dusecekler);
-            degisti = true;
-        }
+            // Artik onayli olmayan (geri alinan / moderasyonla kaldirilan) ogeleri dusur
+            var dusecekler = mevcutOgeler.Where(o => !onayliIdler.Contains(o.KatkiId)).ToList();
+            if (dusecekler.Count > 0)
+            {
+                db.KurasyonOgeleri.RemoveRange(dusecekler);
+                degisti = true;
+            }
 
-        if (degisti) await db.SaveChangesAsync();
+            if (degisti) await db.SaveChangesAsync();
+        }
 
         // Tam veri (oge + katki birlesimi)
         var ogeler = await db.KurasyonOgeleri.AsNoTracking()
@@ -409,9 +450,10 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
         // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
@@ -460,9 +502,10 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
         // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
@@ -495,9 +538,10 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
         // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi
@@ -533,9 +577,10 @@ public static class KurasyonUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR - yazim ve BASKI NUSHASI INDIRME kapalidir.
         // Okuma serbest (onizleme/goruntuleme): dondurma bir DURDURMA'dir, veriyi

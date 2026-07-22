@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using BiAniBirak.Api.Data;
 using BiAniBirak.Api.Entities;
+using BiAniBirak.Api.Kimlik;
 using BiAniBirak.Api.Modeller;
 using BiAniBirak.Api.Servisler;
 using Microsoft.EntityFrameworkCore;
@@ -47,25 +48,36 @@ public static class GorselUclari
         return Guid.TryParse(ham, out id);
     }
 
-    private static async Task<(bool ok, Guid etkinlikId)> AktifTenant(
+    // TENANT COZUMU - ARTIK TEK KAYNAKTAN: Kimlik/TenantErisim.
+    //
+    // Bu dosyada AYRI bir kopya vardi ve yalniz uyelik tanıyordu. Sonuc: super
+    // yonetici bir defteri salt-okunur inceledigunde Fotograflar ekrani 403
+    // donuyor, teshis yarim kaliyordu - dilek gorunuyor ama fotografi gorunmuyordu.
+    //
+    // Donus artik UC degerli: rol de gelir. Yazim uclari rolu okuyup "inceleme"
+    // oturumunu reddeder (write-guard'a ek ikinci katman).
+    private static Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
         HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
-    {
-        var claim = ctx.User.FindFirstValue("aktif_etkinlik_id");
-        if (!Guid.TryParse(claim, out var etkinlikId)) return (false, Guid.Empty);
-        var uye = await db.EtkinlikUyelikleri.AsNoTracking()
-            .AnyAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
-        return (uye, uye ? etkinlikId : Guid.Empty);
-    }
+        => TenantErisim.CozAsync(ctx, db, kullaniciId);
+
+    // Salt-okunur inceleme oturumunda yazim reddi - tek cumle, tek yerde.
+    private static IResult? IncelemeReddi(string rol)
+        => TenantErisim.IncelemeMi(rol)
+            ? Hata(403, "GORUNTULEME_MODU",
+                "Salt okunur inceleme oturumunda değişiklik yapılamaz.")
+            : null;
 
     private static readonly string[] GecerliKonumlar =
         { "kapak", "ithaf", "bolum", "kapanis", "galeri" };
 
     // ---------------- LISTELE ----------------
+    // OKUMA - inceleme oturumunda ACIKTIR. Yonetici, ciftin defterindeki
+    // fotograflari gormeden "fotografim cikmiyor" diyen bir cifte yardim edemez.
     private static async Task<IResult> Listele(HttpContext ctx, BiAniBirakDbContext db)
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
 
         var gorseller = await db.EtkinlikGorselleri.AsNoTracking()
@@ -92,8 +104,9 @@ public static class GorselUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -174,8 +187,9 @@ public static class GorselUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -212,8 +226,9 @@ public static class GorselUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -241,8 +256,9 @@ public static class GorselUclari
     {
         if (!KullaniciKimligi(ctx, out var kullaniciId))
             return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
-        var (ok, etkinlikId) = await AktifTenant(ctx, db, kullaniciId);
+        var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kullaniciId);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya üye değilsin.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
