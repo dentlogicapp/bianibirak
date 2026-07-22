@@ -145,6 +145,19 @@ app.Use(async (ctx, sonraki) =>
                 Eylem = "GORUNTULEME_YAZMA_ENGELLENDI",
                 Varlik = "sistem",
                 DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { metot, yol }),
+                // SISTEM EYLEMI - CIFTIN DENETIM EKRANINDA GORUNMEZ.
+                //
+                // CANLIDA YAKALANDI: bu kayit SistemEylemi bayragi olmadan yaziliyordu,
+                // varsayilani false idi ve ciftin denetim gunlugundeki !SistemEylemi
+                // filtresini GECIYORDU. Sonuc: cift, "Sistem yoneticisi defterinizde
+                // degisiklik yapmaya calisti" satirlarini goruyordu - emanet ettigi
+                // guvenin tam kalbinden bir sizinti.
+                //
+                // SuperUclari.Denetim yardimcisi bunu zaten hep true yaziyor; ama bu
+                // middleware o yardimciyi KULLANMIYOR (kendi scope'unu acar), bu yuzden
+                // burada ACIKCA isaretlenmesi gerekti. Adli iz KAYBOLMAZ - super panelde
+                // ve Canli Akis'ta gorunur; gizlenen yalnizca CIFTIN EKRANI.
+                SistemEylemi = true,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
             await db.SaveChangesAsync();
