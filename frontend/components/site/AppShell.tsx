@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/site/UserMenu";
 import { BildirimBaslatici } from "@/components/site/BildirimBaslatici";
 import { GoruntulemeBandi } from "@/components/site/GoruntulemeBandi";
 import { OnayKapisi } from "@/components/site/OnayKapisi";
+import { SaltOkunurKilit } from "@/components/site/SaltOkunurKilit";
 import { useSwOdakDinleyici } from "@/lib/odak";
 import { useSenkron, useSenkronDinle } from "@/lib/senkron";
 import { api } from "@/lib/api";
@@ -104,6 +105,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* ONAY KAPISI - eksik onay varsa gecilemez. Onaylanmadan panel kullanilamaz. */}
       {onayGerekli && <OnayKapisi onTamam={() => setOnayGerekli(false)} />}
+
+      {/* SALT OKUNUR KILIT - inceleme oturumunda girdi alanlarini kilitler.
+          Backend zaten 403 doner; bu katman ARAYUZUN YALAN SOYLEMESINI onler.
+          Kilit kapaliyken hicbir sey render etmez, hicbir dinleyici baglamaz. */}
+      <SaltOkunurKilit />
 
     <div className="min-h-screen bg-parsomen">
       <GoruntulemeBandi />
