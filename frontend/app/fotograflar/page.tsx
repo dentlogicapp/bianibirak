@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api, gorselYukle, type EtkinlikGorseli } from "@/lib/api";
 import { gorselHazirla } from "@/lib/gorsel";
 import { AppShell } from "@/components/site/AppShell";
+import { useSaltOkunur } from "@/lib/salt-okunur";
 
 // FOTOGRAFLAR (en fazla 8 - Musa karari).
 // Ayni havuz uc yerde: davetli karsilama ekrani, panel, defter (PDF).
@@ -25,6 +26,15 @@ export default function FotograflarSayfasi() {
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
   const [yukleniyor, setYukleniyor] = useState(false);
   const dosyaRef = useRef<HTMLInputElement>(null);
+
+  // SALT OKUNUR INCELEME - super yonetici uyesi olmadigi bir defteri inceliyor.
+  //
+  // Fotograflar GORUNUR (teshis icin sart: "fotografim defterde cikmiyor" diyen
+  // bir cifte, fotograflarini gormeden yardim edilemez), ama YAZMA yapan her
+  // buton kilitlenir. Backend zaten 403 doner; buradaki kilit ARAYUZUN DURUST
+  // olmasi icindir - "yaptim sandim ama olmamis" hissi bir yonetim aracinda
+  // kabul edilemez.
+  const saltOkunur = useSaltOkunur();
 
   const cek = useCallback(async () => {
     const c = await api.gorselListe();
@@ -46,6 +56,7 @@ export default function FotograflarSayfasi() {
     const dosyalar = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (dosyalar.length === 0) return;
+    if (saltOkunur) return;
 
     const bosluk = tavan - gorseller.length;
     if (bosluk <= 0) {
@@ -83,6 +94,7 @@ export default function FotograflarSayfasi() {
   }
 
   async function konumDegistir(g: EtkinlikGorseli, konum: string) {
+    if (saltOkunur) return;
     const c = await api.gorselGuncelle(g.id, { konum });
     if (!c.ok) {
       toast.error(c.mesaj);
@@ -93,6 +105,7 @@ export default function FotograflarSayfasi() {
 
 
   async function tasi(index: number, yon: -1 | 1) {
+    if (saltOkunur) return;
     const hedef = index + yon;
     if (hedef < 0 || hedef >= gorseller.length) return;
     const yeni = [...gorseller];
@@ -106,6 +119,7 @@ export default function FotograflarSayfasi() {
   }
 
   async function sil(g: EtkinlikGorseli) {
+    if (saltOkunur) return;
     const c = await api.gorselSil(g.id);
     if (!c.ok) {
       toast.error(c.mesaj);
@@ -157,7 +171,7 @@ export default function FotograflarSayfasi() {
         </p>
         <button
           onClick={() => dosyaRef.current?.click()}
-          disabled={yukleniyor || dolu >= tavan}
+          disabled={saltOkunur || yukleniyor || dolu >= tavan}
           className="rounded-full bg-sarap px-6 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
         >
           {yukleniyor ? "Hazırlanıyor..." : "Fotoğraf ekle"}
@@ -224,7 +238,8 @@ export default function FotograflarSayfasi() {
                 <select
                   value={g.konum}
                   onChange={(e) => konumDegistir(g, e.target.value)}
-                  className="w-full rounded-lg border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep outline-none focus:border-sarap"
+                  disabled={saltOkunur}
+                  className="w-full rounded-lg border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep outline-none focus:border-sarap disabled:opacity-55"
                 >
                   {KONUMLAR.map((k) => (
                     <option key={k.kod} value={k.kod}>
@@ -241,7 +256,7 @@ export default function FotograflarSayfasi() {
                   <div className="flex gap-1">
                     <button
                       onClick={() => tasi(i, -1)}
-                      disabled={i === 0}
+                      disabled={saltOkunur || i === 0}
                       aria-label="Öne al"
                       className="rounded-md border border-ayrac p-1.5 text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-30"
                     >
@@ -251,7 +266,7 @@ export default function FotograflarSayfasi() {
                     </button>
                     <button
                       onClick={() => tasi(i, 1)}
-                      disabled={i === gorseller.length - 1}
+                      disabled={saltOkunur || i === gorseller.length - 1}
                       aria-label="Sona al"
                       className="rounded-md border border-ayrac p-1.5 text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-30"
                     >
@@ -263,7 +278,8 @@ export default function FotograflarSayfasi() {
 
                   <button
                     onClick={() => sil(g)}
-                    className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+                    disabled={saltOkunur}
+                    className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-40"
                   >
                     Kaldır
                   </button>

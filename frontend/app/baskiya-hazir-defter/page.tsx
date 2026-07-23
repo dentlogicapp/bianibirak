@@ -13,6 +13,7 @@ import { DefterKarti } from "@/components/site/DefterKarti";
 import { DurumBandi, DurumBandiBoslugu } from "@/components/site/DurumBandi";
 import { DilekInceleme } from "@/components/site/DilekInceleme";
 import { useOtoKaydet, otoKayitEtiket } from "@/lib/oto-kaydet";
+import { useSaltOkunur } from "@/lib/salt-okunur";
 
 // KURASYON STUDYOSU (Belge 03 - Akis 6): "Toplayici degil, kurasyon studyosu."
 // Sol: kurgu (dilek secimi/sira, kapak, ithaf, tema, gruplama)
@@ -77,6 +78,21 @@ export default function KurasyonSayfasi() {
 function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> }) {
   const [sekme, setSekme] = useState<Sekme>("dilekler");
 
+  // SALT OKUNUR INCELEME - super yonetici uyesi olmadigi bir defteri inceliyor.
+  //
+  // NE ACIK KALIR: sekme gezinmesi, canli onizleme, sayfa cevirme, dilek
+  // inceleme modali. Yani ciftin GORDUGU her sey. "Defterim bozuk cikiyor"
+  // diyen bir cifte, defterin nasil ciktigini gormeden yanit verilemez -
+  // teshis oturumunun varlik sebebi tam olarak budur.
+  //
+  // NE KILITLENIR: kurgu. Tema, gruplama, kapak/ithaf metinleri, dilek
+  // dahil/haric, sira, muhurleme ve indirme. Backend zaten hepsini 403 doner
+  // (bkz. KurasyonUclari.IncelemeReddi); buradaki kilit ARAYUZUN DURUST olmasi
+  // icindir. Onceden alanlar acik gorunuyor, yonetici degistiriyor, React yerel
+  // state'te tutuyor ve ekranda "degisti" kaliyordu - sunucuya hicbir sey
+  // yazilmadigi halde. Bir yonetim aracinda "yaptim sandim" hissi kabul edilemez.
+  const saltOkunur = useSaltOkunur();
+
   // Kurgu alanlari
   const [tema, setTema] = useState(ilk.tema);
   const [gruplama, setGruplama] = useState(ilk.gruplama_tipi);
@@ -127,16 +143,25 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   }, []);
   const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
 
+  // OTO-KAYDET SUSTURULUR: inceleme oturumunda "degisti" ASLA true olmaz.
+  //
+  // Alanlar zaten kilitli, yani teorik olarak deger degismez. Ama bu satir
+  // savunmanin ikinci katmani: tek bir kacak yol (tarayici otomatik doldurma,
+  // eklenti, gelecekte eklenecek bir alan) oto-kaydeti tetiklerse, 403 alan
+  // bir kayit dongusu ve kullaniciya sahte bir "kaydediliyor" gostergesi
+  // uretirdi.
   const degisti =
-    tema !== ilk.tema ||
-    gruplama !== ilk.gruplama_tipi ||
-    kapakBaslik !== (ilk.kapak_baslik ?? "") ||
-    kapakAltBaslik !== (ilk.kapak_alt_baslik ?? "") ||
-    ithaf !== (ilk.ithaf_metni ?? "") ||
-    kapanis !== (ilk.kapanis_metni ?? "") ||
-    tarihGoster !== ilk.tarih_goster;
+    !saltOkunur &&
+    (tema !== ilk.tema ||
+      gruplama !== ilk.gruplama_tipi ||
+      kapakBaslik !== (ilk.kapak_baslik ?? "") ||
+      kapakAltBaslik !== (ilk.kapak_alt_baslik ?? "") ||
+      ithaf !== (ilk.ithaf_metni ?? "") ||
+      kapanis !== (ilk.kapanis_metni ?? "") ||
+      tarihGoster !== ilk.tarih_goster);
 
   async function kaydet(): Promise<boolean> {
+    if (saltOkunur) return false;
     const c = await api.kurasyonGuncelle({
       tema,
       gruplamaTipi: gruplama,
@@ -162,6 +187,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
 
   // ---- Oge islemleri (anlik) ----
   async function dahilTersle(o: KurasyonOgesi) {
+    if (saltOkunur) return;
     const yeni = !o.dahil;
     setOgeler((liste) =>
       liste.map((x) => (x.katki_id === o.katki_id ? { ...x, dahil: yeni } : x))
@@ -176,6 +202,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   }
 
   async function tasi(index: number, yon: -1 | 1) {
+    if (saltOkunur) return;
     const hedef = index + yon;
     if (hedef < 0 || hedef >= ogeler.length) return;
     const yeniListe = [...ogeler];
@@ -218,6 +245,15 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
    * boyut secimine gecilir - acil durum kolu, ciftin mirasi rehin kalmaz.
    */
   async function indirmeyeBasla() {
+    // INCELEME OTURUMUNDA INDIRME YOK - ve sebebi yetki degil.
+    //
+    // Her PDF cikisi kurasyon_ciktilari'na kayit dusurur ve "ESER_INDIRILDI"
+    // denetimi yazar. Hatirlatma gorevi TAM OLARAK o kayda bakip "bu cift
+    // eserini indirmis" der ve HATIRLATMA GONDERMEYI KESER. Yoneticinin teshis
+    // icin indirmesi, ciftin hatirlatmalarini susturur ve cift 20. gunde
+    // mirasini kaybedebilir. Teshis araci, korumasi gereken seyi yok edemez.
+    if (saltOkunur) return;
+
     setUretiliyor("baski");
     const d = await odemeDurumu();
     setUretiliyor(null);
@@ -240,6 +276,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   }
 
   async function mirasiTamamla() {
+    if (saltOkunur) return;
     setTamamlaniyor(true);
     const c = await api.kurasyonTamamla();
     setTamamlaniyor(false);
@@ -279,7 +316,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         ve nasıl bir düzende yer alacağına karar verirsin.
       </p>
 
-      {/* Sekmeler */}
+      {/* Sekmeler - GEZINME, inceleme oturumunda da SERBEST. */}
       <div className="mt-5 flex min-w-0 gap-1 rounded-full border border-ayrac bg-yuzey p-1">
         {SEKMELER.map((s) => (
           <button
@@ -325,11 +362,12 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                       }`}
                     >
                       <div className="flex min-w-0 items-start gap-3">
-                        {/* Dahil/haric */}
+                        {/* Dahil/haric - YAZIM, inceleme oturumunda kilitli. */}
                         <button
                           onClick={() => dahilTersle(o)}
+                          disabled={saltOkunur}
                           aria-label={o.dahil ? "Eserden çıkar" : "Esere al"}
-                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-40 ${
                             o.dahil
                               ? "border-sarap bg-sarap text-parsomen"
                               : "border-ayrac bg-parsomen text-transparent"
@@ -348,7 +386,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                         </button>
 
                         {/* Govde tiklanabilir: dilegin kagittaki tam hali + davetli
-                            bilgileri acilir (defter ekranindaki desenin AYNISI). */}
+                            bilgileri acilir (defter ekranindaki desenin AYNISI).
+                            OKUMA - inceleme oturumunda da SERBEST. */}
                         <button
                           type="button"
                           onClick={() => setInceleme(o)}
@@ -389,11 +428,11 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                           </span>
                         </button>
 
-                        {/* Sira */}
+                        {/* Sira - YAZIM, inceleme oturumunda kilitli. */}
                         <div className="flex shrink-0 flex-col gap-1">
                           <button
                             onClick={() => tasi(i, -1)}
-                            disabled={i === 0}
+                            disabled={saltOkunur || i === 0}
                             aria-label="Yukarı taşı"
                             className="rounded-md border border-ayrac p-1 text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-30"
                           >
@@ -403,7 +442,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                           </button>
                           <button
                             onClick={() => tasi(i, 1)}
-                            disabled={i === ogeler.length - 1}
+                            disabled={saltOkunur || i === ogeler.length - 1}
                             aria-label="Aşağı taşı"
                             className="rounded-md border border-ayrac p-1 text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-30"
                           >
@@ -426,6 +465,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                 <input
                   value={kapakBaslik}
                   onChange={(e) => setKapakBaslik(e.target.value)}
+                  disabled={saltOkunur}
                   className={girdi}
                 />
               </Alan>
@@ -433,6 +473,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                 <input
                   value={kapakAltBaslik}
                   onChange={(e) => setKapakAltBaslik(e.target.value)}
+                  disabled={saltOkunur}
                   className={girdi}
                 />
               </Alan>
@@ -441,6 +482,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                   value={ithaf}
                   onChange={(e) => setIthaf(e.target.value)}
                   rows={5}
+                  disabled={saltOkunur}
                   className={girdi}
                 />
                 <p className="mt-2 font-govde text-xs text-ikincil">
@@ -452,6 +494,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                   value={kapanis}
                   onChange={(e) => setKapanis(e.target.value)}
                   rows={3}
+                  disabled={saltOkunur}
                   className={girdi}
                 />
               </Alan>
@@ -470,7 +513,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                     <button
                       key={t.kod}
                       onClick={() => setTema(t.kod)}
-                      className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                      disabled={saltOkunur}
+                      className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-55 ${
                         tema === t.kod
                           ? "border-sarap bg-sarap/5"
                           : "border-ayrac bg-parsomen hover:border-sarap/40"
@@ -507,12 +551,14 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                   <SecimSatiri
                     secili={gruplama === "taraf"}
                     onClick={() => setGruplama("taraf")}
+                    kapali={saltOkunur}
                     baslik="Taraflara göre"
                     aciklama={`"${ilk.es1_ad} tarafından" ve "${ilk.es2_ad} tarafından" bölümleri`}
                   />
                   <SecimSatiri
                     secili={gruplama === "kronolojik"}
                     onClick={() => setGruplama("kronolojik")}
+                    kapali={saltOkunur}
                     baslik="Kronolojik"
                     aciklama="Bırakılma sırasına göre, bölümsüz akış"
                   />
@@ -533,7 +579,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
                   role="switch"
                   aria-checked={tarihGoster}
                   onClick={() => setTarihGoster((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  disabled={saltOkunur}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-55 ${
                     tarihGoster ? "bg-sarap" : "bg-ayrac"
                   }`}
                 >
@@ -572,7 +619,11 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
 
       {/* ONIZLEME - defterin kendisi. FILIGRAN YOK.
           Once GORSUN: gurur duysun, paylasmak istesin. Satin alma arzusu buradan dogar.
-          Filigran bunun tam tersini yapardi - urunu cirkinlestirip arzuyu dusururdu. */}
+          Filigran bunun tam tersini yapardi - urunu cirkinlestirip arzuyu dusururdu.
+
+          INCELEME OTURUMUNDA DA ACIK: teshis icin gereken TAM OLARAK budur -
+          "defterim bozuk cikiyor" diyen bir cifte, defterin nasil ciktigini
+          gormeden yanit verilemez. */}
       {dahilOgeler.length > 0 && (
         <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           <div className="text-center">
@@ -609,7 +660,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
               yavas gecen parilti + nefes alan halka VAR - devlerin yontemi. */}
           <button
             onClick={() => void indirmeyeBasla()}
-            disabled={uretiliyor !== null || dahilOgeler.length === 0}
+            disabled={saltOkunur || uretiliyor !== null || dahilOgeler.length === 0}
             className="premium-vurgu flex w-full max-w-md min-w-0 items-center gap-3 rounded-2xl bg-sarap p-5 text-left transition-colors hover:bg-sarapKoyu disabled:opacity-50"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parsomen/20 text-parsomen">
@@ -620,16 +671,20 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </span>
             <span className="min-w-0">
               <span className="block font-govde text-sm font-medium text-parsomen">
-                {uretiliyor === "baski"
-                  ? "Eser hazırlanıyor..."
-                  : "Baskıya hazır yüksek çözünürlüklü defterini indir"}
+                {saltOkunur
+                  ? "Salt okunur incelemede indirme kapalı"
+                  : uretiliyor === "baski"
+                    ? "Eser hazırlanıyor..."
+                    : "Baskıya hazır yüksek çözünürlüklü defterini indir"}
               </span>
               {/* "Istedigin boyutta" DOGRU bir ifade: ISO 216 kagit serisinin tamami
                   (A3/A4/A5/A6) ayni en-boy oranina sahiptir (1:kok2). Bu yuzden A5
                   belge A4'e buyutuldugunde HICBIR SEY BOZULMAZ - kirpma olmaz, oran
                   kaymaz, duzen kaymaz. Yazilar vektor oldugu icin kayipsiz buyur. */}
               <span className="block font-govde text-xs text-parsomen/75">
-                İstediğin boyutta, cilt paylı, gömülü tipografi - matbaaya hazır!
+                {saltOkunur
+                  ? "Her indirme çiftin hatırlatma takvimini etkiler - önizlemeyi kullan."
+                  : "İstediğin boyutta, cilt paylı, gömülü tipografi - matbaaya hazır!"}
               </span>
             </span>
           </button>
@@ -647,8 +702,9 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             Odemeden once "yazici ayarlarini soyle yap, olceklendirmeyi boyle birak"
             demek, henuz satin almamis birine ONUN DEGIL BIZIM isimizi anlatmaktir -
             ve gozunde urunu "ugrasilmasi gereken bir sey"e cevirir.
-            Odedikten sonra ayni not, ona dogru sonucu aldiran bir rehberdir. */}
-        {(odeme === null || !odeme.odemeGerekli || odeme.odendi) && (
+            Odedikten sonra ayni not, ona dogru sonucu aldiran bir rehberdir.
+            Inceleme oturumunda hic gorunmez - indirme zaten kapali. */}
+        {!saltOkunur && (odeme === null || !odeme.odemeGerekli || odeme.odendi) && (
         <div className="mx-auto mt-4 max-w-md rounded-2xl border border-yaldiz/30 bg-parsomen/60 p-4">
           <p className="flex items-start gap-2.5">
             <span className="mt-0.5 shrink-0 text-yaldiz" aria-hidden>
@@ -694,7 +750,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           uretiliyor={uretiliyor === "baski"}
         />
 
-        {/* Muhurleme */}
+        {/* Muhurleme - YAZIM, inceleme oturumunda kilitli. */}
         {!tamamlandi && (
           <div className="mt-5 border-t border-yaldiz/30 pt-5 text-center">
             <p className="metin-yasli mx-auto max-w-md font-govde text-xs leading-relaxed text-ikincil">
@@ -703,7 +759,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </p>
             <button
               onClick={mirasiTamamla}
-              disabled={tamamlaniyor || dahilOgeler.length === 0}
+              disabled={saltOkunur || tamamlaniyor || dahilOgeler.length === 0}
               className="mt-3 rounded-full border border-sarap px-7 py-2.5 font-govde text-sm font-medium text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-50"
             >
               {tamamlaniyor ? "Mühürleniyor..." : "Mirasımı tamamla"}
@@ -712,7 +768,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
         )}
       </div>
 
-      {/* INCELEME - dilegin kagittaki tam hali (defter ekraniyla ayni bilesen) */}
+      {/* INCELEME - dilegin kagittaki tam hali (defter ekraniyla ayni bilesen).
+          OKUMA - inceleme oturumunda da SERBEST. */}
       {inceleme && (
         <DilekInceleme
           katki={ogeyiKatkiyaCevir(inceleme)}
@@ -726,9 +783,16 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       {/* Icerik bandin ALTINDA kalmasin */}
       <DurumBandiBoslugu />
 
+      {/* DURUM BANDI - inceleme oturumunda "Tum degisiklikler kayitli" YAZMAZ.
+          Yazsaydi, hicbir sey kaydedilmediginin tam tersini soylerdi - ve bu
+          bandin tek isi dogruyu soylemektir. */}
       <DurumBandi
-        metin={gosterge?.metin ?? "Tüm değişiklikler kayıtlı"}
-        sinif={gosterge?.sinif}
+        metin={
+          saltOkunur
+            ? "Salt okunur inceleme - değişiklik yapılamaz"
+            : gosterge?.metin ?? "Tüm değişiklikler kayıtlı"
+        }
+        sinif={saltOkunur ? undefined : gosterge?.sinif}
       />
     </AppShell>
   );
@@ -1069,7 +1133,7 @@ function KapanisGovdesi({
 
 // ---- Kucuk bilesenler ----
 const girdi =
-  "w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap";
+  "w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap disabled:opacity-55";
 
 function Alan({ etiket, children }: { etiket: string; children: React.ReactNode }) {
   return (
@@ -1087,16 +1151,19 @@ function SecimSatiri({
   onClick,
   baslik,
   aciklama,
+  kapali = false,
 }: {
   secili: boolean;
   onClick: () => void;
   baslik: string;
   aciklama: string;
+  kapali?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+      disabled={kapali}
+      className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-55 ${
         secili ? "border-sarap bg-sarap/5" : "border-ayrac bg-parsomen hover:border-sarap/40"
       }`}
     >

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useSaltOkunur } from "@/lib/salt-okunur";
 
 // SALT OKUNUR KILIT - inceleme oturumunda arayuzu DURUST hale getirir.
 //
@@ -20,6 +21,19 @@ import { useEffect, useState } from "react";
 //
 // KURAL: kullanicinin yapamayacagi bir seyi, yapabilirmis gibi gostermeyiz.
 //
+// ===================== KAPSAM VE SINIRI =====================
+//
+// BU BILESEN: metin girisi (input/textarea/select/contenteditable), yapistirma,
+// surukle-birak, anahtarlar ve dosya secici. Yani DEGER TASIYAN form ogeleri.
+//
+// BU BILESEN DEGIL: butonlar. Ve bilincli olarak degil - "Sonraki sayfa" ile
+// "Sablonu degistir" ikisi de <button>'dir; hicbir genel DOM kurali aralarindaki
+// farki bilemez. Tumunu kilitlemek onizlemeyi ve gezinmeyi de oldururdu, ki o
+// zaman inceleme oturumunun varlik sebebi kalmazdi.
+//
+// Butonlari SAYFALAR kendi kilitler: useSaltOkunur() hook'unu okur, yazma yapan
+// butonlari disabled eder, okuma/gezinme butonlarina dokunmaz.
+//
 // ===================== NASIL =====================
 //
 // Uc katman, hepsi YAKALAMA (capture) fazinda - React'in kendi olay isleyicileri
@@ -34,45 +48,20 @@ import { useEffect, useState } from "react";
 //      KOPYALAMA (Ctrl+C, Ctrl+A) SERBEST - okumak ve alintilamak tesihisin
 //      kendisidir, engellenmemeli.
 //   3. click       - anahtar/onay kutusu/dosya secici gibi TIKLAMAYLA deger
-//      degistiren ogeler. Duz butonlar serbest birakilir: sekme degistirmek,
-//      bir fotografi buyutmek, sayfa gezinmek yazma degildir ve teshis icin
-//      gereklidir. O yollardan bir yazim denenirse backend zaten 403 doner.
+//      degistiren ogeler.
 //
 // Gorsel taraf: alanlar soluklasir, imlec "yasak" olur ve YAZI IMLECI GORUNMEZ
 // (caret-color: transparent). Tiklayinca yanip sonen bir imlec gormek, "buraya
-// yazabilirim" vaadidir - vaat edilmeyecekse gosterilmemeli.
+// yazabilirim" vaadidir; vaat edilmeyecekse gosterilmemeli.
 //
 // Metin SECILEBILIR kalir: yonetici bir dilegi ya da ayari kopyalayip destek
 // yanitina yapistirabilmeli.
-//
-// ===================== NEDEN BILESEN ICI STIL =====================
-//
-// Stil globals.css yerine burada duruyor. Sebep kapsam degil RISK: globals.css
-// 500 satirlik, canlida calisan ve bu isle ilgisi olmayan onlarca animasyon
-// tasiyan bir dosya. Bes satirlik bir kural icin onu yeniden yazmak, ilgisiz bir
-// yerde harf hatasi riskini davet etmek olurdu. Kurallar zaten tema
-// degiskenlerine dayanmiyor - salt gecirgenlik ve imlec.
 
 export function SaltOkunurKilit() {
-  const [kilit, setKilit] = useState(false);
-
-  // Inceleme oturumunda miyiz? Otorite SUNUCUDUR (JWT claim'inden turetilir);
-  // istemcide tutulan bir bayrak degil.
-  useEffect(() => {
-    let iptal = false;
-    (async () => {
-      try {
-        const y = await fetch("/api/ben", { credentials: "include", cache: "no-store" });
-        if (!y.ok) return;
-        const v = await y.json();
-        if (!iptal) setKilit(v?.goruntuleme_modu === true);
-      } catch {
-        /* ag hatasi: kilit acilmaz. Backend zaten koruyor - burada sessiz kalmak,
-           kullaniciyi gereksiz yere kilitlemekten iyidir. */
-      }
-    })();
-    return () => { iptal = true; };
-  }, []);
+  // Bayrak ARTIK ORTAK KAYNAKTAN (lib/salt-okunur). Onceden bu bilesen kendi
+  // fetch'ini yapiyordu; sayfalar da ayni soruyu sorunca ayni yanit icin uc
+  // istek olusuyordu. Tek kaynak, tek istek.
+  const kilit = useSaltOkunur();
 
   useEffect(() => {
     if (!kilit) return;
@@ -120,7 +109,7 @@ export function SaltOkunurKilit() {
     }
 
     // ---- 3. click: tiklamayla deger degistiren ogeler ----
-    // Duz butonlar (sekme, buyutme, gezinme) SERBEST - teshis icin gerekli.
+    // Duz butonlar SERBEST - onlari sayfalar kendi kilitler (bkz. useSaltOkunur).
     function tiklama(e: MouseEvent) {
       const o = e.target as HTMLElement | null;
       if (!o || !o.closest) return;
@@ -169,6 +158,12 @@ export function SaltOkunurKilit() {
       html[data-salt-okunur="1"] [role="switch"],
       html[data-salt-okunur="1"] input[type="file"] {
         opacity: 0.55;
+        cursor: not-allowed;
+      }
+      /* Sayfalarin kendi kilitledigi YAZMA butonlari: disabled olduklarinda
+         imlec de "yasak" olsun. Tailwind disabled:opacity-* zaten soluklastiriyor;
+         eksik olan tek sey imlecti. */
+      html[data-salt-okunur="1"] button:disabled {
         cursor: not-allowed;
       }
       /* Metin SECILEBILIR kalir: yonetici bir dilegi ya da ayari kopyalayip

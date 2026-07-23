@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using BiAniBirak.Api.Data;
 using BiAniBirak.Api.Entities;
+using BiAniBirak.Api.Kimlik;
 using BiAniBirak.Api.Servisler;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,18 +49,30 @@ public static class CopUclari
         return Guid.TryParse(s, out id);
     }
 
-    private static async Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
+    // TENANT COZUMU - ARTIK TEK KAYNAKTAN: Kimlik/TenantErisim.
+    //
+    // Bu dosyada AYRI bir kopya vardi ve yalniz uyelik taniyordu; super yonetici
+    // bir defteri salt-okunur inceledigunde Cop Kutusu ekrani 403 donuyordu.
+    //
+    // INCELEME ROLUNUN BURADAKI SONUCU - ve bu bir KARARDIR, kaza degil:
+    // cop listesi "KaynakEs == rol" ile suzulur; "inceleme" hicbir es degeriyle
+    // eslesmez, dolayisiyla liste BOS doner. Ciftin cop kutusu, reddettigi
+    // dilekleri tutar - yani esinin bile goremedigi, en mahrem karar alani.
+    // Onay kuyrugunda verilen kararla (Musa: "kuyruk bos kalsin") birebir ayni
+    // cizgi: yonetici ORTAK deftere ve ayarlara bakar, kisisel kuyruklara bakmaz.
+    //
+    // Ekran yine de ACILIR: yonetici "cop kutum bozuk" diyen bir cifte, sayfanin
+    // yuklenip yuklenmedigini gorerek yanit verebilir. Icerik gormeden.
+    private static Task<(bool ok, Guid etkinlikId, string rol)> AktifTenant(
         HttpContext ctx, BiAniBirakDbContext db, Guid kullaniciId)
-    {
-        var claim = ctx.User.FindFirstValue("aktif_etkinlik_id");
-        if (!Guid.TryParse(claim, out var etkinlikId))
-            return (false, Guid.Empty, "");
-        var uyelik = await db.EtkinlikUyelikleri.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId);
-        if (uyelik == null)
-            return (false, Guid.Empty, "");
-        return (true, etkinlikId, uyelik.Rol);
-    }
+        => TenantErisim.CozAsync(ctx, db, kullaniciId);
+
+    // Salt-okunur inceleme oturumunda yazim reddi - tek cumle, tek yerde.
+    private static IResult? IncelemeReddi(string rol)
+        => TenantErisim.IncelemeMi(rol)
+            ? Hata(403, "GORUNTULEME_MODU",
+                "Salt okunur inceleme oturumunda değişiklik yapılamaz.")
+            : null;
 
     private static IResult Hata(int durum, string kod, string mesaj)
         => Results.Json(new { hata = kod, mesaj }, statusCode: durum);
@@ -109,6 +122,7 @@ public static class CopUclari
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -156,6 +170,7 @@ public static class CopUclari
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -206,6 +221,7 @@ public static class CopUclari
             return Hata(400, "DOGRULAMA_HATASI", "Gecersiz katki kimligi.");
         var (ok, etkinlikId, rol) = await AktifTenant(ctx, db, kid);
         if (!ok) return Hata(403, "ERISIM_YOK", "Aktif defter bulunamadi.");
+        if (IncelemeReddi(rol) is { } red) return red;
 
         // DONDURULMUS DEFTER SALT OKUNUR.
         if (await DondurmaGuard.DonduruldumuAsync(db, etkinlikId))
@@ -243,6 +259,10 @@ public static class CopUclari
 
     // Yalniz KULLANICININ UYESI OLDUGU silinmis defterler. Baskasinin defteri
     // gorunmez - cop kutusu da tenant izolasyonuna tabidir.
+    //
+    // NOT: bu uc AKTIF TENANT'a bakmaz, dogrudan kullanicinin UYELIKLERINE bakar.
+    // Yani inceleme oturumundaki yonetici burada KENDI silinmis defterlerini gorur,
+    // inceledigi ciftinkileri DEGIL. Sizinti yok; sinir uyelik.
     private static async Task<IResult> CopDefterler(
         HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
     {
@@ -269,6 +289,10 @@ public static class CopUclari
         return Results.Ok(new { defterler, kalici_silme_gun = Sabitler.CopDefterGun });
     }
 
+    // Bu iki uc UYELIK sinirinda calisir (UyeMi), aktif tenant'a bakmaz. Inceleme
+    // oturumundaki yonetici uyesi olmadigi bir defteri buradan da geri alamaz ya
+    // da silemez - koruma zaten yerinde. Ustelik ikisi de POST oldugu icin
+    // Program.cs'teki global write-guard da onlari keser (iki katman).
     private static async Task<IResult> DefterGeriAl(
         Guid id, HttpContext ctx, BiAniBirakDbContext db, CancellationToken ct)
     {
@@ -305,6 +329,14 @@ public static class CopUclari
         if (e == null) return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadi.");
         if (!e.SilindiMi)
             return Hata(400, "ONCE_COPE_AT", "Kalici silmeden once defter cop kutusuna tasinmali.");
+
+        // Bu defteri AKTIF tutan herkesin isareti temizlenir - satir birazdan
+        // silinecek; kalirsa o kullanicilarin cihazlari olu bir kimlige gonderilir.
+        // (EtkinlikUclari.EtkinlikSil ve SuperUclari'nda ayni kural.)
+        var aktifTutanlar = await db.Kullanicilar
+            .Where(k => k.AktifEtkinlikId == id)
+            .ToListAsync(ct);
+        foreach (var k in aktifTutanlar) k.AktifEtkinlikId = null;
 
         db.DenetimGunlukleri.Add(new DenetimGunlugu
         {
