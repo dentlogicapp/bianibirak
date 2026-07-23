@@ -294,9 +294,25 @@ public static class KurasyonUclari
         if (!ok)
             return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
 
-        // BU UC BIR "GET" AMA YAZIM YAPAR: kurasyon yoksa OLUSTURUR, yeni onaylanan
-        // dilekleri oge olarak EKLER, dusenleri SILER. Inceleme oturumunda bunlarin
-        // hicbiri olmamali - yonetici bakmakla ciftin verisini degistirmemeli.
+        // BU UC BIR "GET" AMA YAZIM YAPAR - ve iki farkli turden yazim yapar.
+        // Inceleme oturumunda ikisi AYNI muameleyi GORMEZ:
+        //
+        //   OLUSTURMA (kurasyon yoksa sifirdan kurmak) -> BLOKE.
+        //     Yeni durum uretir. Cift studyoyu hic acmadiysa o BOSLUK BIR BULGUDUR;
+        //     yoneticinin bakmasi onu doldurup gercegi gizlerse, teshis kendi
+        //     olcumunu bozmus olur.
+        //
+        //   SENKRONIZASYON (onaylanan dilekleri oge yapmak) -> SERBEST.
+        //     Turetilmis durumdur: onaylanmis bir dilek ZATEN deftere aittir, bu
+        //     blok yalnizca DB'yi o gercege esitler. Idempotenttir, ciftin bir
+        //     sonraki ziyaretinde nasil olsa calisacaktir, icerik yaratmaz ve
+        //     yok etmez.
+        //
+        // ILK SURUMDE IKISI DE BLOKEYDI VE BU BIR HATAYDI (canlida yakalandi):
+        // cift bir dilegi onaylamis ama oge listesine henuz girmemisti; yonetici
+        // teshis icin actiginda senkron atlandi, liste bos kaldi ve onizleme
+        // "dilek yok" dedi. Koruma, korumasi gereken teshisi KOR ETTI. Onizlemesiz
+        // bir inceleme oturumunun varlik sebebi kalmaz.
         var inceleme = TenantErisim.IncelemeMi(rol);
 
         var etkinlik = await db.Etkinlikler.AsNoTracking()
@@ -339,8 +355,9 @@ public static class KurasyonUclari
         }
 
         // SENKRONIZASYON: onayli + silinmemis dilekler oge olarak var mi?
-        // Inceleme oturumunda ATLANIR - okumak yazmayi tetiklememeli.
-        if (!inceleme)
+        //
+        // INCELEME OTURUMUNDA DA CALISIR (yukaridaki gerekce). Turetilmis durumun
+        // esitlenmesidir; onizlemenin gercegi gostermesinin tek yolu budur.
         {
             var onayliKatkilar = await db.Katkilar.AsNoTracking()
                 .Where(k => k.EtkinlikId == etkinlikId && k.Durum == "onayli" && !k.SilindiMi)
