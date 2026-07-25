@@ -23,7 +23,8 @@ export type EvreGirdisi = {
 //
 // EVRELER:
 //   donduruldu  - super admin durdurdu (her seyin onunde gelir)
-//   imha        - suresi doldu, veri yok
+//   imha        - suresi doldu VE gercekten silindi (imha_edildi = true)
+//   siliniyor   - sure doldu ama ImhaGorevi henuz calismadi; defter HALA duruyor
 //   toplaniyor  - ozel gun gelmedi; davetliler yaziyor
 //   son-gunler  - ozel gun gecti, toplama hala acik ama kapanis yaklasti
 //   indirme     - toplama kapandi; TEK IS: indir (en kritik evre)
@@ -31,6 +32,7 @@ export type EvreGirdisi = {
 export type Evre =
   | "donduruldu"
   | "imha"
+  | "siliniyor"
   | "toplaniyor"
   | "son-gunler"
   | "indirme"
@@ -87,12 +89,38 @@ export function defterDurumu(e: EvreGirdisi): DefterDurum {
     };
   }
 
-  if (e.imha_edildi || kalanMs <= 0) {
+  // IMHA - GERCEKTEN SILINDI. Yalniz imha_edildi=true iken "silindi" denir.
+  //
+  // Onceki halde kosul "imha_edildi || kalanMs <= 0" idi ve GECMIS ZAMAN cumle
+  // ("kalıcı olarak silindi") donuyordu. Ama kalanMs<=0 (imha ANI gecti) demek,
+  // defterin SILINDIGI anlamina GELMEZ: ImhaGorevi saatlik calisir, o tur gelene
+  // kadar defter fiziksel olarak DURUR (listelenir, indirilir, menuler acik).
+  // Sonuc: arayuz, gerceklesmemis bir silmeyi "oldu" diye ilan ediyordu - "silindi
+  // ama duruyor" hissinin kok nedeni buydu. Artik iki durum AYRILDI.
+  if (e.imha_edildi) {
     return {
       evre: "imha",
-      etiket: "Süresi doldu",
+      etiket: "Silindi",
       aciklama: "Bu defter ve içindeki her şey kalıcı olarak silindi.",
       ton: "notr",
+      kalan: null,
+      eylem: null,
+    };
+  }
+
+  // SILINIYOR - SURE DOLDU AMA ISLEM HENUZ ISLENMEDI (imha_edildi=false).
+  //
+  // Imha ANI gecti; ImhaGorevi bir sonraki turunda silecek. Bu araligi DURUST
+  // anlatiriz: "silindi" (yalan) degil, "silme isleniyor" (gercek). Ton kritik
+  // cunku bu noktadan sonra kurtarma yok - ama fiil GECMIS degil, SUREGEN.
+  if (kalanMs <= 0) {
+    return {
+      evre: "siliniyor",
+      etiket: "Süre doldu",
+      aciklama:
+        "Saklama süreniz doldu; defteriniz kalıcı silme için sıraya alındı ve kısa süre "
+        + "içinde tümüyle kaldırılacak. Bu işlem geri alınamaz.",
+      ton: "kritik",
       kalan: null,
       eylem: null,
     };
@@ -123,10 +151,14 @@ export function defterDurumu(e: EvreGirdisi): DefterDurum {
   }
 
   // Ozel gun gecti, toplama surüyor.
+  //
+  // ETIKET TAM METIN: onceden yalniz "Dilek toplanıyor · 16 gün" yaziyordu ve o
+  // sayinin NE oldugu belirsizdi (toplama kapanisi mi, imha mi?). Sayi imhaya kalan
+  // gundur; artik acikca yazilir: "Kalıcı silinmeye son: N gün".
   if (simdi >= ozelGun) {
     return {
       evre: "son-gunler",
-      etiket: `Dilek toplanıyor · ${kalanMetin(kalanMs)}`,
+      etiket: `Dilek toplanıyor · Kalıcı silinmeye son: ${kalanMetin(kalanMs)}`,
       aciklama: `${tur} gününüz geçti; davetlileriniz hâlâ dilek bırakabiliyor.`,
       ton: "olumlu",
       kalan: kalanMetin(kalanMs),
