@@ -10,6 +10,7 @@ import { ProfilimModal } from "@/components/site/ProfilimModal";
 import { DestekModal } from "@/components/site/DestekModal";
 import { KaydirSil } from "@/components/site/KaydirSil";
 import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
+import { oturumDustu } from "@/lib/oturum";
 
 // Avatar menusu: bolumlu dropdown (Planlama Defteri tenant deseninin defter karsiligi).
 // A) Baslik: isim + mail + ACIK DEFTER (baglam her zaman gorunur)
@@ -58,17 +59,6 @@ export function UserMenu() {
   // Destek bir sayfa degil modaldir; bu yuzden bildirim "?destek=1" ile gelir.
   // Modal acildiktan sonra parametre URL'den TEMIZLENIR - kullanici sayfayi
   // yenilerse ya da geri gelirse modal tekrar acilmasin.
-  // REAKTIF PARAMETRE OKUMA - "bazen calisiyor" hatasinin kok cozumu.
-  //
-  // ONCEKI HALI: window.location.search bir kez, useEffect(..., []) icinde okunuyordu.
-  // Bildirime tiklandiginda hedef ZATEN acik olan sayfaysa React bileseni yeniden
-  // kurmaz; efekt bir daha CALISMAZ ve hicbir sey olmaz. Farkli sayfadaysan calisir.
-  // Kullanicinin gordugu: "bazen goturuyor, bazen olu taklidi yapiyor".
-  //
-  // COZUM: useSearchParams REAKTIFTIR - adres degistiginde efekt yeniden calisir.
-  // Ayrica parametre router.replace ile TEMIZLENIR (window.history ile degil):
-  // boylece Next'in kendi durumu da guncellenir ve AYNI bildirime ikinci kez
-  // tiklandiginda parametre yeniden eklendigi icin degisim algilanir.
   // DESTEK MODALI ACMA - OLAY TABANLI, ADRESE BAGIMLI DEGIL.
   //
   // ONCEKI IKI DENEME DE KAYBETTI:
@@ -109,15 +99,46 @@ export function UserMenu() {
   const [tema, temaTersle] = useTema();
   const kutuRef = useRef<HTMLDivElement>(null);
 
+  // OTURUM DURUMU - "yok" YALNIZCA 401'DE.
+  //
+  // CANLIDA YAKALANDI: burada yalnizca "c.ok" kontrol ediliyordu ve ag hatasinda
+  // (lib/api.ts ok:false + durum:0 doner) oturum "yok" isaretleniyordu. Sonuc:
+  // ucak modunda ya da zayif baglantida AVATAR YERINE "Giris" butonu beliriyor,
+  // kullanici oturumunun kapandigini saniyordu. Oysa cerezi yerindeydi.
+  //
+  // Artik ag hatasinda durum "bilinmiyor" kalir (notr yer tutucu gorunur) ve
+  // baglanti gelince kendiliginden toparlanir. Belirsizken YANLIS bir sey
+  // soylemektense HICBIR SEY sylememek dogrudur.
   useEffect(() => {
-    api.ben().then((c) => {
+    let iptal = false;
+
+    async function sor() {
+      const c = await api.ben();
+      if (iptal) return;
       if (c.ok) {
         setKullanici(c.veri);
         setOturum("var");
-      } else {
-        setOturum("yok");
+        return;
       }
-    });
+      if (oturumDustu(c)) {
+        setOturum("yok");
+        return;
+      }
+      // Ag hatasi / sunucu arizasi: karar VERMEYIZ. "bilinmiyor" kalir.
+    }
+
+    void sor();
+
+    // Baglanti gelince ya da pencereye donunce tekrar dene - kullanicidan
+    // "sayfayi yenile" istemeyiz.
+    function tekrar() { void sor(); }
+    window.addEventListener("online", tekrar);
+    window.addEventListener("focus", tekrar);
+    return () => {
+      iptal = true;
+      window.removeEventListener("online", tekrar);
+      window.removeEventListener("focus", tekrar);
+    };
   }, []);
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/site/AppShell";
 import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 import { defterDurumu, durumTonSinif } from "@/lib/durum";
+import { oturumDustu } from "@/lib/oturum";
 
 // 0D panel: kullanici + etkinlikleri. Aktivasyon (datetime-local), duzenle/sil.
 // Zero-friction: cift yalniz isim + tarih girer; gerisi varsayilan (backend Sabitler).
@@ -29,20 +30,46 @@ function PanelIcerik() {
   const imhaBildirimi = arama.get("imha") === "1";
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[]>([]);
-  const [durum, setDurum] = useState<"yukleniyor" | "hazir">("yukleniyor");
+  const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "aglanamadi">("yukleniyor");
 
   useEffect(() => {
-    (async () => {
+    let iptal = false;
+
+    async function yukle() {
       const ben = await api.ben();
-      if (!ben.ok) {
+
+      // GIRIS EKRANINA YALNIZCA 401'DE.
+      //
+      // CANLIDA YAKALANDI: burada yalnizca "!ben.ok" kontrol ediliyordu. Oysa
+      // lib/api.ts AG HATASINDA da ok:false doner (durum: 0). Sonuc: bir saniye
+      // suren bir baglanti blibi kullaniciyi GIRIS EKRANINA firlatiyordu - oysa
+      // oturumu yerinde duruyordu. Ucak modunda bu her seferinde oluyordu.
+      if (oturumDustu(ben)) {
         router.replace("/giris");
         return;
       }
+      if (!ben.ok) {
+        // Ag yok ya da sunucu arizasi: oturum GECERLI olabilir. Kullaniciyi
+        // atmak yerine durumu soyleriz ve tekrar denemesini sunariz.
+        if (!iptal) setDurum("aglanamadi");
+        return;
+      }
+
+      if (iptal) return;
       setKullanici(ben.veri);
       const liste = await api.etkinliklerim();
+      if (iptal) return;
       if (liste.ok) setEtkinlikler(liste.veri);
       setDurum("hazir");
-    })();
+    }
+
+    void yukle();
+
+    // AG GERI GELINCE KENDILIGINDEN TOPARLAN.
+    // Kullaniciya "yenile" dedirtmek, bizim beceremedigimiz isi ona yaptirmaktir.
+    function agGeldi() { void yukle(); }
+    window.addEventListener("online", agGeldi);
+    return () => { iptal = true; window.removeEventListener("online", agGeldi); };
   }, [router]);
 
   // YENI DEFTER -> ZORUNLU ES DAVET ADIMI.
@@ -63,6 +90,27 @@ function PanelIcerik() {
 
   function etkinlikSilindi(id: string) {
     setEtkinlikler((onceki) => onceki.filter((e) => e.id !== id));
+  }
+
+  // AG YOK - oturum dusmedi, yalniz ulasamadik. Fark bu ekranda ANLATILIR.
+  if (durum === "aglanamadi") {
+    return (
+      <AppShell>
+        <div className="rounded-3xl border border-ayrac bg-yuzey p-10 text-center">
+          <p className="font-display text-lg text-murekkep">Sunucuya ulaşılamadı</p>
+          <p className="metin-yasli mx-auto mt-2 max-w-sm font-govde text-sm leading-relaxed text-ikincil">
+            Oturumun açık; yalnız bağlantı kurulamadı. İnternetin geri geldiğinde
+            buradan devam edebilirsin.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+          >
+            Tekrar dene
+          </button>
+        </div>
+      </AppShell>
+    );
   }
 
   if (durum !== "hazir" || !kullanici) {

@@ -21,6 +21,7 @@ import { DestekSekmesi } from "@/components/site/DestekSekmesi";
 import { SssYonetimi } from "@/components/site/SssYonetimi";
 import { KvkkYonetimi } from "@/components/site/KvkkYonetimi";
 import OdemelerSekmesi from "@/components/site/OdemelerSekmesi";
+import { oturumDustu } from "@/lib/oturum";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
@@ -41,7 +42,7 @@ const SEKMELER: { kod: Sekme; etiket: string }[] = [
 export default function SuperPanelSayfasi() {
   const router = useRouter();
   const [ozet, setOzet] = useState<SuperOzet | null>(null);
-  const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yetkisiz">("yukleniyor");
+  const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yetkisiz" | "aglanamadi">("yukleniyor");
   const [sekme, setSekme] = useState<Sekme>("defterler");
   // DERIN BAGLANTI: bildirimden gelen "?sekme=destek&talep=..." dogru sekmeyi acar.
   // Yonetici listede aramaz - bildirimin isaret ettigi konusmaya DOGRUDAN duser.
@@ -61,20 +62,43 @@ export default function SuperPanelSayfasi() {
   }, []);
 
   useEffect(() => {
-    (async () => {
+    let iptal = false;
+
+    async function yukle() {
       const b = await api.ben();
-      if (!b.ok) {
+
+      // GIRIS EKRANINA YALNIZCA 401'DE.
+      //
+      // CANLIDA YAKALANDI: burada yalnizca "!b.ok" kontrol ediliyordu. Oysa
+      // lib/api.ts AG HATASINDA da ok:false doner (durum: 0) - yani "sunucuya
+      // ulasamadim" ile "sunucu beni tanimiyor" ayni kabin icinde geliyordu.
+      // Sonuc: bir saniyelik baglanti blibi yoneticiyi giris ekranina firlatiyor,
+      // acik olan teshis oturumu kayboluyordu.
+      if (oturumDustu(b)) {
         router.replace("/giris");
         return;
       }
+      if (!b.ok) {
+        if (!iptal) setDurum("aglanamadi");
+        return;
+      }
+      if (iptal) return;
       if (!b.veri.super_admin) {
         setDurum("yetkisiz");
         return;
       }
       const o = await api.superOzet();
+      if (iptal) return;
       if (o.ok) setOzet(o.veri);
       setDurum("hazir");
-    })();
+    }
+
+    void yukle();
+
+    // Ag geri gelince kendiliginden toparlan - yoneticiye "yenile" dedirtmeyiz.
+    function agGeldi() { void yukle(); }
+    window.addEventListener("online", agGeldi);
+    return () => { iptal = true; window.removeEventListener("online", agGeldi); };
   }, [router]);
 
   if (durum === "yukleniyor") {
@@ -82,6 +106,27 @@ export default function SuperPanelSayfasi() {
       <AppShell>
         <div className="flex min-h-[50vh] items-center justify-center font-govde text-sm text-ikincil">
           Yükleniyor...
+        </div>
+      </AppShell>
+    );
+  }
+
+  // AG YOK - oturum dusmedi, yalniz ulasamadik.
+  if (durum === "aglanamadi") {
+    return (
+      <AppShell>
+        <div className="rounded-3xl border border-ayrac bg-yuzey p-10 text-center">
+          <p className="font-display text-lg text-murekkep">Sunucuya ulaşılamadı</p>
+          <p className="metin-yasli mx-auto mt-2 max-w-sm font-govde text-sm leading-relaxed text-ikincil">
+            Oturumun açık; yalnız bağlantı kurulamadı. İnternetin geri geldiğinde
+            panel kendiliğinden yüklenir.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-full bg-sarap px-7 py-3 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu"
+          >
+            Tekrar dene
+          </button>
         </div>
       </AppShell>
     );
