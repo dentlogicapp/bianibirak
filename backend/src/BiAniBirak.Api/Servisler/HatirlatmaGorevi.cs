@@ -96,7 +96,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         var defterler = await db.Etkinlikler.AsNoTracking()
             .Where(e => !e.ImhaEdildi && !e.SilindiMi && !e.Donduruldu)
-            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi, e.Tur })
+            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi, e.KapanisTarihi, e.Tur })
             .ToListAsync(ct);
 
         if (defterler.Count == 0) return;
@@ -130,9 +130,13 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         foreach (var d in defterler)
         {
-            // IMHA ANI - tek dogruluk kaynagi. Faz 2 esikleri bu ana gore hesaplanir.
-            var imhaAn = new DateTimeOffset(
-                d.EtkinlikTarihi.Date.AddDays(Sabitler.ToplamGun), TimeSpan.Zero);
+            // IMHA ANI - ImhaGorevi ile AYNI kaynak: KapanisTarihi + SaklamaGun (saat
+            // korunur). Eskiden EtkinlikTarihi.Date.AddDays(ToplamGun) idi; .Date saati
+            // gece yarisina kirpiyordu, oysa gercek imha (ImhaGorevi) saati koruyor.
+            // Faz 2 saat-hassas oldugu icin bu kayma saat-esiklerini yanlis anlara
+            // dusuruyordu. Iki gorev artik ayni ani okur. (VIP SaklamaGun kolonu gelince
+            // ikisi birlikte guncellenir.)
+            var imhaAn = d.KapanisTarihi.AddDays(Sabitler.SaklamaGun);
 
             // ---- GUN 0: OZEL GUN KUTLAMASI ----
             // Bugun onlarin gunu. Teknik hicbir sey soylenmez ("defterinizi indirin"
@@ -205,23 +209,36 @@ public sealed class HatirlatmaGorevi : BackgroundService
             }
 
             // ---- FAZ 2: son 5 gun, saat bazli (INDIRENE DE GIDER) ----
-            foreach (var saat in SonSaatler)
+            //
+            // PENCERE MANTIGI: "en son gecilen esik". Eskiden her esik 6 saatlik sabit
+            // pencerede gonderiliyordu; defter gec bir evrede dogdugunda (deneme defteri
+            // ya da gorev bir sure calismadiginda) ust esikler 6 saatten fazla gecmis
+            // olup HEPSI atlaniyordu - Faz 2'den tek bildirim cikmiyordu. Artik o AN
+            // icin gecerli (imhaya en yakin gecilmis) esik gonderilir; gecmis esikler
+            // ust uste yigilmaz. Saglikli akista her esik kendi aninda birer kez
+            // tetiklenir; idempotency denetim gunlugunden gelir.
+            if (simdi < imhaAn) // imha ani gectiyse uyarinin anlami kalmadi
             {
-                var hedefUtc = imhaAn.AddHours(-saat);
+                // SonSaatler AZALAN sirali: {120,96,72,48,24,12,3}. Buyuk saat = daha
+                // erken an. Gecilmis esikler icinde imhaya EN YAKIN olan (en kucuk saat)
+                // araniyor: azalan listede en son gecen atama odur.
+                int? aktifSaat = null;
+                foreach (var saat in SonSaatler)
+                {
+                    if (simdi >= imhaAn.AddHours(-saat)) aktifSaat = saat;
+                }
 
-                if (simdi < hedefUtc) continue;
-                // Pencere: bir sonraki esige kadar (en fazla 6 saat) - kacirilmis
-                // esik gec de olsa gider, ama gecmis esikler ust uste yigilmaz.
-                if (simdi > hedefUtc.AddHours(6)) continue;
-                if (simdi >= imhaAn) continue; // imha olduysa uyarinin anlami kalmadi
-
-                var anahtar = SaatAnahtari(saat);
-                if (gonderilmis.Contains($"{d.Id}:{anahtar}")) continue;
-
-                await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
-                    SaatMetni(saat, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
-                    new { kalan_saat = saat }, ct);
-                gonderilen++;
+                if (aktifSaat is int gecerliSaat)
+                {
+                    var anahtar = SaatAnahtari(gecerliSaat);
+                    if (!gonderilmis.Contains($"{d.Id}:{anahtar}"))
+                    {
+                        await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
+                            SaatMetni(gecerliSaat, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
+                            new { kalan_saat = gecerliSaat }, ct);
+                        gonderilen++;
+                    }
+                }
             }
         }
 
