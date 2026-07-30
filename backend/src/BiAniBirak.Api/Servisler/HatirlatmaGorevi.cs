@@ -96,7 +96,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         var defterler = await db.Etkinlikler.AsNoTracking()
             .Where(e => !e.ImhaEdildi && !e.SilindiMi && !e.Donduruldu)
-            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi, e.KapanisTarihi, e.Tur })
+            .Select(e => new { e.Id, e.Es1Ad, e.Es2Ad, e.EtkinlikTarihi, e.OzelSaklamaGun, e.Tur })
             .ToListAsync(ct);
 
         if (defterler.Count == 0) return;
@@ -130,13 +130,11 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         foreach (var d in defterler)
         {
-            // IMHA ANI - ImhaGorevi ile AYNI kaynak: KapanisTarihi + SaklamaGun (saat
-            // korunur). Eskiden EtkinlikTarihi.Date.AddDays(ToplamGun) idi; .Date saati
-            // gece yarisina kirpiyordu, oysa gercek imha (ImhaGorevi) saati koruyor.
-            // Faz 2 saat-hassas oldugu icin bu kayma saat-esiklerini yanlis anlara
-            // dusuruyordu. Iki gorev artik ayni ani okur. (VIP SaklamaGun kolonu gelince
-            // ikisi birlikte guncellenir.)
-            var imhaAn = d.KapanisTarihi.AddDays(Sabitler.SaklamaGun);
+            // IMHA ANI - TEK KAYNAK (Sabitler.ImhaAni): ozel gun + (OzelSaklamaGun ??
+            // ToplamGun). ImhaGorevi ile BIREBIR ayni fonksiyon; iki gorev asla ayrisamaz.
+            // VIP defter (OzelSaklamaGun dolu) otomatik dogru: imha yillar sonra, bu yuzden
+            // Faz 2 saat-esikleri de kendiliginden o zamana kayar (susar).
+            var imhaAn = Sabitler.ImhaAni(d.EtkinlikTarihi, d.OzelSaklamaGun);
 
             // ---- GUN 0: OZEL GUN KUTLAMASI ----
             // Bugun onlarin gunu. Teknik hicbir sey soylenmez ("defterinizi indirin"
@@ -184,8 +182,11 @@ public sealed class HatirlatmaGorevi : BackgroundService
                 }
             }
 
-            // ---- FAZ 1: gunluk sayim (indirene GITMEZ) ----
-            if (!indirenler.Contains(d.Id))
+            // ---- FAZ 1: gunluk sayim (indirene GITMEZ; VIP'ye de GITMEZ) ----
+            // VIP defter (OzelSaklamaGun dolu) yillarca yasar; "silinmesine N gun"
+            // saymak yaniltici olur. GUN 0 kutlama ve GUN 1 ozeti VIP'te yine gider;
+            // yalniz silme geri sayimi susar. Faz 2 zaten imhaAn'a bagli (kendiliginden susar).
+            if (!indirenler.Contains(d.Id) && d.OzelSaklamaGun == null)
             {
                 foreach (var gun in GunlukGunler)
                 {

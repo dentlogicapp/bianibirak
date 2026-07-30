@@ -98,10 +98,20 @@ public sealed class ImhaGorevi : BackgroundService
         // ---- 2) IMHA ----
         // Uyari blogu kalktigi icin aday listesi ARTIK CEKILMIYOR; suresi dolani
         // dogrudan veritabanindan sorguluyoruz (tum defterleri bellege almak yerine).
-        var imhaliklar = await db.Etkinlikler
+        // IMHA ANI tek kaynaktan (Sabitler.ImhaAni): ozel gun + (OzelSaklamaGun ?? ToplamGun).
+        // SQL on filtresi EF-cevrilebilir SABITLE genis tutulur (kolon-bagimli gun sayisini
+        // SQL'e cevirmeye guvenmeyiz); kesin karar bellekte helper ile verilir. VIP defter
+        // (OzelSaklamaGun dolu) on filtreye daima girer, bellekte gercek imha anina gore
+        // elenir - normal defter gun 20'de, VIP kendi (uzak) gununde imha olur.
+        var adaylar = await db.Etkinlikler
             .Where(e => !e.ImhaEdildi && !e.SilindiMi
-                        && e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi)
+                        && (e.EtkinlikTarihi.AddDays(Sabitler.ToplamGun) <= simdi
+                            || e.OzelSaklamaGun != null))
             .ToListAsync(ct);
+
+        var imhaliklar = adaylar
+            .Where(e => Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun) <= simdi)
+            .ToList();
 
         foreach (var e in imhaliklar)
         {

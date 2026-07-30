@@ -167,6 +167,13 @@ public static class Sabitler
     // AYNI sayiyi soyler; ayri hesap yapan ikinci bir yer YOKTUR.
     public const int SaklamaGun = IndirmeGun;
 
+    // IMHA ANI - TEK KAYNAK. Ozel gunden itibaren toplam yasam suresinin sonu.
+    // OzelSaklamaGun (VIP) doluysa o gun sayisi; bos ise varsayilan ToplamGun (20).
+    // ImhaGorevi ve HatirlatmaGorevi bu AYNI fonksiyondan okur - iki gorev asla
+    // ayrisamaz. Davetli penceresi (ToplamaGun=15) DEGISMEZ; uzayan yalniz toplamdir.
+    public static DateTimeOffset ImhaAni(DateTimeOffset etkinlikTarihi, int? ozelSaklamaGun)
+        => etkinlikTarihi.AddDays(ozelSaklamaGun ?? ToplamGun);
+
     // COP KUTUSU SURELERI - iki farkli saat, tek cop kutusu.
     //
     // DILEK 30 gun: tek bir dilegin kaybi sinirlidir; bolca dusunme payi verilir.
