@@ -44,6 +44,8 @@ type Props = {
   onKapat: () => void;
   /** Zemine tiklayinca kapansin mi? Varsayilan: evet. */
   zeminKapatir?: boolean;
+  /** Immersif koyu zemin (medya izleyici gibi). Varsayilan: hayir. */
+  koyuZemin?: boolean;
   /** Ekran okuyucuya pencerenin adi (baslik metni). */
   etiket?: string;
   children: React.ReactNode;
@@ -57,6 +59,7 @@ export function TamEkranKatman({
   acik,
   onKapat,
   zeminKapatir = true,
+  koyuZemin = false,
   etiket,
   children,
 }: Props) {
@@ -150,7 +153,7 @@ export function TamEkranKatman({
   return (
     <Portal>
       <div
-        className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-murekkep/70 p-4 backdrop-blur-sm"
+        className={`fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm ${koyuZemin ? "bg-murekkep/90" : "bg-murekkep/70"}`}
         // onMouseDown KULLANILIR, onClick DEGIL: pencere icinde metin secerken
         // fare zemine tasip birakilirsa onClick tetiklenir ve pencere kapanir -
         // kullanici yazdigini kaybeder. mousedown, baslangic noktasina bakar.

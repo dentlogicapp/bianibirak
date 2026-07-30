@@ -31,20 +31,29 @@ import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 // Temiz onizleme urunu guzel gosterir, arzuyu YUKSELTIR.
 //
 // ---------------------------------------------------------------------------
-// BU SURUMDE: TAM EKRAN ARTIK TamEkranKatman.
+// TAM EKRAN: dogrulanmis modal kabugu (TamEkranKatman) + DOKUNMATIGE UYGUN KONTROL.
 //
-// Onceden tam ekran kendi "fixed inset-0" katmanini kuruyordu ve kapat (x)
-// butonu "absolute right-5 top-5" ile yerlesiyordu. Sayfanin bir ust atasinda
-// backdrop-blur bulundugunda (baskiya-hazir-defter duzeni) "fixed", o ataya
-// gore konumlanir - Portal.tsx'te yazili kural - ve (x) ekranin disina tasip
-// gorunmez oldu. Cozum tek tek degil KOKTEN: tam ekran, projenin dogrulanmis
-// modal kabugu TamEkranKatman'a tasindi. Portal (blur/transform ata bozamaz),
-// ESC, odak tuzagi, odak iadesi ve scroll kilidi ARTIK KABUKTAN gelir; bu
-// bilesen yalniz KENDI icerigini (sayfa gorseli + gezinme) tasir.
+// KOK NEDEN (duzeltilen): onceki tam ekran kendi "fixed inset-0" katmanini kuruyor,
+// kapat (x) "absolute right-5 top-5" ile yerlesiyordu. Iki ayri kusur:
+//   1) Ust atada backdrop-blur olan sayfada "fixed" o ataya gore konumlanip (x)
+//      ekran disina tasiyordu (Portal.tsx'te yazili kural).
+//   2) Kontroller acik renk ince cizgiydi; acik/soluk zemin uzerinde kayboluyordu.
+//      Cevirme bolgeleri "opacity-0 hover:opacity-100" idi - DOKUNMATIKTE HOVER YOK,
+//      yani telefonda HIC gorunmuyorlardi. Masaustu-ozel bir cozumdu.
 //
-// Kagit (sayfa gorseli + kenar cevirme bolgeleri) TEK KAYNAK bir ic bilesene
-// cikarildi: inline ve tam ekran AYNI koddan beslenir, iki yerde ayrisan
-// davranis olusamaz.
+// COZUM (kokten):
+//   - Tam ekran, projenin dogrulanmis kabugu TamEkranKatman'a tasindi (Portal + ESC +
+//     odak tuzagi + odak iadesi + scroll kilidi kabuktan gelir).
+//   - Zemin immersif KOYU (koyuZemin) - sayfa one cikar, kontroller okunur.
+//   - Butun kontroller KATI, HER ZAMAN GORUNUR cip: murekkep dolgu + parsomen ikon +
+//     golge + ince halka. murekkep ile parsomen tema ne olursa olsun BIRBIRININ ZITTI,
+//     yani cip her iki temada da kendi icinde kontrastli ve zeminden ayrisir.
+//   - Dokunmatik icin GORUNUR ALT GEZINME CUBUGU (onceki - sayfa - sonraki). Kenar
+//     dokunma bolgeleri masaustu icin bonus olarak kalir; birincil gorunur denetim
+//     alt cubuktur.
+//
+// Kagit (sayfa gorseli + kenar cevirme bolgeleri) TEK KAYNAK bir ic bilesende: inline
+// ve tam ekran AYNI koddan beslenir, iki yerde ayrisan davranis olusamaz.
 export function DefterOnizleme() {
   const [bilgi, setBilgi] = useState<OnizlemeBilgi | null>(null);
   const [sayfa, setSayfa] = useState(0);
@@ -70,9 +79,8 @@ export function DefterOnizleme() {
     setSayfa((s) => (s > 0 ? s - 1 : s));
   }, []);
 
-  // Klavye: ok tuslariyla sayfa cevir (kitap okuma hissi), iki modda da.
-  // ESC ARTIK BURADA DEGIL: tam ekran kabugu (TamEkranKatman) sahiplenir -
-  // kapatmanin klavye yolu tum pencerelerde ayni yerden gelir.
+  // Klavye: ok tuslariyla sayfa cevir (masaustu okuma hissi), iki modda da.
+  // ESC ARTIK BURADA DEGIL: tam ekran kabugu (TamEkranKatman) sahiplenir.
   useEffect(() => {
     function tus(e: KeyboardEvent) {
       if (e.key === "ArrowRight") ileri();
@@ -126,46 +134,74 @@ export function DefterOnizleme() {
         tamEkran={false}
       />
 
-      {/* TAM EKRAN - dogrulanmis modal kabugu. Portal sayesinde (x) her zaman
-          gorunur; ESC/odak tuzagi/scroll kilidi kabuktan gelir. */}
+      {/* TAM EKRAN - dogrulanmis kabuk + immersif koyu zemin + katI gorunur kontrol */}
       <TamEkranKatman
         acik={tamEkran}
         onKapat={() => setTamEkran(false)}
         etiket="Defter önizleme"
+        koyuZemin
       >
         <div
-          className="mx-auto flex w-full max-w-3xl flex-col items-center"
+          className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5"
           // Kagit uzerinde metin secip fareyi zemine birakinca pencere kapanmasin.
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="mb-3 flex w-full justify-end">
+          {/* Sayfa + kose kapatma dugmesi. Sarmalayici w-fit: (x) tam sayfa
+              kosesine oturur, notch'un altinda kalir. */}
+          <div className="relative mx-auto w-fit max-w-full">
+            <Kagit
+              sayfa={sayfa}
+              sonSayfa={sonSayfa}
+              ileri={ileri}
+              geri={geri}
+              tamEkran
+            />
             <button
               type="button"
               onClick={() => setTamEkran(false)}
-              className="rounded-full border border-parsomen/30 p-2.5 text-parsomen transition-colors hover:bg-parsomen/10"
+              className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/30 backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
               aria-label="Kapat"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-                <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+                <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
               </svg>
             </button>
           </div>
 
-          <Kagit
-            sayfa={sayfa}
-            sonSayfa={sonSayfa}
-            ileri={ileri}
-            geri={geri}
-            tamEkran
-          />
+          {/* GORUNUR ALT GEZINME - dokunmatikte tek birincil denetim. Katı cipler. */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={geri}
+              disabled={sayfa === 0}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/25 transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              aria-label="Önceki sayfa"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="m15 5-7 7 7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
 
-          <p className="mt-4 font-govde text-xs text-parsomen/70">
-            {sayfa + 1} / {bilgi.sayfa_sayisi} · ok tuşlarıyla çevirin
-          </p>
+            <span className="rounded-full bg-murekkep/90 px-4 py-2 font-govde text-xs tabular-nums text-parsomen shadow-lg ring-1 ring-parsomen/25">
+              {sayfa + 1} / {bilgi.sayfa_sayisi}
+            </span>
+
+            <button
+              type="button"
+              onClick={ileri}
+              disabled={sayfa >= sonSayfa}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/25 transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              aria-label="Sonraki sayfa"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </svg>
+            </button>
+          </div>
         </div>
       </TamEkranKatman>
 
-      {/* Kumanda - yalniz inline modda */}
+      {/* Kumanda - inline mod */}
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
@@ -244,10 +280,11 @@ export function DefterOnizleme() {
   );
 }
 
-// KAGIT - sayfa gorseli + kenar cevirme bolgeleri. TEK KAYNAK: inline ve tam
-// ekran ayni bilesenden beslenir. Tek fark boyutlama: inline dar (max-w-md),
-// tam ekran gorunum yuksekligine sigar (max-h-[82vh]) ve kenar cevirme
-// bolgeleri gorsele hizali kalir (w-fit).
+// KAGIT - sayfa gorseli + kenar cevirme bolgeleri. TEK KAYNAK: inline ve tam ekran
+// ayni bilesenden beslenir. Tek fark boyutlama: inline dar (max-w-md), tam ekran
+// gorunum yuksekligine sigar (max-h-[72vh]) ve kenar bolgeleri gorsele hizali kalir
+// (w-fit). Kenar cevirme bolgeleri masaustunde hover ile belirir; dokunmatikte
+// birincil gorunur denetim tam ekrandaki alt gezinme cubugudur.
 function Kagit({
   sayfa,
   sonSayfa,
@@ -275,13 +312,13 @@ function Kagit({
         <img
           src={onizlemeSayfaUrl(sayfa)}
           alt={`Sayfa ${sayfa + 1}`}
-          className={`block select-none ${tamEkran ? "mx-auto max-h-[82vh] w-auto" : "w-full"}`}
+          className={`block select-none ${tamEkran ? "mx-auto max-h-[72vh] w-auto" : "w-full"}`}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         />
       </div>
 
-      {/* Sayfa cevirme - kagidin kenarlarinda, kitap gibi */}
+      {/* Sayfa cevirme - kagidin kenarlarinda, kitap gibi (masaustu bonus) */}
       {sayfa > 0 && (
         <button
           type="button"
