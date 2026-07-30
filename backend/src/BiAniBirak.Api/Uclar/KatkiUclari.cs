@@ -89,7 +89,7 @@ public static class KatkiUclari
             etkinlik_tarihi = etkinlik.EtkinlikTarihi,
             gorseller,
             // Saklama seffafligi (Musa karari): davetli ne kadar tutuldugunu BILSIN.
-            saklama_gun = Sabitler.SaklamaGun,
+            saklama_gun = etkinlik.OzelSaklamaGun ?? Sabitler.ToplamGun,
         });
     }
 

@@ -160,15 +160,27 @@ public static class SuperUclari
         // Panele girer girmez "her sey yolunda mi?" sorusunun cevabi. Bu sayilarin
         // hepsi MUDAHALE GEREKTIREN durumlardir; suslu istatistik degildir.
         var simdiNabiz = DateTimeOffset.UtcNow;
-        var imhaGecikmis = await db.Etkinlikler.CountAsync(e =>
-            !e.ImhaEdildi && !e.SilindiMi &&
-            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdiNabiz);
+
+        // IMHA NABZI tek kaynaktan (Sabitler.ImhaAni): ozel gun + (OzelSaklamaGun ?? ToplamGun).
+        // Adaylar EF-guvenli SABIT on filtreyle cekilir (kolon-bagimli gun sayisi SQL'e
+        // cevrilmez); imha_gecikmis ve imha_yakin BELLEKTE helper ile sayilir. VIP defter
+        // (OzelSaklamaGun dolu) on filtreye daima girer, bellekte gercek anina gore elenir -
+        // boylece nabiz VIP'i "gecikmis" saymaz. Panel super olcegindedir; materialize guvenli.
+        var adaylarNabiz = await db.Etkinlikler.AsNoTracking()
+            .Where(e => !e.ImhaEdildi && !e.SilindiMi
+                        && (e.EtkinlikTarihi.AddDays(Sabitler.ToplamGun) <= simdiNabiz.AddDays(Sabitler.IndirmeGun)
+                            || e.OzelSaklamaGun != null))
+            .Select(e => new { e.EtkinlikTarihi, e.OzelSaklamaGun })
+            .ToListAsync();
+        var imhaGecikmis = adaylarNabiz.Count(e =>
+            Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun) <= simdiNabiz);
         var destekBekleyen = await db.DestekTalepleri.CountAsync(t => t.Durum == "acik");
         var odemeBekleyen = await db.Odemeler.CountAsync(o => o.Durum == "bekliyor");
-        var imhaYakin = await db.Etkinlikler.CountAsync(e =>
-            !e.ImhaEdildi && !e.SilindiMi &&
-            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) > simdiNabiz &&
-            e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdiNabiz.AddDays(Sabitler.IndirmeGun));
+        var imhaYakin = adaylarNabiz.Count(e =>
+        {
+            var an = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun);
+            return an > simdiNabiz && an <= simdiNabiz.AddDays(Sabitler.IndirmeGun);
+        });
 
         // Disk: medya kokunun bagli oldugu surucu. DiskGozcusu ile AYNI olcum -
         // iki farkli yerde iki farkli sayi gostermek guveni yikar.
@@ -300,7 +312,7 @@ public static class SuperUclari
             // Evre hesabi icin (lib/durum.ts): kullanicinin gordugu ile
             // yoneticinin gordugu AYNI cumle olmali.
             kapanis_tarihi = e.KapanisTarihi,
-            imha_tarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
+            imha_tarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun),
             imha_edildi = e.ImhaEdildi,
             durum = e.Durum,
             donduruldu = e.Donduruldu,

@@ -88,7 +88,7 @@ public static class EtkinlikUclari
             // bir hata degil - urunun temel vaadinin cokusudur.
             //
             // Artik hesap TEK yerde: burada. Frontend yalniz GOSTERIR.
-            imha_tarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
+            imha_tarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun),
             toplama_gun = Sabitler.ToplamaGun,
             indirme_gun = Sabitler.IndirmeGun,
             toplam_gun = Sabitler.ToplamGun,

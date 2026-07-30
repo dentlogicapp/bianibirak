@@ -163,7 +163,7 @@ public static class SuperTeshisUclari
 
         // Yasam dongusu: acik / kapanmis / imhaya kalan gun
         var kapandi = simdi > e.KapanisTarihi;
-        var imhaTarihi = e.KapanisTarihi.AddDays(Sabitler.SaklamaGun);
+        var imhaTarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun);
         var imhayaKalanGun = (int)Math.Ceiling((imhaTarihi - simdi).TotalDays);
 
         return Results.Json(new
@@ -270,6 +270,7 @@ public static class SuperTeshisUclari
                 e.UpdatedAt,
                 e.KapanisTarihi,
                 e.EtkinlikTarihi,
+                e.OzelSaklamaGun,
             })
             .ToListAsync();
 
@@ -340,7 +341,7 @@ public static class SuperTeshisUclari
                 d.Id,
                 d.Es1Ad,
                 d.Es2Ad,
-                ImhaTarihi = d.KapanisTarihi.AddDays(Sabitler.SaklamaGun),
+                ImhaTarihi = Sabitler.ImhaAni(d.EtkinlikTarihi, d.OzelSaklamaGun),
             })
             // ESIK = INDIRME PENCERESI (Sabitler.IndirmeGun). 20 gunluk dongude sabit
             // "14 gun" neredeyse TUM aktif defterleri listeye doldururdu; uyari degeri
@@ -361,7 +362,7 @@ public static class SuperTeshisUclari
         // Gecikmis imha: suresi dolmus ama HALA duruyor (cron yok/calismiyor).
         // Bu bir KVKK riskidir; panelde KIRMIZI gorunmeli.
         var imhaGecikmis = defterler.Count(d =>
-            d.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi);
+            Sabitler.ImhaAni(d.EtkinlikTarihi, d.OzelSaklamaGun) <= simdi);
 
         // Ortalama "link -> ilk dilek" gecikmesi (saat). Urun ne kadar hizli deger
         // uretiyor? Bu sure uzunsa davetli daveti anlamiyordur.
@@ -755,7 +756,7 @@ public static class SuperTeshisUclari
             .ToListAsync();
 
         var hedefler = imhaliklar
-            .Where(e => e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi)
+            .Where(e => Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun) <= simdi)
             .ToList();
 
         foreach (var e in hedefler)
