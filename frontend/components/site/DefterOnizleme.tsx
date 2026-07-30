@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { onizlemeBilgi, onizlemeSayfaUrl, type OnizlemeBilgi } from "@/lib/api";
+import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 
 // DEFTER ONIZLEME - "gormek bedava, BASMAK ucretli".
 //
@@ -28,6 +29,22 @@ import { onizlemeBilgi, onizlemeSayfaUrl, type OnizlemeBilgi } from "@/lib/api";
 //
 // Ve filigrandan USTUNDUR: filigran urunu cirkinlestirir, satin alma arzusunu DUSURUR.
 // Temiz onizleme urunu guzel gosterir, arzuyu YUKSELTIR.
+//
+// ---------------------------------------------------------------------------
+// BU SURUMDE: TAM EKRAN ARTIK TamEkranKatman.
+//
+// Onceden tam ekran kendi "fixed inset-0" katmanini kuruyordu ve kapat (x)
+// butonu "absolute right-5 top-5" ile yerlesiyordu. Sayfanin bir ust atasinda
+// backdrop-blur bulundugunda (baskiya-hazir-defter duzeni) "fixed", o ataya
+// gore konumlanir - Portal.tsx'te yazili kural - ve (x) ekranin disina tasip
+// gorunmez oldu. Cozum tek tek degil KOKTEN: tam ekran, projenin dogrulanmis
+// modal kabugu TamEkranKatman'a tasindi. Portal (blur/transform ata bozamaz),
+// ESC, odak tuzagi, odak iadesi ve scroll kilidi ARTIK KABUKTAN gelir; bu
+// bilesen yalniz KENDI icerigini (sayfa gorseli + gezinme) tasir.
+//
+// Kagit (sayfa gorseli + kenar cevirme bolgeleri) TEK KAYNAK bir ic bilesene
+// cikarildi: inline ve tam ekran AYNI koddan beslenir, iki yerde ayrisan
+// davranis olusamaz.
 export function DefterOnizleme() {
   const [bilgi, setBilgi] = useState<OnizlemeBilgi | null>(null);
   const [sayfa, setSayfa] = useState(0);
@@ -53,16 +70,17 @@ export function DefterOnizleme() {
     setSayfa((s) => (s > 0 ? s - 1 : s));
   }, []);
 
-  // Klavye: ok tuslariyla sayfa cevir (kitap okuma hissi)
+  // Klavye: ok tuslariyla sayfa cevir (kitap okuma hissi), iki modda da.
+  // ESC ARTIK BURADA DEGIL: tam ekran kabugu (TamEkranKatman) sahiplenir -
+  // kapatmanin klavye yolu tum pencerelerde ayni yerden gelir.
   useEffect(() => {
     function tus(e: KeyboardEvent) {
       if (e.key === "ArrowRight") ileri();
       if (e.key === "ArrowLeft") geri();
-      if (e.key === "Escape" && tamEkran) setTamEkran(false);
     }
     window.addEventListener("keydown", tus);
     return () => window.removeEventListener("keydown", tus);
-  }, [ileri, geri, tamEkran]);
+  }, [ileri, geri]);
 
   if (yukleniyor) {
     return (
@@ -99,167 +117,199 @@ export function DefterOnizleme() {
 
   return (
     <div className="space-y-4">
-      {/* KAGIT - gercek defterin kendisi */}
-      <div
-        className={
-          tamEkran
-            ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-murekkep/95 p-4"
-            : "relative"
-        }
-      >
-        {tamEkran && (
-          <button
-            type="button"
-            onClick={() => setTamEkran(false)}
-            className="absolute right-5 top-5 rounded-full border border-parsomen/30 p-2.5 text-parsomen transition-colors hover:bg-parsomen/10"
-            aria-label="Kapat"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-              <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
-            </svg>
-          </button>
-        )}
+      {/* INLINE KAGIT - gercek defterin kendisi, sayfa akisinda */}
+      <Kagit
+        sayfa={sayfa}
+        sonSayfa={sonSayfa}
+        ileri={ileri}
+        geri={geri}
+        tamEkran={false}
+      />
 
+      {/* TAM EKRAN - dogrulanmis modal kabugu. Portal sayesinde (x) her zaman
+          gorunur; ESC/odak tuzagi/scroll kilidi kabuktan gelir. */}
+      <TamEkranKatman
+        acik={tamEkran}
+        onKapat={() => setTamEkran(false)}
+        etiket="Defter önizleme"
+      >
         <div
-          className={`relative mx-auto ${
-            tamEkran ? "max-h-[82vh] max-w-3xl" : "max-w-md"
-          }`}
+          className="mx-auto flex w-full max-w-3xl flex-col items-center"
+          // Kagit uzerinde metin secip fareyi zemine birakinca pencere kapanmasin.
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          {/* KITAP GOLGESI - bir dosyaya degil, bir ESERE bakiyorsunuz hissi.
-              Fiziksel baski satisina da kopru: bu bir kitap. */}
-          <div
-            className="overflow-hidden rounded-r-lg rounded-l-sm bg-[#fdf9f0] shadow-[0_18px_50px_-12px_rgba(33,26,23,0.45),-3px_0_0_0_rgba(33,26,23,0.08),-6px_0_0_0_rgba(33,26,23,0.04)]"
-            // SAG TIK KAPALI: kesin cozum degil (ekran goruntusu hep alinabilir),
-            // ama surtunme yaratir. Asil koruma COZUNURLUK - 96 DPI bir goruntu
-            // kagitta ise yaramaz.
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <img
-              src={onizlemeSayfaUrl(sayfa)}
-              alt={`Sayfa ${sayfa + 1}`}
-              className="block w-full select-none"
-              draggable={false}
-              onDragStart={(e) => e.preventDefault()}
-            />
+          <div className="mb-3 flex w-full justify-end">
+            <button
+              type="button"
+              onClick={() => setTamEkran(false)}
+              className="rounded-full border border-parsomen/30 p-2.5 text-parsomen transition-colors hover:bg-parsomen/10"
+              aria-label="Kapat"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
 
-          {/* Sayfa cevirme - kagidin kenarlarinda, kitap gibi */}
-          {sayfa > 0 && (
-            <button
-              type="button"
-              onClick={geri}
-              className="absolute left-0 top-0 flex h-full w-1/4 cursor-w-resize items-center justify-start pl-1 opacity-0 transition-opacity hover:opacity-100"
-              aria-label="Önceki sayfa"
-            >
-              <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-                  <path d="m15 5-7 7 7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-              </span>
-            </button>
-          )}
+          <Kagit
+            sayfa={sayfa}
+            sonSayfa={sonSayfa}
+            ileri={ileri}
+            geri={geri}
+            tamEkran
+          />
 
-          {sayfa < sonSayfa && (
-            <button
-              type="button"
-              onClick={ileri}
-              className="absolute right-0 top-0 flex h-full w-1/4 cursor-e-resize items-center justify-end pr-1 opacity-0 transition-opacity hover:opacity-100"
-              aria-label="Sonraki sayfa"
-            >
-              <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-                  <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-              </span>
-            </button>
-          )}
-        </div>
-
-        {tamEkran && (
           <p className="mt-4 font-govde text-xs text-parsomen/70">
             {sayfa + 1} / {bilgi.sayfa_sayisi} · ok tuşlarıyla çevirin
           </p>
-        )}
+        </div>
+      </TamEkranKatman>
+
+      {/* Kumanda - yalniz inline modda */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={geri}
+          disabled={sayfa === 0}
+          className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-murekkep hover:text-murekkep disabled:opacity-30"
+        >
+          Önceki
+        </button>
+
+        <div className="flex items-center gap-2">
+          <span className="font-govde text-xs tabular-nums text-ikincil">
+            {sayfa + 1} / {bilgi.sayfa_sayisi}
+          </span>
+          <button
+            type="button"
+            onClick={() => setTamEkran(true)}
+            className="rounded-full border border-ayrac p-1.5 text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+            aria-label="Tam ekran"
+            title="Tam ekran"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={ileri}
+          disabled={sayfa >= sonSayfa}
+          className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-murekkep hover:text-murekkep disabled:opacity-30"
+        >
+          Sonraki
+        </button>
       </div>
 
-      {/* Kumanda */}
-      {!tamEkran && (
-        <>
-          <div className="flex items-center justify-between gap-3">
+      {/* Sayfa seridi - hizli gezinme */}
+      {bilgi.sayfa_sayisi > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {Array.from({ length: bilgi.sayfa_sayisi }).map((_, i) => (
             <button
+              key={i}
               type="button"
-              onClick={geri}
-              disabled={sayfa === 0}
-              className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-murekkep hover:text-murekkep disabled:opacity-30"
-            >
-              Önceki
-            </button>
+              onClick={() => setSayfa(i)}
+              className={`h-1.5 shrink-0 rounded-full transition-all ${
+                i === sayfa ? "w-6 bg-sarap" : "w-1.5 bg-ayrac hover:bg-ikincil/40"
+              }`}
+              aria-label={`Sayfa ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
 
-            <div className="flex items-center gap-2">
-              <span className="font-govde text-xs tabular-nums text-ikincil">
-                {sayfa + 1} / {bilgi.sayfa_sayisi}
-              </span>
-              <button
-                type="button"
-                onClick={() => setTamEkran(true)}
-                className="rounded-full border border-ayrac p-1.5 text-ikincil transition-colors hover:border-sarap hover:text-sarap"
-                aria-label="Tam ekran"
-                title="Tam ekran"
-              >
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
-                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </svg>
-              </button>
-            </div>
+      {/* DURUST COZUNURLUK ANLATIMI.
+          Saklamak yerine acikca soylemek hem guven verir hem FARKI HISSETTIRIR:
+          "demek ki bastigim sey daha da iyi olacak." Bu, satisin kendisidir. */}
+      <div className="rounded-2xl border border-ayrac bg-parsomen p-4">
+        <p className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
+          Gördüğünüz nedir?
+        </p>
+        <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+          Bu, defterinizin{" "}
+          <span className="font-medium text-murekkep">birebir aynısıdır</span> — aynı
+          tipografi, aynı sayfa düzeni, aynı yerleşim. Tek fark çözünürlük: burada
+          ekran kalitesi ({bilgi.onizleme_dpi} DPI) görüyorsunuz.
+        </p>
+        <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
+          Baskıya hazır nüsha{" "}
+          <span className="font-medium text-murekkep">{bilgi.baski_dpi} DPI</span>'dır —
+          kâğıtta keskin, net, kitap kalitesinde. Yaldız çizgiler ince kalır, yazı
+          kenarları dağılmaz.
+        </p>
+      </div>
+    </div>
+  );
+}
 
-            <button
-              type="button"
-              onClick={ileri}
-              disabled={sayfa >= sonSayfa}
-              className="rounded-full border border-ayrac px-4 py-2 font-govde text-xs text-ikincil transition-colors hover:border-murekkep hover:text-murekkep disabled:opacity-30"
-            >
-              Sonraki
-            </button>
-          </div>
+// KAGIT - sayfa gorseli + kenar cevirme bolgeleri. TEK KAYNAK: inline ve tam
+// ekran ayni bilesenden beslenir. Tek fark boyutlama: inline dar (max-w-md),
+// tam ekran gorunum yuksekligine sigar (max-h-[82vh]) ve kenar cevirme
+// bolgeleri gorsele hizali kalir (w-fit).
+function Kagit({
+  sayfa,
+  sonSayfa,
+  ileri,
+  geri,
+  tamEkran,
+}: {
+  sayfa: number;
+  sonSayfa: number;
+  ileri: () => void;
+  geri: () => void;
+  tamEkran: boolean;
+}) {
+  return (
+    <div className={`relative mx-auto ${tamEkran ? "w-fit max-w-full" : "max-w-md"}`}>
+      {/* KITAP GOLGESI - bir dosyaya degil, bir ESERE bakiyorsunuz hissi.
+          Fiziksel baski satisina da kopru: bu bir kitap. */}
+      <div
+        className="overflow-hidden rounded-r-lg rounded-l-sm bg-[#fdf9f0] shadow-[0_18px_50px_-12px_rgba(33,26,23,0.45),-3px_0_0_0_rgba(33,26,23,0.08),-6px_0_0_0_rgba(33,26,23,0.04)]"
+        // SAG TIK KAPALI: kesin cozum degil (ekran goruntusu hep alinabilir),
+        // ama surtunme yaratir. Asil koruma COZUNURLUK - 96 DPI bir goruntu
+        // kagitta ise yaramaz.
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <img
+          src={onizlemeSayfaUrl(sayfa)}
+          alt={`Sayfa ${sayfa + 1}`}
+          className={`block select-none ${tamEkran ? "mx-auto max-h-[82vh] w-auto" : "w-full"}`}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+        />
+      </div>
 
-          {/* Sayfa seridi - hizli gezinme */}
-          {bilgi.sayfa_sayisi > 1 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {Array.from({ length: bilgi.sayfa_sayisi }).map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSayfa(i)}
-                  className={`h-1.5 shrink-0 rounded-full transition-all ${
-                    i === sayfa ? "w-6 bg-sarap" : "w-1.5 bg-ayrac hover:bg-ikincil/40"
-                  }`}
-                  aria-label={`Sayfa ${i + 1}`}
-                />
-              ))}
-            </div>
-          )}
+      {/* Sayfa cevirme - kagidin kenarlarinda, kitap gibi */}
+      {sayfa > 0 && (
+        <button
+          type="button"
+          onClick={geri}
+          className="absolute left-0 top-0 flex h-full w-1/4 cursor-w-resize items-center justify-start pl-1 opacity-0 transition-opacity hover:opacity-100"
+          aria-label="Önceki sayfa"
+        >
+          <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path d="m15 5-7 7 7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </span>
+        </button>
+      )}
 
-          {/* DURUST COZUNURLUK ANLATIMI.
-              Saklamak yerine acikca soylemek hem guven verir hem FARKI HISSETTIRIR:
-              "demek ki bastigim sey daha da iyi olacak." Bu, satisin kendisidir. */}
-          <div className="rounded-2xl border border-ayrac bg-parsomen p-4">
-            <p className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
-              Gördüğünüz nedir?
-            </p>
-            <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
-              Bu, defterinizin{" "}
-              <span className="font-medium text-murekkep">birebir aynısıdır</span> — aynı
-              tipografi, aynı sayfa düzeni, aynı yerleşim. Tek fark çözünürlük: burada
-              ekran kalitesi ({bilgi.onizleme_dpi} DPI) görüyorsunuz.
-            </p>
-            <p className="metin-yasli mt-1.5 font-govde text-xs leading-relaxed text-ikincil">
-              Baskıya hazır nüsha{" "}
-              <span className="font-medium text-murekkep">{bilgi.baski_dpi} DPI</span>'dır —
-              kâğıtta keskin, net, kitap kalitesinde. Yaldız çizgiler ince kalır, yazı
-              kenarları dağılmaz.
-            </p>
-          </div>
-        </>
+      {sayfa < sonSayfa && (
+        <button
+          type="button"
+          onClick={ileri}
+          className="absolute right-0 top-0 flex h-full w-1/4 cursor-e-resize items-center justify-end pr-1 opacity-0 transition-opacity hover:opacity-100"
+          aria-label="Sonraki sayfa"
+        >
+          <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </span>
+        </button>
       )}
     </div>
   );
