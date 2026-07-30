@@ -153,7 +153,7 @@ export function TamEkranKatman({
   return (
     <Portal>
       <div
-        className={`fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm ${koyuZemin ? "bg-murekkep/90" : "bg-murekkep/70"}`}
+        className={`fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm ${koyuZemin ? "bg-[#211a17]/92" : "bg-murekkep/70"}`}
         // onMouseDown KULLANILIR, onClick DEGIL: pencere icinde metin secerken
         // fare zemine tasip birakilirsa onClick tetiklenir ve pencere kapanir -
         // kullanici yazdigini kaybeder. mousedown, baslangic noktasina bakar.

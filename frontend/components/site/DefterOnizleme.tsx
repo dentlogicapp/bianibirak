@@ -31,29 +31,27 @@ import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 // Temiz onizleme urunu guzel gosterir, arzuyu YUKSELTIR.
 //
 // ---------------------------------------------------------------------------
-// TAM EKRAN: dogrulanmis modal kabugu (TamEkranKatman) + DOKUNMATIGE UYGUN KONTROL.
+// TAM EKRAN KROMASI - TEMA-BAGIMSIZ SABIT RENK.
 //
-// KOK NEDEN (duzeltilen): onceki tam ekran kendi "fixed inset-0" katmanini kuruyor,
-// kapat (x) "absolute right-5 top-5" ile yerlesiyordu. Iki ayri kusur:
-//   1) Ust atada backdrop-blur olan sayfada "fixed" o ataya gore konumlanip (x)
-//      ekran disina tasiyordu (Portal.tsx'te yazili kural).
-//   2) Kontroller acik renk ince cizgiydi; acik/soluk zemin uzerinde kayboluyordu.
-//      Cevirme bolgeleri "opacity-0 hover:opacity-100" idi - DOKUNMATIKTE HOVER YOK,
-//      yani telefonda HIC gorunmuyorlardi. Masaustu-ozel bir cozumdu.
+// KOK NEDEN (kesin): tam ekran kontrolleri tema token'i (parsomen/murekkep) ile
+// renkleniyordu. Bu token'lar TEMAYLA DONER: parsomen acik temada acik, koyu temada
+// koyudur. Sonuc, bir metni parsomen ile boyayinca koyu temada KARARIR, acik temada
+// ACILIR - yani hangi temada olursanuz olun bir zeminde gorunmez olur. Kullanicinin
+// yasadigi tam olarak buydu.
 //
-// COZUM (kokten):
-//   - Tam ekran, projenin dogrulanmis kabugu TamEkranKatman'a tasindi (Portal + ESC +
-//     odak tuzagi + odak iadesi + scroll kilidi kabuktan gelir).
-//   - Zemin immersif KOYU (koyuZemin) - sayfa one cikar, kontroller okunur.
-//   - Butun kontroller KATI, HER ZAMAN GORUNUR cip: murekkep dolgu + parsomen ikon +
-//     golge + ince halka. murekkep ile parsomen tema ne olursa olsun BIRBIRININ ZITTI,
-//     yani cip her iki temada da kendi icinde kontrastli ve zeminden ayrisir.
-//   - Dokunmatik icin GORUNUR ALT GEZINME CUBUGU (onceki - sayfa - sonraki). Kenar
-//     dokunma bolgeleri masaustu icin bonus olarak kalir; birincil gorunur denetim
-//     alt cubuktur.
+// COZUM: tam ekran bir MEDYA IZLEYICIDIR; kromasi (dugmeler, sayac, kose kapatma)
+// her iki temada da SABIT KOYU olmali - iOS Photos, Google Photos deseni. Token
+// kullanilmaz; sabit #211a17 (koyu murekkep) dolgu + #f4ebda (acik parsomen) ikon.
+// Bu ikili tema ne olursa olsun kendi icinde kontrastli ve zeminden ayrisir; asla
+// donmez, asla gorunmez olmaz. (Kitap sayfasinin kendisi de zaten sabit #fdf9f0 -
+// ayni gerekce: sabit deger, cunku isik/koyu temayla degismemeli.)
 //
 // Kagit (sayfa gorseli + kenar cevirme bolgeleri) TEK KAYNAK bir ic bilesende: inline
 // ve tam ekran AYNI koddan beslenir, iki yerde ayrisan davranis olusamaz.
+
+// Tam ekran kroma cipi - tema-bagimsiz sabit koyu dolgu + acik ikon.
+const KROM = "bg-[#211a17]/90 text-[#f4ebda] shadow-lg ring-1 ring-[#f4ebda]/25 backdrop-blur-sm";
+
 export function DefterOnizleme() {
   const [bilgi, setBilgi] = useState<OnizlemeBilgi | null>(null);
   const [sayfa, setSayfa] = useState(0);
@@ -134,7 +132,7 @@ export function DefterOnizleme() {
         tamEkran={false}
       />
 
-      {/* TAM EKRAN - dogrulanmis kabuk + immersif koyu zemin + katI gorunur kontrol */}
+      {/* TAM EKRAN - dogrulanmis kabuk + immersif koyu zemin + tema-bagimsiz kroma */}
       <TamEkranKatman
         acik={tamEkran}
         onKapat={() => setTamEkran(false)}
@@ -159,7 +157,7 @@ export function DefterOnizleme() {
             <button
               type="button"
               onClick={() => setTamEkran(false)}
-              className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/30 backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
+              className={`absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 ${KROM}`}
               aria-label="Kapat"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
@@ -168,13 +166,13 @@ export function DefterOnizleme() {
             </button>
           </div>
 
-          {/* GORUNUR ALT GEZINME - dokunmatikte tek birincil denetim. Katı cipler. */}
+          {/* GORUNUR ALT GEZINME - dokunmatikte birincil denetim. Sabit koyu cip. */}
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={geri}
               disabled={sayfa === 0}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/25 transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              className={`flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100 ${KROM}`}
               aria-label="Önceki sayfa"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
@@ -182,7 +180,7 @@ export function DefterOnizleme() {
               </svg>
             </button>
 
-            <span className="rounded-full bg-murekkep/90 px-4 py-2 font-govde text-xs tabular-nums text-parsomen shadow-lg ring-1 ring-parsomen/25">
+            <span className={`rounded-full px-4 py-2 font-govde text-xs tabular-nums ${KROM}`}>
               {sayfa + 1} / {bilgi.sayfa_sayisi}
             </span>
 
@@ -190,7 +188,7 @@ export function DefterOnizleme() {
               type="button"
               onClick={ileri}
               disabled={sayfa >= sonSayfa}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-murekkep/90 text-parsomen shadow-lg ring-1 ring-parsomen/25 transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              className={`flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100 ${KROM}`}
               aria-label="Sonraki sayfa"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
@@ -284,7 +282,8 @@ export function DefterOnizleme() {
 // ayni bilesenden beslenir. Tek fark boyutlama: inline dar (max-w-md), tam ekran
 // gorunum yuksekligine sigar (max-h-[72vh]) ve kenar bolgeleri gorsele hizali kalir
 // (w-fit). Kenar cevirme bolgeleri masaustunde hover ile belirir; dokunmatikte
-// birincil gorunur denetim tam ekrandaki alt gezinme cubugudur.
+// birincil gorunur denetim tam ekrandaki alt gezinme cubugudur. Kenar cipleri de
+// kagidin (sabit #fdf9f0) uzerinde sabit koyu renkle boyanir - tema ile donmez.
 function Kagit({
   sayfa,
   sonSayfa,
@@ -326,7 +325,7 @@ function Kagit({
           className="absolute left-0 top-0 flex h-full w-1/4 cursor-w-resize items-center justify-start pl-1 opacity-0 transition-opacity hover:opacity-100"
           aria-label="Önceki sayfa"
         >
-          <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
+          <span className="rounded-full bg-[#211a17]/70 p-2 text-[#f4ebda] backdrop-blur">
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
               <path d="m15 5-7 7 7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
@@ -341,7 +340,7 @@ function Kagit({
           className="absolute right-0 top-0 flex h-full w-1/4 cursor-e-resize items-center justify-end pr-1 opacity-0 transition-opacity hover:opacity-100"
           aria-label="Sonraki sayfa"
         >
-          <span className="rounded-full bg-murekkep/70 p-2 text-parsomen backdrop-blur">
+          <span className="rounded-full bg-[#211a17]/70 p-2 text-[#f4ebda] backdrop-blur">
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
               <path d="m9 5 7 7-7 7" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
