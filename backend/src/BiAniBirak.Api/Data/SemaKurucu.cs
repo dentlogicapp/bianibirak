@@ -552,6 +552,11 @@ public static class SemaKurucu
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaEdildi" boolean NOT NULL DEFAULT false;
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaZamani" timestamptz NULL;
 
+        -- VIP KALICI SAKLAMA (Bolum 4-I): ozel gunden itibaren TOPLAM yasam suresi (gun).
+        -- NULL -> varsayilan (Sabitler.ToplamGun). Dolu -> o sayi (VIP: 3650 = 10 yil).
+        -- Idempotent; mevcut satirlar NULL kalir, varsayilan sureyi korur.
+        ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "OzelSaklamaGun" integer NULL;
+
         -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;

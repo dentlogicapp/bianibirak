@@ -48,6 +48,19 @@ public class Etkinlik
     // Ama imha, ciftin mirasini kaybetmesi ANLAMINA GELMEZ: uyarilariz. Iki kez.
     // Uyari gonderildigini isaretlemezsek her cron turunda tekrar gonderir ve
     // cifti bogariz - bu yuzden bayrak tutulur.
+    // ---- VIP KALICI SAKLAMA (Bolum 4-I) ----
+    //
+    // Ozel gunden itibaren defterin TOPLAM yasam suresi (gun). Bos (null) ise
+    // varsayilan Sabitler.ToplamGun (20) gecerlidir; dolu ise o sayi kullanilir
+    // (VIP defterlerde ornegin 3650 = 10 yil). Davetli penceresi (15 gun) DEGISMEZ;
+    // uzayan yalniz toplama sonrasi saklama/indirme suresidir.
+    //
+    // YALNIZ super panelden girilir/degistirilir. Imha ani bu alandan TURETILIR
+    // (ImhaGorevi + HatirlatmaGorevi tek formulden okur); ikinci kod dali yok,
+    // sizma yuzeyi yok, geri alinabilir. Nullable: mevcut defterler dokunulmadan
+    // varsayilan sureyi korur.
+    public int? OzelSaklamaGun { get; set; }
+
     public bool ImhaUyari14Gonderildi { get; set; }
     public bool ImhaUyari3Gonderildi { get; set; }
 
