@@ -31,6 +31,8 @@ public static class SuperUclari
         app.MapPost("/api/super/defter/{id:guid}/goruntule", Goruntule).RequireAuthorization();
         app.MapPost("/api/super/goruntule/bitir", GoruntulemeBitir).RequireAuthorization();
         app.MapPost("/api/super/defter/{id:guid}/dondur", Dondur).RequireAuthorization();
+        // VIP kalici saklama: OzelSaklamaGun set/degistir/kaldir (yalniz super admin).
+        app.MapPut("/api/super/defter/{id:guid}/saklama", SaklamaGuncelle).RequireAuthorization();
         // Deneme defteri: gercekci veriyle dolu defter uretir (yalniz super admin).
         app.MapPost("/api/super/deneme-defteri", DenemeUret).RequireAuthorization();
         app.MapDelete("/api/super/defter/{id:guid}", DefterCopeAt).RequireAuthorization();
@@ -313,6 +315,7 @@ public static class SuperUclari
             // yoneticinin gordugu AYNI cumle olmali.
             kapanis_tarihi = e.KapanisTarihi,
             imha_tarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun),
+            ozel_saklama_gun = e.OzelSaklamaGun,
             imha_edildi = e.ImhaEdildi,
             durum = e.Durum,
             donduruldu = e.Donduruldu,
@@ -492,6 +495,50 @@ public static class SuperUclari
 
         return Results.Json(new { ok = true, donduruldu = defter.Donduruldu });
     }
+
+    // VIP KALICI SAKLAMA (Bolum 4-I): defterin ozel gunden itibaren TOPLAM yasam
+    // suresini (gun) super panelden ayarlar. null -> kaldir (varsayilan ToplamGun/20
+    // gune don); sayi -> o gun (VIP, ornek 3650 = 10 yil). Imha ani bu alandan
+    // TURETILIR (Sabitler.ImhaAni); ImhaGorevi/HatirlatmaGorevi/uc yanitlari otomatik
+    // uyar - ikinci kod dali yok. GERI ALINABILIR: null'a cekince eski davranisa doner.
+    // UpdatedAt DOKUNULUR: imha tarihi degisti, senkron damgasi cifte de yansimali.
+    private static async Task<IResult> SaklamaGuncelle(
+        Guid id, SaklamaIstegi istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, kullanici) = await SuperAdminMi(ctx, db);
+        if (!ok || kullanici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
+
+        var deger = istek.OzelSaklamaGun;
+        // Dogrulama: null (kaldir) serbest; sayi ise makul aralik. Ust sinir 36500
+        // (100 yil) - "sonsuz" vaadi vermeyiz (KVKK belirli sure ister) ama VIP icin genis.
+        // Alt sinir ToplamaGun+1: davetli penceresinden (15 gun) once imha OLAMAZ.
+        if (deger != null && (deger < Sabitler.ToplamaGun + 1 || deger > 36500))
+            return Hata(400, "DOGRULAMA_HATASI",
+                $"Saklama suresi {Sabitler.ToplamaGun + 1}-36500 gun araliginda olmalidir (ya da bos birakilmalidir).");
+
+        var defter = await db.Etkinlikler.FirstOrDefaultAsync(e => e.Id == id && !e.SilindiMi);
+        if (defter == null)
+            return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadı.");
+
+        var eski = defter.OzelSaklamaGun;
+        defter.OzelSaklamaGun = deger;
+        defter.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        await Denetim(db, id, kullanici.Id, "DEFTER_SAKLAMA_DEGISTIRILDI", "etkinlikler", id,
+            new { eski, yeni = deger });
+
+        return Results.Json(new
+        {
+            ok = true,
+            ozel_saklama_gun = defter.OzelSaklamaGun,
+            imha_tarihi = Sabitler.ImhaAni(defter.EtkinlikTarihi, defter.OzelSaklamaGun),
+        });
+    }
+
+    // Body modeli: null -> varsayilana don, sayi -> VIP gun. (case-insensitive bind)
+    public record SaklamaIstegi(int? OzelSaklamaGun);
 
     // Cope at (soft delete - geri alinabilir)
     private static async Task<IResult> DefterCopeAt(Guid id, HttpContext ctx, BiAniBirakDbContext db)

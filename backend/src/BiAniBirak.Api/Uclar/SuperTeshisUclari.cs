@@ -185,6 +185,7 @@ public static class SuperTeshisUclari
             kapandi,
             imha_tarihi = imhaTarihi,
             imhaya_kalan_gun = imhayaKalanGun,
+            ozel_saklama_gun = e.OzelSaklamaGun,
 
             // Saglik
             saglik = SaglikHesapla(kurulumTam, linkVar, katkiVar, aktif30),
