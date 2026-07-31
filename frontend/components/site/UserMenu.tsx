@@ -231,6 +231,19 @@ export function UserMenu() {
     setEtkinlikler((o) => o.filter((x) => x.id !== e.id));
     setSilHedef(null);
     toast.success("Defter çöp kutusuna taşındı.");
+
+    // AKILLI GECIS: silinen defter ACIK defterse kullanici bosluga dusmemeli.
+    // (etkinliklerim ekranindaki desenin AYNISI - tek dogruluk kaynagi.) Pasif
+    // defter silindiyse baglam bozulmaz; gecis yapilmaz. etkinlikAktifYap JWT'yi
+    // yeniler, bu yuzden hard-nav (window.location) - etkinlikDegistir ile ayni.
+    if (e.id === aktifId) {
+      const kalanlar = etkinlikler.filter((x) => x.id !== e.id);
+      if (kalanlar.length > 0) {
+        const g = await api.etkinlikAktifYap(kalanlar[0].id);
+        if (g.ok) { window.location.href = "/gelen-dilekler"; return; }
+      }
+      window.location.href = "/etkinliklerim";
+    }
   }
 
   function bildirimeTikla(b: Bildirim) {
@@ -355,12 +368,11 @@ export function UserMenu() {
                 Cok defterli kullanicida yanlis deftere islem yapmanin tek panzehiri
                 baglami HER ZAMAN gorunur kilmaktir.
 
-                ACIK DEFTER SILINEMEZ - bilincli.
-                Silme eylemi yalniz PASIF defterlerde durur. Icinde bulundugun defteri
-                menuden silmek, ayagin bastigi dali kesmektir: silme aninda tum ekran
-                baglamsiz kalir, JWT'deki aktif_etkinlik_id olu bir kimlige isaret eder.
-                Acik defteri silmenin dogru yeri Etkinliklerim ekranidir - orada silme
-                sonrasi hangi deftere gecilecegi de yonetilir. */}
+                ACIK DEFTER DE SILINEBILIR (sagdaki x). Onceden kapaliydi ("bastigi
+                dali kesmek"); artik AktifEtkinlikId SUNUCUDA tutuldugu ve akilli gecis
+                (etkinliklerim ile ayni) kanitlandigi icin guvenle silinir: silme sonrasi
+                baska defter varsa ona gecilir, yoksa /etkinliklerim'e donulur. x tek
+                tikla silmez - once onay (miras, once teyit). */}
             {aktifEtkinlik && (
               <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-yuzeyKoyu px-3 py-2">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yaldiz" aria-hidden />
@@ -372,6 +384,20 @@ export function UserMenu() {
                     {aktifEtkinlik.es1_ad} &amp; {aktifEtkinlik.es2_ad} - {turKisa(aktifEtkinlik.tur)}
                   </p>
                 </div>
+                {/* ACIK DEFTERI SIL - switcher (x) diliyle ayni; ama dokunmatikte
+                    hover yok, bu yuzden HAFIF-DAIMA gorunur (text-ikincil/60), hover'da
+                    belirginlesir. Tek tikla silmez: silNiyeti -> onay penceresi. */}
+                <button
+                  type="button"
+                  onClick={() => silNiyeti(aktifEtkinlik)}
+                  aria-label="Açık defteri çöp kutusuna taşı"
+                  title="Çöp kutusuna taşı"
+                  className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ikincil/60 transition-colors hover:bg-sarap/10 hover:text-sarap"
+                >
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+                  </svg>
+                </button>
               </div>
             )}
           </div>
@@ -728,6 +754,9 @@ export function UserMenu() {
           "Davetli bağlantıları çalışmaz - yeni dilek gelmez.",
           "Dilekler ve fotoğraflar SİLİNMEZ, çöp kutusunda bekler.",
           "Baskıya hazır nüsha indirilemez.",
+          ...(etkinlikler.length === 1
+            ? ["Bu senin son defterin - silince açık defterin kalmaz."]
+            : []),
         ]}
         geriDonus="Çöp Kutusu'ndan geri alınabilir. 5 gün sonra kalıcı olarak silinir."
         onayEtiket="Çöp kutusuna taşı"
