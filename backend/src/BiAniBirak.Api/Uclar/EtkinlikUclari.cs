@@ -248,7 +248,10 @@ public static class EtkinlikUclari
         var liste = await (
             from u in db.EtkinlikUyelikleri.AsNoTracking()
             join e in db.Etkinlikler.AsNoTracking() on u.EtkinlikId equals e.Id
-            where u.KullaniciId == kullaniciId && e.DeletedAt == null
+            // COP FILTRESI: SilindiMi (guncel cop mekanizmasi) + DeletedAt (legacy).
+            // EtkinlikSil artik SilindiMi yaziyor; bu liste eskiden yalniz DeletedAt'e
+            // bakiyordu, bu yuzden cope tasinan defter menude gorunmeye devam ediyordu.
+            where u.KullaniciId == kullaniciId && !e.SilindiMi && e.DeletedAt == null
             orderby e.CreatedAt descending
             select new { e, u.Rol }).ToListAsync();
 
