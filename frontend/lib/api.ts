@@ -253,6 +253,7 @@ export type SuperDefter = {
   bekleyen_dilek: number;
   hareketsiz: boolean;
   saglik: number;
+  ozel_saklama_gun: number | null;
 };
 
 export type SuperKullanici = {
@@ -656,6 +657,12 @@ export const api = {
     istek<{ ok: boolean; donduruldu: boolean }>(`/api/super/defter/${id}/dondur`, {
       method: "POST",
     }),
+  // VIP kalici saklama: ozelSaklamaGun null -> varsayilana don, sayi -> VIP gun.
+  superSaklamaGuncelle: (id: string, ozelSaklamaGun: number | null) =>
+    istek<{ ok: boolean; ozel_saklama_gun: number | null; imha_tarihi: string }>(
+      `/api/super/defter/${id}/saklama`,
+      { method: "PUT", body: JSON.stringify({ OzelSaklamaGun: ozelSaklamaGun }) }
+    ),
   superDefterCopeAt: (id: string) =>
     istek<{ ok: boolean }>(`/api/super/defter/${id}`, { method: "DELETE" }),
   superDefterGeriAl: (id: string) =>
@@ -1059,6 +1066,7 @@ export type SuperDefterDetay = {
   kapandi: boolean;
   imha_tarihi: string;
   imhaya_kalan_gun: number;
+  ozel_saklama_gun: number | null;
 
   saglik: number;
   saglik_detay: {

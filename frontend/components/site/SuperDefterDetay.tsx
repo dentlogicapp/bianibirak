@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { api, rontgenIndir, type SuperDefterDetay } from "@/lib/api";
+import { VipSaklamaModal } from "@/components/site/VipSaklamaModal";
 
 // SAGLIK ROZETI - defterin dort ceyregi tek bakista.
 //
@@ -46,6 +47,7 @@ export function DefterDetayModal({
   const [veri, setVeri] = useState<SuperDefterDetay | null>(null);
   const [hata, setHata] = useState("");
   const [rontgenBekliyor, setRontgenBekliyor] = useState(false);
+  const [saklamaAcik, setSaklamaAcik] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -142,6 +144,38 @@ export function DefterDetayModal({
                     }`}
                     vurgu={veri.imhaya_kalan_gun <= 0}
                   />
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-govde text-xs text-ikincil">Kalıcı saklama</span>{" "}
+                      <span className="font-govde text-xs text-murekkep">
+                        {veri.ozel_saklama_gun != null
+                          ? `\uD83D\uDC51 ${veri.ozel_saklama_gun.toLocaleString("tr-TR")} gün (özel)`
+                          : "Varsayılan"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSaklamaAcik(true)}
+                      className="shrink-0 rounded-full border border-yaldiz/50 px-3 py-1 font-govde text-[0.65rem] text-yaldiz transition-colors hover:bg-yaldiz/10"
+                    >
+                      Özel süre
+                    </button>
+                  </div>
+                  {saklamaAcik && (
+                    <VipSaklamaModal
+                      acik
+                      defterId={veri.id}
+                      es1Ad={veri.es1_ad}
+                      es2Ad={veri.es2_ad}
+                      etkinlikTarihi={veri.etkinlik_tarihi}
+                      mevcutDeger={veri.ozel_saklama_gun}
+                      onKapat={() => setSaklamaAcik(false)}
+                      onKaydedildi={async () => {
+                        const c = await api.superDefterDetay(defterId);
+                        if (c.ok) setVeri(c.veri);
+                      }}
+                    />
+                  )}
                   <Satir etiket="Son hareket" deger={tarih(veri.son_hareket)} />
                 </div>
               </Bolum>

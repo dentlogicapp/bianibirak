@@ -16,6 +16,7 @@ import { AppShell } from "@/components/site/AppShell";
 import { OlcumSekmesi } from "@/components/site/SuperOlcum";
 import { SaglikRozeti, DefterDetayModal } from "@/components/site/SuperDefterDetay";
 import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
+import { VipSaklamaModal } from "@/components/site/VipSaklamaModal";
 import { defterDurumu, durumTonSinif } from "@/lib/durum";
 import { DestekSekmesi } from "@/components/site/DestekSekmesi";
 import { SssYonetimi } from "@/components/site/SssYonetimi";
@@ -244,6 +245,7 @@ function OzetIzgara({ ozet }: { ozet: SuperOzet }) {
 function DefterlerSekmesi() {
   const [defterler, setDefterler] = useState<SuperDefter[]>([]);
   const [detayId, setDetayId] = useState<string | null>(null);
+  const [saklamaHedef, setSaklamaHedef] = useState<SuperDefter | null>(null);
   const [ara, setAra] = useState("");
   const [yukleniyor, setYukleniyor] = useState(true);
   const [islenen, setIslenen] = useState<string | null>(null);
@@ -401,6 +403,12 @@ function DefterlerSekmesi() {
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {/* SAGLIK: yonetici, batan defteri LISTEDEN gorur - acmasi gerekmez */}
                   <SaglikRozeti skor={d.saglik} />
+                  {d.ozel_saklama_gun != null && (
+                    <Rozet
+                      metin={`\uD83D\uDC51 VIP (${d.ozel_saklama_gun.toLocaleString("tr-TR")} gün)`}
+                      tip="vip"
+                    />
+                  )}
                   {/* Eski "durum" rozeti (Hazirlik/Aktif) KALDIRILDI: o alan defter
                       kuruldugunda yazilip bir daha degismiyordu - bilgi tasimiyordu.
                       Yerini asagidaki CANLI EVRE rozeti aldi (lib/durum.ts). */}
@@ -460,6 +468,12 @@ function DefterlerSekmesi() {
                 {/* TESHIS: deftere GIRMEDEN sorunu gor. Impersonation'a alternatif -
                     daha az yetki, ayni fayda. */}
                 <button
+                  onClick={() => setSaklamaHedef(d)}
+                  className="rounded-full border border-yaldiz/50 px-4 py-2 font-govde text-xs text-yaldiz transition-colors hover:bg-yaldiz/10"
+                >
+                  Özel süre
+                </button>
+                <button
                   onClick={() => setDetayId(d.id)}
                   className="rounded-full border border-yaldiz/50 px-4 py-2 font-govde text-xs text-yaldiz transition-colors hover:bg-yaldiz/10"
                 >
@@ -495,6 +509,19 @@ function DefterlerSekmesi() {
       {/* TESHIS MODALI - saglik, yasam dongusu, dilek dagilimi, medya + RONTGEN */}
       {detayId && (
         <DefterDetayModal defterId={detayId} onKapat={() => setDetayId(null)} />
+      )}
+
+      {saklamaHedef && (
+        <VipSaklamaModal
+          acik
+          defterId={saklamaHedef.id}
+          es1Ad={saklamaHedef.es1_ad}
+          es2Ad={saklamaHedef.es2_ad}
+          etkinlikTarihi={saklamaHedef.etkinlik_tarihi}
+          mevcutDeger={saklamaHedef.ozel_saklama_gun}
+          onKapat={() => setSaklamaHedef(null)}
+          onKaydedildi={() => { void cek(); }}
+        />
       )}
 
       {/* DONDUR / COZ - geri alinabilir ama ETKISI buyuk: cift yazamaz, indiremez. */}
@@ -1027,9 +1054,11 @@ function AkisSekmesi() {
 }
 
 // ---------------- YARDIMCILAR ----------------
-function Rozet({ metin, tip }: { metin: string; tip?: "uyari" | "soluk" }) {
+function Rozet({ metin, tip }: { metin: string; tip?: "uyari" | "soluk" | "vip" }) {
   const sinif =
-    tip === "uyari"
+    tip === "vip"
+      ? "bg-yaldiz/25 text-yaldiz ring-1 ring-yaldiz/40"
+      : tip === "uyari"
       ? "bg-yaldiz/20 text-yaldiz"
       : tip === "soluk"
         ? "bg-ayrac/40 text-ikincil"
