@@ -1,5 +1,7 @@
 "use client";
 
+import { adBicimle } from "@/lib/dogrulama";
+
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -148,6 +150,7 @@ function GirisIcerik() {
             <input
               value={ad}
               onChange={(e) => setAd(e.target.value)}
+              onBlur={(e) => setAd(adBicimle(e.target.value))}
               className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm outline-none focus:border-sarap"
               placeholder="Adınız Soyadınız"
             />

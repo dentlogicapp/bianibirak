@@ -1,5 +1,7 @@
 "use client";
 
+import { adBicimle } from "@/lib/dogrulama";
+
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -108,6 +110,7 @@ export function ProfilimModal({
           <input
             value={ad}
             onChange={(e) => setAd(e.target.value)}
+            onBlur={(e) => setAd(adBicimle(e.target.value))}
             className="mt-2 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
           />
 

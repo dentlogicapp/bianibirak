@@ -1,5 +1,7 @@
 "use client";
 
+import { adBicimle } from "@/lib/dogrulama";
+
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Kullanici, type Etkinlik } from "@/lib/api";
@@ -401,6 +403,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
           <input
             value={es1Ad}
             onChange={(ev) => setEs1Ad(ev.target.value)}
+            onBlur={(ev) => setEs1Ad(adBicimle(ev.target.value))}
             className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
             placeholder="Örn. Ayşe"
           />
@@ -412,6 +415,7 @@ function EtkinlikAlanlari({ onEklendi }: { onEklendi: (e: Etkinlik) => void }) {
           <input
             value={es2Ad}
             onChange={(ev) => setEs2Ad(ev.target.value)}
+            onBlur={(ev) => setEs2Ad(adBicimle(ev.target.value))}
             className="w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm text-murekkep outline-none focus:border-sarap"
             placeholder="Örn. Mehmet"
           />
