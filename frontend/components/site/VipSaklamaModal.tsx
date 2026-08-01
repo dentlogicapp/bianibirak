@@ -7,28 +7,32 @@ import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 // VIP KALICI SAKLAMA MODALI - TEK KAYNAK.
 //
 // Ayni modal HEM defter kartindan (hizli duzenleme) HEM detaydan cagirilir; giris
-// mantigi (dogrulama, "10 yil" onayari, "kaldir", canli onizleme) TEK yerde yasar -
-// iki yerde ayrisan bir kutu olusamaz (paralel yapi yasak).
+// mantigi (dogrulama, "10 yil" onayari, canli onizleme) TEK yerde yasar.
 //
 // SEMANTIK: OzelSaklamaGun = ozel gunden itibaren defterin TOPLAM yasam suresi (gun).
-//   null  -> varsayilana don (normal 20 gun)
+//   null  -> varsayilana don (VARSAYILAN_GUN)
 //   sayi  -> VIP (ornek 3650 = 10 yil)
-// Backend imha anini bu alandan turetir (Sabitler.ImhaAni); kaydettikten sonra ebeveyn
-// listeyi/detayi yeniler ve gercek imha tarihi backend'den okunur.
 //
-// GERI ALINABILIR: "Varsayilana don" tek tikla null'a ceker. Bu yuzden agir teyit
-// (ad yazdirma) YOK - ama etkiyi (yeni imha tarihi) ACIKCA gosteririz.
+// ============ VERI-KAYBI KILIDI (CANLIDA OGRENILDI) ============
+// VIP yalnizca UZATIR, ASLA kisaltmaz veya imha etmez. Iki kural birlikte:
+//   1. Deger en az VARSAYILAN_GUN (20). Daha kucuk = kisaltma = YASAK.
+//   2. Olusan imha ani GELECEKTE olmali. Ozel gun GECMISTE olan bir defterde,
+//      kucuk bir deger (hatta "varsayilana don") imha anini bugune/gecmise ceker;
+//      bir sonraki imha gorevi defteri ANINDA ve sessizce yok eder. Bir kez tam
+//      boyle oldu (12 Tem + 16 = 28 Tem, gecmis). Artik onizleme bunu KIRMIZI
+//      gosterir ve Kaydet KILITLENIR - tehlikeli deger hic gonderilemez.
+// Bir defteri gercekten yok etmek "Cope at -> kalici sil" akisidir (teyitli).
 
-const ON_AYAR_GUN = 3650; // 10 yil - varsayilan VIP uzatma (YOL_HARITASI Bolum 4-I)
-const MIN_GUN = 16;       // davetli penceresinden (15) once imha olamaz
-const MAX_GUN = 36500;    // 100 yil - "sonsuz" degil (KVKK belirli sure ister)
+const VARSAYILAN_GUN = 20;   // Sabitler.ToplamGun - VIP bunun ALTINA inemez
+const ON_AYAR_GUN = 3650;    // 10 yil - varsayilan VIP uzatma
+const MAX_GUN = 36500;       // 100 yil - "sonsuz" degil (KVKK belirli sure ister)
 
 type Props = {
   acik: boolean;
   defterId: string;
   es1Ad: string;
   es2Ad: string;
-  /** Ozel gun (ISO) - onizleme icin yeni imha tarihi bundan hesaplanir. */
+  /** Ozel gun (ISO) - imha onizlemesi bundan hesaplanir. */
   etkinlikTarihi: string;
   /** Mevcut OzelSaklamaGun (null = varsayilan). */
   mevcutDeger: number | null;
@@ -51,12 +55,10 @@ export function VipSaklamaModal({
   onKapat,
   onKaydedildi,
 }: Props) {
-  // Metin girisi: bos string = "varsayilan (kaldir)".
   const [metin, setMetin] = useState<string>("");
   const [hata, setHata] = useState<string>("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
-  // Modal her acildiginda mevcut degerden baslar (onceki oturum sizmaz).
   useEffect(() => {
     if (acik) {
       setMetin(mevcutDeger != null ? String(mevcutDeger) : "");
@@ -64,39 +66,49 @@ export function VipSaklamaModal({
     }
   }, [acik, mevcutDeger]);
 
-  // Girilen degeri yorumla: bos -> null; sayi -> gun. Gecersizse null-degil hata.
-  const yorum = useMemo(() => {
+  // TEK DEGERLENDIRME: bicim + veri-kaybi kilidi birlikte.
+  const durum = useMemo(() => {
     const t = metin.trim();
-    if (t === "") return { deger: null as number | null, gecerli: true };
-    if (!/^\d+$/.test(t)) return { deger: null, gecerli: false };
-    const n = parseInt(t, 10);
-    if (n < MIN_GUN || n > MAX_GUN) return { deger: n, gecerli: false };
-    return { deger: n, gecerli: true };
-  }, [metin]);
 
-  // Canli onizleme: yeni imha tarihi = ozel gun + (girilen deger). Bos ise varsayilan.
-  const onizleme = useMemo(() => {
+    // deger: bos -> null; sayi -> parse. Bicim ve aralik (>= VARSAYILAN_GUN).
+    let deger: number | null = null;
+    let bicimGecerli = true;
+    if (t !== "") {
+      if (!/^\d+$/.test(t)) {
+        bicimGecerli = false;
+      } else {
+        deger = parseInt(t, 10);
+        if (deger < VARSAYILAN_GUN || deger > MAX_GUN) bicimGecerli = false;
+      }
+    }
+
+    // Etkin gun (deger ?? varsayilan) ve olusan imha ani. null (kaldir) da varsayilan
+    // uzerinden imha uretir - gecmis tarihli defterde bu da tehlikeli olabilir.
+    const etkinGun = deger ?? VARSAYILAN_GUN;
     const ozel = new Date(etkinlikTarihi);
-    if (Number.isNaN(ozel.getTime())) return null;
-    if (yorum.deger == null) return null; // bos -> varsayilan (metinle anlatilir)
-    if (!yorum.gecerli) return null;
-    const imha = new Date(ozel);
-    imha.setDate(imha.getDate() + yorum.deger);
-    return tarihMetni(imha);
-  }, [etkinlikTarihi, yorum]);
+    const ozelGecerli = !Number.isNaN(ozel.getTime());
+
+    let imha: Date | null = null;
+    let imhaGelecekte = true;
+    if (ozelGecerli) {
+      imha = new Date(ozel);
+      imha.setDate(imha.getDate() + etkinGun);
+      imhaGelecekte = imha.getTime() > Date.now();
+    }
+
+    const gecerli = bicimGecerli && imhaGelecekte;
+    return { deger, bicimGecerli, imha, imhaGelecekte, gecerli };
+  }, [metin, etkinlikTarihi]);
 
   if (!acik) return null;
 
-  const degisti = (yorum.deger ?? null) !== (mevcutDeger ?? null);
+  const degisti = (durum.deger ?? null) !== (mevcutDeger ?? null);
 
   async function kaydet() {
-    if (!yorum.gecerli) {
-      setHata(`Süre ${MIN_GUN}-${MAX_GUN} gün aralığında olmalı ya da boş bırakılmalı.`);
-      return;
-    }
+    if (!durum.gecerli) return;
     setKaydediliyor(true);
     setHata("");
-    const c = await api.superSaklamaGuncelle(defterId, yorum.deger);
+    const c = await api.superSaklamaGuncelle(defterId, durum.deger);
     setKaydediliyor(false);
     if (!c.ok) {
       setHata(c.mesaj);
@@ -125,21 +137,21 @@ export function VipSaklamaModal({
           <p className="font-govde text-xs leading-relaxed text-ikincil">
             Bu defter, özel gününden itibaren aşağıdaki gün sayısı kadar saklanır; süre
             sonunda içeriği kalıcı olarak imha edilir. Alanı{" "}
-            <span className="font-medium text-murekkep">boş bırakırsanız</span> varsayılan
-            saklama süresi geçerli olur. Bu ayar yalnızca sistem yöneticisi tarafından
-            değiştirilir ve geri alınabilir.
+            <span className="font-medium text-murekkep">boş bırakırsanız</span> varsayılan{" "}
+            {VARSAYILAN_GUN} gün geçerli olur. VIP yalnızca <span className="font-medium text-murekkep">uzatır</span>;
+            defteri asla erkene çekmez veya imha etmez.
           </p>
 
           <div>
             <label className="font-govde text-[0.66rem] uppercase tracking-etiket text-ikincil">
-              Saklama süresi (gün)
+              Saklama süresi (gün) · en az {VARSAYILAN_GUN}
             </label>
             <input
               type="text"
               inputMode="numeric"
               value={metin}
               onChange={(e) => setMetin(e.target.value)}
-              placeholder="Varsayılan (boş bırak)"
+              placeholder={`Varsayılan (${VARSAYILAN_GUN} gün) için boş bırak`}
               className="mt-1.5 w-full rounded-xl border border-ayrac bg-parsomen px-4 py-3 font-govde text-sm tabular-nums text-murekkep outline-none focus:border-sarap"
             />
           </div>
@@ -157,31 +169,43 @@ export function VipSaklamaModal({
               onClick={() => setMetin("")}
               className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-sarap hover:text-sarap"
             >
-              Varsayılana dön (kaldır)
+              Varsayılana dön ({VARSAYILAN_GUN} gün)
             </button>
           </div>
 
-          {/* Canli onizleme - etkiyi ACIKCA gosterir */}
-          <div className="rounded-xl border border-ayrac bg-parsomen px-4 py-3">
-            {yorum.deger == null ? (
-              <p className="font-govde text-xs text-ikincil">
-                Varsayılan saklama süresine dönülecek.
+          {/* Canli onizleme - etkiyi ACIKCA gosterir; tehlike KIRMIZI */}
+          <div
+            className={`rounded-xl border px-4 py-3 ${
+              !durum.gecerli
+                ? "border-sarap/50 bg-sarap/10"
+                : "border-ayrac bg-parsomen"
+            }`}
+          >
+            {!durum.bicimGecerli ? (
+              <p className="font-govde text-xs text-sarap">
+                Geçersiz süre — en az {VARSAYILAN_GUN}, en fazla {MAX_GUN.toLocaleString("tr-TR")} gün olmalı.
+                VIP kısaltamaz.
               </p>
-            ) : onizleme ? (
+            ) : !durum.imhaGelecekte ? (
+              <p className="font-govde text-xs text-sarap">
+                Bu süre defteri <span className="font-semibold">hemen imhaya sokar</span> (imha tarihi
+                geçmişte/bugün kalıyor). Bu defterin özel günü geçtiği için, korumak istiyorsanız imha
+                tarihini geleceğe taşıyan daha uzun bir süre girin.
+              </p>
+            ) : durum.imha ? (
               <p className="font-govde text-xs text-ikincil">
                 Yeni imha tarihi:{" "}
-                <span className="font-medium text-murekkep">{onizleme}</span>
+                <span className="font-medium text-murekkep">{tarihMetni(durum.imha)}</span>
+                {durum.deger == null && (
+                  <span className="text-ikincil"> · varsayılan {VARSAYILAN_GUN} gün</span>
+                )}
               </p>
             ) : (
-              <p className="font-govde text-xs text-uyari">
-                Geçersiz süre — {MIN_GUN}-{MAX_GUN} gün arasında olmalı.
-              </p>
+              <p className="font-govde text-xs text-ikincil">Özel gün tarihi okunamadı.</p>
             )}
           </div>
 
-          {hata && (
-            <p className="font-govde text-xs text-sarap">{hata}</p>
-          )}
+          {hata && <p className="font-govde text-xs text-sarap">{hata}</p>}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-ayrac px-6 py-4">
@@ -196,7 +220,7 @@ export function VipSaklamaModal({
           <button
             type="button"
             onClick={kaydet}
-            disabled={kaydediliyor || !degisti || !yorum.gecerli}
+            disabled={kaydediliyor || !degisti || !durum.gecerli}
             className="rounded-full bg-sarap px-5 py-2 font-govde text-xs text-parsomen transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}

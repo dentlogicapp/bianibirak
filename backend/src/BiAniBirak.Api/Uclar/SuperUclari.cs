@@ -512,16 +512,33 @@ public static class SuperUclari
             return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
         var deger = istek.OzelSaklamaGun;
-        // Dogrulama: null (kaldir) serbest; sayi ise makul aralik. Ust sinir 36500
-        // (100 yil) - "sonsuz" vaadi vermeyiz (KVKK belirli sure ister) ama VIP icin genis.
-        // Alt sinir ToplamaGun+1: davetli penceresinden (15 gun) once imha OLAMAZ.
-        if (deger != null && (deger < Sabitler.ToplamaGun + 1 || deger > 36500))
+        // Deger araligi: null (kaldir) serbest; sayi ise en az ToplamGun (20).
+        // VIP yalnizca UZATIR - varsayilandan kisa deger (kisaltma) YASAK. Ust sinir
+        // 36500 (100 yil) - "sonsuz" degil (KVKK belirli sure ister).
+        if (deger != null && (deger < Sabitler.ToplamGun || deger > 36500))
             return Hata(400, "DOGRULAMA_HATASI",
-                $"Saklama suresi {Sabitler.ToplamaGun + 1}-36500 gun araliginda olmalidir (ya da bos birakilmalidir).");
+                $"Saklama suresi en az {Sabitler.ToplamGun}, en fazla 36500 gun olmalidir (ya da bos birakilmalidir). VIP yalnizca uzatir, kisaltmaz.");
 
         var defter = await db.Etkinlikler.FirstOrDefaultAsync(e => e.Id == id && !e.SilindiMi);
         if (defter == null)
             return Hata(404, "ETKINLIK_BULUNAMADI", "Defter bulunamadı.");
+
+        // VERI-KAYBI KILIDI (savunma derinligi - CANLIDA OGRENILDI).
+        //
+        // Ozel gun GECMISTE olan bir defterde, kucuk bir sure (hatta "varsayilana don")
+        // imha anini bugune/gecmise cekebilir; bir sonraki ImhaGorevi turu defteri
+        // SESSIZCE ve ANINDA imha eder - cifte tepki verme sansi birakmadan. Bir kez
+        // tam boyle oldu: 12 Tem ozel gun + 16 gun = 28 Tem, deger girilir girilmez gecmis.
+        //
+        // KURAL: bu ucun urettigi imha ani GELECEKTE olmalidir. Gecmis/bugun ise REDDET.
+        // VIP bir defteri ASLA imhaya sokamaz; yalnizca ileri tasir. Bir defteri gercekten
+        // yok etmek "Cope at -> kalici sil" akisidir (teyitli, geri alinabilir pencere).
+        var yeniImha = Sabitler.ImhaAni(defter.EtkinlikTarihi, deger);
+        if (yeniImha <= DateTimeOffset.UtcNow)
+            return Hata(409, "IMHA_TEHLIKELI",
+                "Bu sure defteri hemen imhaya sokar (imha tarihi gecmis/bugun kaliyor). Bu defterin "
+                + "ozel gunu gectigi icin, korumak istiyorsaniz imha tarihini gelecege tasiyacak daha "
+                + "uzun bir sure girin. VIP yalnizca uzatir.");
 
         var eski = defter.OzelSaklamaGun;
         defter.OzelSaklamaGun = deger;

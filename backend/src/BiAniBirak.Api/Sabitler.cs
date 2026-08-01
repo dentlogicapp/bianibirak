@@ -171,8 +171,13 @@ public static class Sabitler
     // OzelSaklamaGun (VIP) doluysa o gun sayisi; bos ise varsayilan ToplamGun (20).
     // ImhaGorevi ve HatirlatmaGorevi bu AYNI fonksiyondan okur - iki gorev asla
     // ayrisamaz. Davetli penceresi (ToplamaGun=15) DEGISMEZ; uzayan yalniz toplamdir.
+    //
+    // GUVENLIK TABANI (savunma derinligi - CANLIDA OGRENILDI): OzelSaklamaGun
+    // ToplamGun'un ALTINA dusemez; Math.Max ile tabanlanir. Boylece DB'de yanlislikla
+    // kisa bir deger dursa bile (eski veri / uc atlatilsa) imha ani ASLA varsayilandan
+    // (20 gun) erken hesaplanmaz. VIP yalnizca UZATIR; kisaltma bu fonksiyonda imkansiz.
     public static DateTimeOffset ImhaAni(DateTimeOffset etkinlikTarihi, int? ozelSaklamaGun)
-        => etkinlikTarihi.AddDays(ozelSaklamaGun ?? ToplamGun);
+        => etkinlikTarihi.AddDays(Math.Max(ozelSaklamaGun ?? ToplamGun, ToplamGun));
 
     // COP KUTUSU SURELERI - iki farkli saat, tek cop kutusu.
     //
