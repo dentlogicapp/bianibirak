@@ -663,6 +663,17 @@ export const api = {
       `/api/super/defter/${id}/saklama`,
       { method: "PUT", body: JSON.stringify({ OzelSaklamaGun: ozelSaklamaGun }) }
     ),
+  // Son 20 sistem hatasi (1.2 - hata gorunurlugu). Yalniz super admin.
+  superHatalar: () =>
+    istek<{
+      id: string;
+      zaman: string;
+      yol: string;
+      metot: string;
+      mesaj: string;
+      tip: string;
+      durum: number;
+    }[]>("/api/super/hatalar"),
   superDefterCopeAt: (id: string) =>
     istek<{ ok: boolean }>(`/api/super/defter/${id}`, { method: "DELETE" }),
   superDefterGeriAl: (id: string) =>

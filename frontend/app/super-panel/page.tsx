@@ -26,7 +26,7 @@ import { oturumDustu } from "@/lib/oturum";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
-type Sekme = "defterler" | "destek" | "sss" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis";
+type Sekme = "defterler" | "destek" | "sss" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis" | "hatalar";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "defterler", etiket: "Defterler" },
@@ -38,6 +38,7 @@ const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "cop", etiket: "Çöp Kutusu" },
   { kod: "kvkk", etiket: "KVKK" },
   { kod: "akis", etiket: "Canlı Akış" },
+  { kod: "hatalar", etiket: "Hatalar" },
 ];
 
 export default function SuperPanelSayfasi() {
@@ -184,8 +185,84 @@ export default function SuperPanelSayfasi() {
         {sekme === "cop" && <CopSekmesi />}
         {sekme === "kvkk" && <KvkkYonetimi />}
         {sekme === "akis" && <AkisSekmesi />}
+        {sekme === "hatalar" && <HatalarSekmesi />}
       </div>
     </AppShell>
+  );
+}
+
+// ---------------- HATALAR (1.2 - son 20 sistem hatasi) ----------------
+// Yakalanmamis exception'lar (global middleware) buraya akar. PASIF gorunurluk:
+// yonetici sekmeyi acar, son 20 hatayi zaman/uc/mesajiyla gorur. Aktif uyari
+// (bildirim/rozet) ayri bir istir (Bolum 4-D).
+function HatalarSekmesi() {
+  const [hatalar, setHatalar] = useState<
+    { id: string; zaman: string; yol: string; metot: string; mesaj: string; tip: string; durum: number }[]
+  >([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+
+  const cek = useCallback(async () => {
+    setYukleniyor(true);
+    const c = await api.superHatalar();
+    if (c.ok) setHatalar(c.veri);
+    setYukleniyor(false);
+  }, []);
+
+  useEffect(() => {
+    void cek();
+  }, [cek]);
+
+  if (yukleniyor) {
+    return (
+      <div className="flex min-h-[30vh] items-center justify-center font-govde text-sm text-ikincil">
+        Yükleniyor...
+      </div>
+    );
+  }
+
+  if (hatalar.length === 0) {
+    return (
+      <div className="rounded-3xl border border-yaldiz/40 bg-yaldiz/5 p-10 text-center">
+        <p className="font-govde text-sm text-murekkep">Son 20 hatada kayıt yok — sistem temiz.</p>
+        <p className="mt-1 font-govde text-xs text-ikincil">
+          Yakalanmamış bir hata oluşursa burada zaman, uç ve mesajıyla belirir.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="font-govde text-xs text-ikincil">
+          Son {hatalar.length} yakalanmamış hata (en yeni üstte). 30 gün sonra otomatik silinir.
+        </p>
+        <button
+          onClick={() => void cek()}
+          className="rounded-full border border-ayrac px-3 py-1.5 font-govde text-xs text-ikincil transition-colors hover:border-murekkep hover:text-murekkep"
+        >
+          Yenile
+        </button>
+      </div>
+      {hatalar.map((h) => (
+        <div key={h.id} className="rounded-2xl border border-sarap/30 bg-sarap/5 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-sarap px-2 py-0.5 font-govde text-[0.6rem] font-medium text-parsomen">
+              {h.durum}
+            </span>
+            <span className="rounded-full border border-ayrac px-2 py-0.5 font-govde text-[0.6rem] text-ikincil">
+              {h.metot}
+            </span>
+            <span className="truncate font-govde text-xs font-medium text-murekkep">{h.yol}</span>
+            <span className="ml-auto font-govde text-[0.65rem] tabular-nums text-ikincil">
+              {new Date(h.zaman).toLocaleString("tr-TR")}
+            </span>
+          </div>
+          <p className="mt-2 break-words font-govde text-sm text-murekkep">{h.mesaj}</p>
+          <p className="mt-1 break-all font-govde text-[0.65rem] text-ikincil">{h.tip}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
