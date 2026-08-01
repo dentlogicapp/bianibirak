@@ -47,6 +47,9 @@ builder.Services.AddHostedService<HatirlatmaGorevi>();
 builder.Services.AddHostedService<OdemeSureGorevi>();
 builder.Services.AddHostedService<CopTemizlemeGorevi>();
 builder.Services.AddHostedService<DiskGozcusu>();
+// SUPER BILDIRIM GOREVI (Bolum 4-D): gecikmis imha + sistem hatasi anlik uyarilari.
+// Kurallar BildirimKurallari merkezinde; idempotency denetim_gunlukleri uzerinden.
+builder.Services.AddHostedService<SuperBildirimGorevi>();
 builder.Services.AddHostedService<DestekTemizlemeGorevi>(); // 7 gun sessizlikte kapat, 24 saat sonra sil   // disk %75/85/92 esiklerinde super admin uyarisi
 builder.Services.AddSingleton(new JwtServisi(jwtGizli!, jwtYayinci, jwtHedef, jwtGun));
 builder.Services.AddSingleton<DepolamaServisi>();
