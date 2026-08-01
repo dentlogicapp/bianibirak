@@ -108,6 +108,62 @@ if (!string.IsNullOrWhiteSpace(postgresBaglanti))
     app.Logger.LogInformation("Idempotent sema uygulandi + yasal metinler hazir.");
 }
 
+// ============ GLOBAL HATA YAKALAMA (1.2 - hata gorunurlugu) ============
+// Yakalanmamis her exception buraya duser: best-effort sistem_hatalari'na yazilir
+// (super panel "son 20 hata"), kullaniciya temiz 500 doner (stack SIZMAZ). DB yazimi
+// try/catch ile sarilir - DB'nin kendisi cokmusse hata handler'i da cokmesin.
+// Yalniz UNHANDLED exception yakalanir; Hata() ile donen 400/403/404 buraya DUSMEZ
+// (onlar exception degil, normal JSON) - "hata" gercekten hata olur, gurultu olmaz.
+// EN DISTA (UseAuthentication'dan once): tum ic middleware + endpoint sarilir.
+app.Use(async (ctx, sonraki) =>
+{
+    try
+    {
+        await sonraki();
+    }
+    catch (Exception ex)
+    {
+        try
+        {
+            using var kapsam = ctx.RequestServices.CreateScope();
+            var hataDb = kapsam.ServiceProvider.GetRequiredService<BiAniBirakDbContext>();
+            Guid.TryParse(ctx.User?.FindFirst("sub")?.Value, out var aktorId);
+            var yol = ctx.Request.Path.Value ?? "";
+            var iz = ex.StackTrace ?? "";
+            hataDb.SistemHatalari.Add(new SistemHatasi
+            {
+                Id = Guid.NewGuid(),
+                Yol = yol.Length > 300 ? yol[..300] : yol,
+                Metot = ctx.Request.Method,
+                Mesaj = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message,
+                Tip = ex.GetType().FullName ?? ex.GetType().Name,
+                Iz = iz.Length > 4000 ? iz[..4000] : iz,
+                KullaniciId = aktorId == Guid.Empty ? null : aktorId,
+                Durum = 500,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await hataDb.SaveChangesAsync();
+            // RETENTION: 30 gunden eskiyi buda (hata NADIR -> her hatada budamak ucuz).
+            await hataDb.SistemHatalari
+                .Where(h => h.CreatedAt < DateTimeOffset.UtcNow.AddDays(-30))
+                .ExecuteDeleteAsync();
+        }
+        catch { /* DB yazilamadi - yut; asagida stdout log'a dusecek */ }
+
+        app.Logger.LogError(ex, "Yakalanmamis hata: {Metot} {Yol}",
+            ctx.Request.Method, ctx.Request.Path);
+
+        if (!ctx.Response.HasStarted)
+        {
+            ctx.Response.Clear();
+            ctx.Response.StatusCode = 500;
+            ctx.Response.ContentType = "application/json; charset=utf-8";
+            await ctx.Response.WriteAsync(
+                "{\"hata\":\"SUNUCU_HATASI\",\"mesaj\":\"Beklenmeyen bir sunucu hatasi olustu.\"}");
+        }
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 

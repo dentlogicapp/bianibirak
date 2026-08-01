@@ -40,6 +40,7 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<KurasyonOgesi> KurasyonOgeleri => Set<KurasyonOgesi>();
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
     public DbSet<EtkinlikGorseli> EtkinlikGorselleri => Set<EtkinlikGorseli>();
+    public DbSet<SistemHatasi> SistemHatalari => Set<SistemHatasi>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -81,6 +82,22 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.VarlikId).HasColumnName("VarlikId");
             e.Property(x => x.DegisenAlanlar).HasColumnName("DegisenAlanlar").HasColumnType("jsonb");
             e.Property(x => x.SistemEylemi).HasColumnName("SistemEylemi").HasDefaultValue(false);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        // ---- sistem_hatalari (1.2 - yakalanmamis hatalar; super panel gorunurlugu) ----
+        model.Entity<SistemHatasi>(e =>
+        {
+            e.ToTable("sistem_hatalari");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.Yol).HasColumnName("Yol");
+            e.Property(x => x.Metot).HasColumnName("Metot");
+            e.Property(x => x.Mesaj).HasColumnName("Mesaj");
+            e.Property(x => x.Tip).HasColumnName("Tip");
+            e.Property(x => x.Iz).HasColumnName("Iz");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.Durum).HasColumnName("Durum");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
         });
 

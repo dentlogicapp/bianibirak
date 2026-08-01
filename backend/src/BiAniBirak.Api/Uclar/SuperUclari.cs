@@ -33,6 +33,8 @@ public static class SuperUclari
         app.MapPost("/api/super/defter/{id:guid}/dondur", Dondur).RequireAuthorization();
         // VIP kalici saklama: OzelSaklamaGun set/degistir/kaldir (yalniz super admin).
         app.MapPut("/api/super/defter/{id:guid}/saklama", SaklamaGuncelle).RequireAuthorization();
+        // Son 20 sistem hatasi (1.2 - hata gorunurlugu).
+        app.MapGet("/api/super/hatalar", SonHatalar).RequireAuthorization();
         // Deneme defteri: gercekci veriyle dolu defter uretir (yalniz super admin).
         app.MapPost("/api/super/deneme-defteri", DenemeUret).RequireAuthorization();
         app.MapDelete("/api/super/defter/{id:guid}", DefterCopeAt).RequireAuthorization();
@@ -539,6 +541,32 @@ public static class SuperUclari
 
     // Body modeli: null -> varsayilana don, sayi -> VIP gun. (case-insensitive bind)
     public record SaklamaIstegi(int? OzelSaklamaGun);
+
+    // SON 20 HATA (1.2 - hata gorunurlugu). Yalniz super admin. Yakalanmamis
+    // exception'lar (global middleware) buradan super panele akar.
+    private static async Task<IResult> SonHatalar(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, _) = await SuperAdminMi(ctx, db);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalniz sistem yoneticisi erisebilir.");
+
+        var son = await db.SistemHatalari.AsNoTracking()
+            .OrderByDescending(h => h.CreatedAt)
+            .Take(20)
+            .Select(h => new
+            {
+                h.Id,
+                zaman = h.CreatedAt,
+                yol = h.Yol,
+                metot = h.Metot,
+                mesaj = h.Mesaj,
+                tip = h.Tip,
+                durum = h.Durum,
+            })
+            .ToListAsync();
+
+        return Results.Json(son);
+    }
 
     // Cope at (soft delete - geri alinabilir)
     private static async Task<IResult> DefterCopeAt(Guid id, HttpContext ctx, BiAniBirakDbContext db)

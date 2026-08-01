@@ -557,6 +557,22 @@ public static class SemaKurucu
         -- Idempotent; mevcut satirlar NULL kalir, varsayilan sureyi korur.
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "OzelSaklamaGun" integer NULL;
 
+        -- SISTEM HATALARI (1.2 - hata gorunurlugu): yakalanmamis exception kaydi.
+        -- Global hata middleware yazar; super panel son 20'yi gosterir. 30 gun
+        -- retention (middleware her hatada eskiyi budar). Kisisel veri yok.
+        CREATE TABLE IF NOT EXISTS sistem_hatalari (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "Yol" text NOT NULL DEFAULT '',
+            "Metot" text NOT NULL DEFAULT '',
+            "Mesaj" text NOT NULL DEFAULT '',
+            "Tip" text NOT NULL DEFAULT '',
+            "Iz" text NULL,
+            "KullaniciId" uuid NULL,
+            "Durum" integer NOT NULL DEFAULT 500,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS ix_sistem_hatalari_created ON sistem_hatalari (created_at DESC);
+
         -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;
