@@ -235,7 +235,7 @@ public sealed class HatirlatmaGorevi : BackgroundService
                     if (!gonderilmis.Contains($"{d.Id}:{anahtar}"))
                     {
                         await GonderAsync(db, push, d.Id, $"{d.Es1Ad} & {d.Es2Ad}",
-                            SaatMetni(gecerliSaat, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
+                            SaatMetni(gecerliSaat, imhaAn - simdi, $"{d.Es1Ad} & {d.Es2Ad}"), anahtar,
                             new { kalan_saat = gecerliSaat }, ct);
                         gonderilen++;
                     }
@@ -434,8 +434,25 @@ public sealed class HatirlatmaGorevi : BackgroundService
     // Burada sure GUN degil SAAT olarak soylenir. "3 gun" ertelenebilir; "72 saat"
     // ertelenemez. Metin ayrica NEREDEN silinecegini acikca yazar (uygulama +
     // veritabani) ve geri donusun IMKANSIZ oldugunu tekrar eder - belirsizlik birakmaz.
-    private static (string Baslik, string Govde, string PushGovde) SaatMetni(int saat, string ciftAdi)
+    // KALAN SURE METNI - DEFTER EKRANIYLA AYNI KURAL.
+    // ==> lib/durum.ts icindeki kalanMetin ile BIREBIR AYNI kalmalidir <==
+    // (>=48 saat "gün", <48 saat "saat"; asagi yuvarlar). Ikisi ayrisirsa push ile
+    // defterde farkli birim/sayi gorunur - guveni yikar. Degistirirsen ikisini birlikte degistir.
+    private static string KalanMetni(TimeSpan kalan)
     {
+        if (kalan.TotalMilliseconds <= 0) return "süre doldu";
+        var saat = (int)Math.Floor(kalan.TotalHours);
+        if (saat < 48) return $"{Math.Max(1, saat)} saat";
+        return $"{saat / 24} gün";
+    }
+
+    // FAZ 2 METNI: son 5 gun. SAYI+BIRIM defterle DENK olsun diye esigi degil,
+    // gonderim anindaki CANLI kalan sureyi (kalan) KalanMetni ile yazar. Esik (saat)
+    // yalnizca TONU secer (120=kapanis, 12/3=son saatler).
+    private static (string Baslik, string Govde, string PushGovde) SaatMetni(
+        int saat, TimeSpan kalan, string ciftAdi)
+    {
+        var k = KalanMetni(kalan);
         var ortak =
             "Bu süre sonunda anı defteriniz uygulamanızdan ve veritabanımızdan kalıcı olarak "
             + "silinerek kaldırılacaktır. Bu kalıcı silme işleminden sonra oluşturduğunuz anı "
@@ -443,30 +460,30 @@ public sealed class HatirlatmaGorevi : BackgroundService
 
         if (saat == 120)
             return (
-                "Dilek toplama kapandı · Kalıcı silinmesine 120 saat kaldı",
+                $"Dilek toplama kapandı · Kalıcı silinmesine {k} kaldı",
                 $"{ciftAdi}, davetli girişleri sona erdi ve defteriniz tamamlandı. "
-                + $"Kalıcı silinmesine kalan süre 120 saattir. {ortak} "
+                + $"Kalıcı silinmesine kalan süre {k}. {ortak} "
                 + "Şimdi yapmanız gereken tek şey: baskıya hazır defterinizi indirin.",
-                "Dilek toplama kapandı. Kalıcı silinmeye 120 saat kaldı - defterinizi indirin.");
+                $"Dilek toplama kapandı. Kalıcı silinmeye {k} kaldı - defterinizi indirin.");
 
         if (saat >= 24)
             return (
-                $"Kalıcı silinmesine {saat} saat kaldı",
-                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre {saat} saattir. "
+                $"Kalıcı silinmesine {k} kaldı",
+                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre {k}. "
                 + $"{ortak} Eserinizi indirip güvenli bir yere kaydedin.",
-                $"Kalıcı silinmeye {saat} saat kaldı. Defteriniz sonra geri getirilemez.");
+                $"Kalıcı silinmeye {k} kaldı. Defteriniz sonra geri getirilemez.");
 
         if (saat == 12)
             return (
-                "SON 12 SAAT",
-                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre 12 saattir. "
+                $"SON {k.ToUpperInvariant()}",
+                $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre {k}. "
                 + $"{ortak} Bu, eserinizi kurtarmak için son fırsatlarınızdan biridir.",
-                "SON 12 SAAT. Defteriniz kalıcı olarak silinecek - şimdi indirin.");
+                $"SON {k.ToUpperInvariant()}. Defteriniz kalıcı olarak silinecek - şimdi indirin.");
 
         return (
-            "SON 3 SAAT · Defteriniz siliniyor",
-            $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre yalnızca 3 saattir. "
+            $"SON {k.ToUpperInvariant()} · Defteriniz siliniyor",
+            $"{ciftAdi}, anı defterinizin kalıcı silinmesine kalan süre yalnızca {k}. "
             + $"{ortak} Şimdi indirmezseniz bu defter bir daha var olmayacak.",
-            "SON 3 SAAT. Defteriniz siliniyor - şimdi indirmezseniz bir daha var olmayacak.");
+            $"SON {k.ToUpperInvariant()}. Defteriniz siliniyor - şimdi indirmezseniz bir daha var olmayacak.");
     }
 }
