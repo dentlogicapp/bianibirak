@@ -124,6 +124,12 @@ app.Use(async (ctx, sonraki) =>
     {
         await sonraki();
     }
+    catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+    {
+        // ISTEMCI IPTALI - hata DEGIL. Tarayici sekmeyi kapatti / gezindi / polling
+        // (ornek /api/durum) yavas kaldi ve istegi iptal etti. sistem_hatalari'na
+        // YAZMAYIZ (yanlis pozitif) ve 500 DONMEYIZ - client zaten gitti.
+    }
     catch (Exception ex)
     {
         try
