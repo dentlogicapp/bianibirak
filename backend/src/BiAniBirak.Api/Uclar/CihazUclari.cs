@@ -81,7 +81,18 @@ public static class CihazUclari
                 SonAktiflik = simdi,
             });
         }
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == "23505")
+        {
+            // YARIS DURUMU (canlida ogrenildi): pushSenkronEt her acilista cagrilir; iki
+            // sekme / hizli yenileme AYNI PushToken'i es zamanli Add edebilir - biri kazanir,
+            // digeri benzersizlik kisitina (23505) takilir. Bu HATA DEGIL: cihaz zaten kayitli.
+            // Ayni abonelikten geldigi icin alanlar ayni; sessizce basarili donulur.
+        }
 
         return Results.Json(new { durum = "kayitli" });
     }

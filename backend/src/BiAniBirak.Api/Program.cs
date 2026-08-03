@@ -139,12 +139,17 @@ app.Use(async (ctx, sonraki) =>
             Guid.TryParse(ctx.User?.FindFirst("sub")?.Value, out var aktorId);
             var yol = ctx.Request.Path.Value ?? "";
             var iz = ex.StackTrace ?? "";
+            // Ic exception zinciri: DbUpdateException gibi sarmalayan hatalarda asil
+            // neden InnerException'dadir ("See the inner exception" tek basina ise yaramaz).
+            var mesaj = ex.Message;
+            for (var ic = ex.InnerException; ic != null; ic = ic.InnerException)
+                mesaj += " | " + ic.Message;
             hataDb.SistemHatalari.Add(new SistemHatasi
             {
                 Id = Guid.NewGuid(),
                 Yol = yol.Length > 300 ? yol[..300] : yol,
                 Metot = ctx.Request.Method,
-                Mesaj = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message,
+                Mesaj = mesaj.Length > 1000 ? mesaj[..1000] : mesaj,
                 Tip = ex.GetType().FullName ?? ex.GetType().Name,
                 Iz = iz.Length > 4000 ? iz[..4000] : iz,
                 KullaniciId = aktorId == Guid.Empty ? null : aktorId,
