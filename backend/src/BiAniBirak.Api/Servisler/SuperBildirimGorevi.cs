@@ -29,6 +29,7 @@ public sealed class SuperBildirimGorevi : BackgroundService
 
     private static readonly TimeSpan Aralik = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan HataPenceresi = TimeSpan.FromHours(3);
+    private const int OzetSaatiTR = 9; // gunluk ozet TR 09:00'da gider
 
     public SuperBildirimGorevi(IServiceScopeFactory scopeFactory, ILogger<SuperBildirimGorevi> log)
     {
@@ -62,6 +63,7 @@ public sealed class SuperBildirimGorevi : BackgroundService
 
         await GecikmisImhaKontrol(db, push, yoneticiler, ct);
         await SistemHatasiKontrol(db, push, yoneticiler, ct);
+        await GunlukOzetKontrol(db, push, yoneticiler, ct);
     }
 
     // ---- GECIKMIS IMHA (gunde bir kez) ----
@@ -129,6 +131,34 @@ public sealed class SuperBildirimGorevi : BackgroundService
 
         await IzYaz(db, eylem, new { sayi = yeniHata }, ct);
         _log.LogWarning("Super bildirim: sistem hatasi {Sayi} (son 3s)", yeniHata);
+    }
+
+    // ---- GUNLUK OZET (her gun TR 09:00, sessiz saatten bagimsiz - D4) ----
+    // Tek bildirimde toplulastirir; kaynak GunlukOzetHesabi (mail FAZ 4 sonrasi ayni hesabi kullanir).
+    private async Task GunlukOzetKontrol(
+        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler, CancellationToken ct)
+    {
+        var simdi = DateTimeOffset.UtcNow;
+        var trSaat = simdi.UtcDateTime.AddHours(3).Hour; // TR = UTC+3
+        if (trSaat < OzetSaatiTR) return; // ozet saati gelmedi
+
+        // Gunde bir kez: bugun ozet gonderildiyse sus.
+        var eylem = BildirimKurallari.AuditEylem(BildirimKurallari.GunlukOzet);
+        var gunBasi = new DateTimeOffset(simdi.UtcDateTime.Date, TimeSpan.Zero);
+        if (await db.DenetimGunlukleri.AnyAsync(d => d.Eylem == eylem && d.CreatedAt >= gunBasi, ct))
+            return;
+
+        var ozet = await GunlukOzetHesabi.HesaplaAsync(db, ct);
+        var (baslik, govde) = GunlukOzetHesabi.Metin(ozet);
+
+        foreach (var yid in yoneticiler)
+            await push.GonderAsync(
+                yid, baslik, govde, BildirimKurallari.GunlukOzet.Url, null,
+                // OZET sessiz saate TABI DEGIL: sabit saatte gider (D4).
+                sessizSaateTabi: BildirimKurallari.GunlukOzet.SessizSaatDinle, ct);
+
+        await IzYaz(db, eylem, new { ozet.BekleyenToplam }, ct);
+        _log.LogInformation("Super bildirim: gunluk ozet gonderildi (bekleyen {Toplam})", ozet.BekleyenToplam);
     }
 
     // Idempotency izi: append-only denetim kaydi. SistemEylemi=true (cift ekraninda gorunmez).

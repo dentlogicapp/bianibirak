@@ -43,6 +43,11 @@ public static class BildirimKurallari
     public static readonly Kural BekleyenKvkk =
         new("bekleyen_kvkk", Kanal.Ozet, SessizSaatDinle: true, "/super-panel");
 
+    // Gunluk ozet: her gun tek toplu bildirim (D-B). Sabit saatte gider - sessiz
+    // saat DINLEMEZ (D4: sessiz saat yalniz ANLIK bildirimleri etkiler).
+    public static readonly Kural GunlukOzet =
+        new("gunluk_ozet", Kanal.Ozet, SessizSaatDinle: false, "/super-panel");
+
     // Idempotency audit eylemi: gorev, bildirdikten sonra denetim_gunlukleri'ne bu eylemi
     // yazar; tekrar bildirmeden once zaman penceresinde bu eylem var mi diye bakar
     // (HatirlatmaGorevi deseni - PushGonderici'nin Tip davranisindan BAGIMSIZ).
