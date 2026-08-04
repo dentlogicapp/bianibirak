@@ -61,4 +61,30 @@ public static class BildirimKurallari
 
     // Disk uyarisi audit eylemi - esik gomulu (idempotency seviye basina).
     public static string DiskAuditEylem(int esik) => $"DISK_UYARI_{esik}";
+
+    // ---- COZUMLEME (D3) ----
+    // Bir olayin bir yonetici icin GECERLI kanali: tercih varsa o, yoksa varsayilan.
+    // null = KAPALI (o admine gonderme). Gorev/DiskGozcusu bunu cagirir (D-C-1b).
+    public static Kanal? Coz(Kural varsayilan, string? tercihKanal) => tercihKanal switch
+    {
+        "anlik" => Kanal.Anlik,
+        "ozet" => Kanal.Ozet,
+        "kapali" => (Kanal?)null,
+        _ => varsayilan.Kanal,
+    };
+
+    // Tercih ekraninin OLAY KATALOGU: kod + kural + izinli kanallar. Etiketler
+    // FRONTEND'de (UI kaygisi); backend ASCII kalir. "anlik"-capable olaylar gorev
+    // tarafindan anlik tespit edilir; digerleri yalniz ozet/kapali.
+    public sealed record OlayTanimi(string Kod, Kural Kural, string[] Secenekler);
+    public static readonly OlayTanimi[] Katalog =
+    {
+        new(GecikmisImha.Kod, GecikmisImha, new[] { "anlik", "ozet", "kapali" }),
+        new(SistemHatasi.Kod, SistemHatasi, new[] { "anlik", "ozet", "kapali" }),
+        new(BekleyenOdeme.Kod, BekleyenOdeme, new[] { "ozet", "kapali" }),
+        new(BekleyenKvkk.Kod, BekleyenKvkk, new[] { "ozet", "kapali" }),
+    };
+
+    public static OlayTanimi? OlayBul(string kod) =>
+        System.Array.Find(Katalog, o => o.Kod == kod);
 }

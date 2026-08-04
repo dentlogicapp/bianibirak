@@ -573,6 +573,27 @@ public static class SemaKurucu
         );
         CREATE INDEX IF NOT EXISTS ix_sistem_hatalari_created ON sistem_hatalari (created_at DESC);
 
+        -- BILDIRIM TERCIHLERI (D3 - per-admin, olay basina kanal). Satir yoksa
+        -- BildirimKurallari varsayilani gecerli (geriye donuk uyumlu).
+        CREATE TABLE IF NOT EXISTS bildirim_tercihleri (
+            "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "KullaniciId" uuid NOT NULL,
+            "OlayKodu" text NOT NULL,
+            "Kanal" text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_bildirim_tercih_kullanici_olay
+            ON bildirim_tercihleri ("KullaniciId", "OlayKodu");
+
+        -- BILDIRIM AYARLARI (D3 - per-admin gunluk ozet saati).
+        CREATE TABLE IF NOT EXISTS bildirim_ayarlari (
+            "KullaniciId" uuid PRIMARY KEY,
+            "OzetSaati" integer NOT NULL DEFAULT 9,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+
         -- Etkinlik & Gorunum: sayac kolonlari (idempotent)
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktif" boolean NOT NULL DEFAULT true;
         ALTER TABLE etkinlik_ayarlari ADD COLUMN IF NOT EXISTS "SayacAktifCumle" text NULL;

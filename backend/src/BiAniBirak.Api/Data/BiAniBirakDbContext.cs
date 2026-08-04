@@ -41,6 +41,8 @@ public class BiAniBirakDbContext : DbContext
     public DbSet<KurasyonCiktisi> KurasyonCiktilari => Set<KurasyonCiktisi>();
     public DbSet<EtkinlikGorseli> EtkinlikGorselleri => Set<EtkinlikGorseli>();
     public DbSet<SistemHatasi> SistemHatalari => Set<SistemHatasi>();
+    public DbSet<BildirimTercihi> BildirimTercihleri => Set<BildirimTercihi>();
+    public DbSet<BildirimAyari> BildirimAyarlari => Set<BildirimAyari>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -99,6 +101,31 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
             e.Property(x => x.Durum).HasColumnName("Durum");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
+        });
+
+        // ---- bildirim_tercihleri (D3 - per-admin, olay basina kanal) ----
+        model.Entity<BildirimTercihi>(e =>
+        {
+            e.ToTable("bildirim_tercihleri");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("Id");
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.OlayKodu).HasColumnName("OlayKodu");
+            e.Property(x => x.Kanal).HasColumnName("Kanal");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => new { x.KullaniciId, x.OlayKodu }).IsUnique();
+        });
+
+        // ---- bildirim_ayarlari (D3 - per-admin gunluk ozet saati) ----
+        model.Entity<BildirimAyari>(e =>
+        {
+            e.ToTable("bildirim_ayarlari");
+            e.HasKey(x => x.KullaniciId);
+            e.Property(x => x.KullaniciId).HasColumnName("KullaniciId");
+            e.Property(x => x.OzetSaati).HasColumnName("OzetSaati");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         });
 
         // ---- etkinlikler (TENANT - izolasyon siniri) ----

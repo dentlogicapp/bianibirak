@@ -35,6 +35,9 @@ public static class SuperUclari
         app.MapPut("/api/super/defter/{id:guid}/saklama", SaklamaGuncelle).RequireAuthorization();
         // Son 20 sistem hatasi (1.2 - hata gorunurlugu).
         app.MapGet("/api/super/hatalar", SonHatalar).RequireAuthorization();
+        // Bildirim tercihleri (D3 - per-admin kanal + ozet saati).
+        app.MapGet("/api/super/bildirim-tercihleri", BildirimTercihGetir).RequireAuthorization();
+        app.MapPut("/api/super/bildirim-tercihleri", BildirimTercihGuncelle).RequireAuthorization();
         // Deneme defteri: gercekci veriyle dolu defter uretir (yalniz super admin).
         app.MapPost("/api/super/deneme-defteri", DenemeUret).RequireAuthorization();
         app.MapDelete("/api/super/defter/{id:guid}", DefterCopeAt).RequireAuthorization();
@@ -584,6 +587,87 @@ public static class SuperUclari
 
         return Results.Json(son);
     }
+
+    // ---- BILDIRIM TERCIHLERI (D3) ----
+    // Mevcut super adminin tercihleri + olay katalogu + ozet saati. Satir yoksa
+    // varsayilan gosterilir (secili = varsayilan).
+    private static async Task<IResult> BildirimTercihGetir(HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, kullanici) = await SuperAdminMi(ctx, db);
+        if (!ok || kullanici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalniz sistem yoneticisi erisebilir.");
+
+        var tercihler = await db.BildirimTercihleri.AsNoTracking()
+            .Where(t => t.KullaniciId == kullanici.Id)
+            .ToListAsync();
+        var seciliHarita = tercihler.ToDictionary(t => t.OlayKodu, t => t.Kanal);
+        var ayar = await db.BildirimAyarlari.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.KullaniciId == kullanici.Id);
+
+        return Results.Json(new
+        {
+            ozet_saati = ayar?.OzetSaati ?? 9,
+            olaylar = BildirimKurallari.Katalog.Select(o => new
+            {
+                kod = o.Kod,
+                varsayilan = o.Kural.Kanal.ToString().ToLowerInvariant(),
+                secenekler = o.Secenekler,
+                secili = seciliHarita.TryGetValue(o.Kod, out var k)
+                    ? k
+                    : o.Kural.Kanal.ToString().ToLowerInvariant(),
+            }),
+        });
+    }
+
+    private static async Task<IResult> BildirimTercihGuncelle(
+        BildirimTercihIstek istek, HttpContext ctx, BiAniBirakDbContext db)
+    {
+        var (ok, kullanici) = await SuperAdminMi(ctx, db);
+        if (!ok || kullanici == null)
+            return Hata(403, "ERISIM_YOK", "Bu alana yalniz sistem yoneticisi erisebilir.");
+
+        var simdi = DateTimeOffset.UtcNow;
+
+        // Ozet saati (0-23).
+        if (istek.OzetSaati is int saat)
+        {
+            if (saat < 0 || saat > 23)
+                return Hata(400, "DOGRULAMA_HATASI", "Ozet saati 0-23 araliginda olmalidir.");
+            var ayar = await db.BildirimAyarlari.FirstOrDefaultAsync(a => a.KullaniciId == kullanici.Id);
+            if (ayar == null)
+                db.BildirimAyarlari.Add(new BildirimAyari
+                { KullaniciId = kullanici.Id, OzetSaati = saat, CreatedAt = simdi, UpdatedAt = simdi });
+            else { ayar.OzetSaati = saat; ayar.UpdatedAt = simdi; }
+        }
+
+        // Tercih satirlari. Bilinmeyen olay atlanir; gecersiz kanal reddedilir.
+        foreach (var t in istek.Tercihler ?? System.Array.Empty<BildirimTercihSatir>())
+        {
+            var tanim = BildirimKurallari.OlayBul(t.Olay);
+            if (tanim == null) continue;
+            if (System.Array.IndexOf(tanim.Secenekler, t.Kanal) < 0)
+                return Hata(400, "DOGRULAMA_HATASI", "Gecersiz kanal secimi.");
+            var mevcut = await db.BildirimTercihleri
+                .FirstOrDefaultAsync(x => x.KullaniciId == kullanici.Id && x.OlayKodu == t.Olay);
+            if (mevcut == null)
+                db.BildirimTercihleri.Add(new BildirimTercihi
+                {
+                    Id = Guid.NewGuid(),
+                    KullaniciId = kullanici.Id,
+                    OlayKodu = t.Olay,
+                    Kanal = t.Kanal,
+                    CreatedAt = simdi,
+                    UpdatedAt = simdi,
+                });
+            else { mevcut.Kanal = t.Kanal; mevcut.UpdatedAt = simdi; }
+        }
+
+        await db.SaveChangesAsync();
+        return Results.Json(new { ok = true });
+    }
+
+    public record BildirimTercihIstek(BildirimTercihSatir[]? Tercihler, int? OzetSaati);
+    public record BildirimTercihSatir(string Olay, string Kanal);
 
     // Cope at (soft delete - geri alinabilir)
     private static async Task<IResult> DefterCopeAt(Guid id, HttpContext ctx, BiAniBirakDbContext db)
