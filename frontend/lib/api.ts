@@ -942,6 +942,23 @@ export const api = {
         }),
       }
     ),
+  // ---- Super bildirim tercihleri (D3) ----
+  superBildirimTercihleri: () =>
+    istek<{
+      ozet_saati: number;
+      olaylar: { kod: string; varsayilan: string; secenekler: string[]; secili: string }[];
+    }>("/api/super/bildirim-tercihleri"),
+  superBildirimTercihGuncelle: (v: {
+    tercihler?: { olay: string; kanal: string }[];
+    ozetSaati?: number;
+  }) =>
+    istek<{ ok: boolean }>("/api/super/bildirim-tercihleri", {
+      method: "PUT",
+      body: JSON.stringify({
+        Tercihler: v.tercihler?.map((t) => ({ Olay: t.olay, Kanal: t.kanal })) ?? null,
+        OzetSaati: v.ozetSaati ?? null,
+      }),
+    }),
 };
 
 // ---------------- ONIZLEME (goruntu, PDF degil) ----------------

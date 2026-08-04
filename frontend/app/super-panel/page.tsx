@@ -26,7 +26,7 @@ import { oturumDustu } from "@/lib/oturum";
 
 // SUPER PANEL - sistem yoneticisi gorusu (planlama super-admin deseni).
 // Sekmeler: Defterler / Kullanicilar / Cop Kutusu / KVKK / Canli Akis
-type Sekme = "defterler" | "destek" | "sss" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis" | "hatalar";
+type Sekme = "defterler" | "destek" | "sss" | "odemeler" | "olcum" | "kullanicilar" | "cop" | "kvkk" | "akis" | "hatalar" | "bildirimler";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "defterler", etiket: "Defterler" },
@@ -39,6 +39,7 @@ const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "kvkk", etiket: "KVKK" },
   { kod: "akis", etiket: "Canlı Akış" },
   { kod: "hatalar", etiket: "Hatalar" },
+  { kod: "bildirimler", etiket: "Bildirimler" },
 ];
 
 export default function SuperPanelSayfasi() {
@@ -186,8 +187,145 @@ export default function SuperPanelSayfasi() {
         {sekme === "kvkk" && <KvkkYonetimi />}
         {sekme === "akis" && <AkisSekmesi />}
         {sekme === "hatalar" && <HatalarSekmesi />}
+        {sekme === "bildirimler" && <SuperBildirimTercihSekmesi />}
       </div>
     </AppShell>
+  );
+}
+
+// ---------------- BILDIRIMLER (D3 - super admin bildirim tercihleri) ----------------
+const OLAY_ETIKET: Record<string, string> = {
+  gecikmis_imha: "Gecikmiş imha",
+  sistem_hatasi: "Sistem hatası",
+  bekleyen_odeme: "Bekleyen ödeme",
+  bekleyen_kvkk: "Bekleyen KVKK talebi",
+};
+const KANAL_ETIKET: Record<string, string> = {
+  anlik: "Anlık",
+  ozet: "Özet",
+  kapali: "Kapalı",
+};
+
+function SuperBildirimTercihSekmesi() {
+  const [olaylar, setOlaylar] = useState<
+    { kod: string; varsayilan: string; secenekler: string[]; secili: string }[]
+  >([]);
+  const [ozetSaati, setOzetSaati] = useState(9);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+
+  const cek = useCallback(async () => {
+    setYukleniyor(true);
+    const c = await api.superBildirimTercihleri();
+    if (c.ok) {
+      setOlaylar(c.veri.olaylar);
+      setOzetSaati(c.veri.ozet_saati);
+    }
+    setYukleniyor(false);
+  }, []);
+
+  useEffect(() => {
+    void cek();
+  }, [cek]);
+
+  function secim(kod: string, kanal: string) {
+    setOlaylar((o) => o.map((x) => (x.kod === kod ? { ...x, secili: kanal } : x)));
+  }
+
+  async function kaydet() {
+    setKaydediliyor(true);
+    const c = await api.superBildirimTercihGuncelle({
+      tercihler: olaylar.map((o) => ({ olay: o.kod, kanal: o.secili })),
+      ozetSaati,
+    });
+    setKaydediliyor(false);
+    if (c.ok) toast.success("Bildirim tercihleri kaydedildi.");
+    else toast.error(c.mesaj);
+  }
+
+  if (yukleniyor) {
+    return (
+      <div className="flex min-h-[30vh] items-center justify-center font-govde text-sm text-ikincil">
+        Yükleniyor...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-3xl border border-ayrac bg-yuzey p-6">
+        <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Sistem yöneticisi</p>
+        <h2 className="mt-1 font-display text-xl text-murekkep">Bildirim tercihleri</h2>
+        <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
+          Her olay için nasıl haberdar olmak istediğini seç.{" "}
+          <span className="font-medium text-murekkep">Anlık</span> hemen bildirir (sessiz saate tabi);{" "}
+          <span className="font-medium text-murekkep">Özet</span> günlük tek bildirimde toplar;{" "}
+          <span className="font-medium text-murekkep">Kapalı</span> hiç bildirmez. Ayar yapmazsan
+          varsayılan geçerlidir.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {olaylar.map((o) => (
+          <div
+            key={o.kod}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ayrac bg-yuzey px-5 py-4"
+          >
+            <div className="min-w-0">
+              <p className="font-govde text-sm font-medium text-murekkep">
+                {OLAY_ETIKET[o.kod] ?? o.kod}
+              </p>
+              <p className="font-govde text-xs text-ikincil">
+                Varsayılan: {KANAL_ETIKET[o.varsayilan] ?? o.varsayilan}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-1 rounded-full border border-ayrac bg-parsomen p-1">
+              {o.secenekler.map((k) => (
+                <button
+                  key={k}
+                  onClick={() => secim(o.kod, k)}
+                  className={`rounded-full px-3 py-1.5 font-govde text-xs transition-colors ${
+                    o.secili === k ? "bg-sarap text-parsomen" : "text-ikincil hover:text-sarap"
+                  }`}
+                >
+                  {KANAL_ETIKET[k] ?? k}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ayrac bg-yuzey px-5 py-4">
+        <div className="min-w-0">
+          <p className="font-govde text-sm font-medium text-murekkep">Günlük özet saati</p>
+          <p className="font-govde text-xs text-ikincil">
+            Özet bildirimleri her gün bu saatte gönderilir (TR).
+          </p>
+        </div>
+        <select
+          value={ozetSaati}
+          onChange={(e) => setOzetSaati(Number(e.target.value))}
+          className="shrink-0 rounded-xl border border-ayrac bg-parsomen px-3 py-2 font-govde text-sm text-murekkep outline-none focus:border-sarap"
+        >
+          {Array.from({ length: 24 }, (_, i) => i).map((h) => (
+            <option key={h} value={h}>
+              {String(h).padStart(2, "0")}:00
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={kaydet}
+          disabled={kaydediliyor}
+          className="rounded-full bg-sarap px-6 py-2.5 font-govde text-sm font-medium text-parsomen transition-colors hover:bg-sarapKoyu disabled:opacity-50"
+        >
+          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
+    </div>
   );
 }
 
