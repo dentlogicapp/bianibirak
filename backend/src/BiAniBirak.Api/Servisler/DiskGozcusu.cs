@@ -1,4 +1,5 @@
 using BiAniBirak.Api.Data;
+using BiAniBirak.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace BiAniBirak.Api.Servisler;
@@ -75,12 +76,17 @@ public sealed class DiskGozcusu : BackgroundService
                  : 0;
         if (esik == 0) return; // saglikli - sessiz kal
 
-        // Gunde bir kez, esik seviyesi basina. Tip alanina esik gomulur
-        // ("disk_uyari_85"): ayni gun ayni seviye ikinci kez bildirilmez. Seviye
-        // YUKSELIRSE yeni tip olusur ve HEMEN bildirilir - siddet artisi susturulmaz.
-        var tip = $"disk_uyari_{esik}";
-        var gunBasi = DateTimeOffset.UtcNow.Date;
-        if (await db.Bildirimler.AnyAsync(b => b.Tip == tip && b.CreatedAt >= gunBasi, ct))
+        // Gunde bir kez, esik seviyesi basina. Idempotency denetim_gunlukleri uzerinden
+        // ("DISK_UYARI_85"): ayni gun ayni seviye ikinci kez bildirilmez. Seviye
+        // YUKSELIRSE yeni eylem olusur ve HEMEN bildirilir - siddet artisi susturulmaz.
+        //
+        // ONCEDEN Bildirim.Tip'e ("disk_uyari_85") bakiyordu; ama PushGonderici Tip'i
+        // url'den ("sistem") turetip ezdigi icin o kontrol TUTMUYORDU - disk 6 saatte bir
+        // tekrar bildiriyordu. Audit-tabanli desen (SuperBildirimGorevi ile ayni) bundan
+        // bagimsizdir; audit eylemi tek merkezden (BildirimKurallari) gelir.
+        var eylem = BildirimKurallari.DiskAuditEylem(esik);
+        var gunBasi = new DateTimeOffset(DateTimeOffset.UtcNow.UtcDateTime.Date, TimeSpan.Zero);
+        if (await db.DenetimGunlukleri.AnyAsync(d => d.Eylem == eylem && d.CreatedAt >= gunBasi, ct))
             return;
 
         var (baslik, govde) = Metin(esik, yuzde, bosBayt);
@@ -106,6 +112,21 @@ public sealed class DiskGozcusu : BackgroundService
                 // sabahi beklemek kabul edilemez.
                 sessizSaateTabi: esik < EsikAcil, ct);
         }
+
+        // Idempotency izi (append-only denetim). SistemEylemi=true - cift ekraninda gorunmez.
+        db.DenetimGunlukleri.Add(new DenetimGunlugu
+        {
+            Id = Guid.NewGuid(),
+            EtkinlikId = null,
+            KullaniciId = null,
+            Eylem = eylem,
+            Varlik = "sistem",
+            VarlikId = null,
+            DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(new { yuzde, esik }),
+            SistemEylemi = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
 
         _log.LogWarning("Disk uyarisi gonderildi: %{Yuzde} (esik %{Esik})", yuzde, esik);
     }

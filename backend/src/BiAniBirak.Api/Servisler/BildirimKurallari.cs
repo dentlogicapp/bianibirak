@@ -48,8 +48,17 @@ public static class BildirimKurallari
     public static readonly Kural GunlukOzet =
         new("gunluk_ozet", Kanal.Ozet, SessizSaatDinle: false, "/super-panel");
 
+    // Disk esikleri - DiskGozcusu (ozel olcum, ayri gorev). Merkez audit eylemini
+    // uretir; esik gomulu ("DISK_UYARI_85") - seviye yukselince yeni eylem -> hemen
+    // bildirilir. (Acil esikte sessiz saat DINLENMEZ; o karar esige bagli, DiskGozcusu'nda.)
+    public static readonly Kural Disk =
+        new("disk", Kanal.Anlik, SessizSaatDinle: true, "/super-panel");
+
     // Idempotency audit eylemi: gorev, bildirdikten sonra denetim_gunlukleri'ne bu eylemi
     // yazar; tekrar bildirmeden once zaman penceresinde bu eylem var mi diye bakar
     // (HatirlatmaGorevi deseni - PushGonderici'nin Tip davranisindan BAGIMSIZ).
     public static string AuditEylem(Kural k) => $"SUPER_BILDIRIM_{k.Kod.ToUpperInvariant()}";
+
+    // Disk uyarisi audit eylemi - esik gomulu (idempotency seviye basina).
+    public static string DiskAuditEylem(int esik) => $"DISK_UYARI_{esik}";
 }
