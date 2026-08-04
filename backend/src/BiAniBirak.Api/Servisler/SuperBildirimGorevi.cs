@@ -7,21 +7,24 @@ namespace BiAniBirak.Api.Servisler;
 // SUPER BILDIRIM GOREVI (Bolum 4-D)
 //
 // Kaynaginda anlik bildirimi OLMAYAN super-admin olaylarini periyodik tarar ve
-// BildirimKurallari'na gore bildirir. Su an iki ANLIK olay:
+// BildirimKurallari'na gore bildirir. Iki ANLIK olay + gunluk ozet:
 //   - Gecikmis imha : imha suresi gecmis defter duruyor (gunde bir kez).
 //   - Sistem hatasi : son 3 saatte yeni yakalanmamis hata (3 saatte bir tavan).
+//   - Gunluk ozet   : her admin kendi saatinde tek toplu bildirim.
 //
-// IDEMPOTENCY - EKSTRA TABLO YOK, PushGonderici'nin Tip'inden BAGIMSIZ:
-//   HatirlatmaGorevi deseni. Bildirdikten sonra denetim_gunlukleri'ne bir "SUPER_BILDIRIM_*"
-//   eylemi yazilir; tekrar bildirmeden once o eylem zaman penceresinde var mi diye bakilir.
-//   (DiskGozcusu'nun Bildirim.Tip'e bakan yontemi guvenilir DEGIL - GonderAsync Tip'i
-//   url'den turetir, ozel tipi ezer. Bu gorev o tuzaga dusmez.)
+// PER-ADMIN COZUMLEME (D3): olay degeri BIR KEZ hesaplanir (global); sonra HER admin
+// icin BildirimKurallari.Coz ile kanali cozulur (tercih varsa o, yoksa varsayilan):
+//   Anlik -> o admine anlik push | Ozet -> o adminin gunluk ozetine | Kapali -> gitmez.
+// Boylece bir admin bir olayi sustursa/ozete atsa digerleri etkilenmez.
+//
+// IDEMPOTENCY - EKSTRA TABLO YOK, PushGonderici'nin Tip'inden BAGIMSIZ, ADMIN BASINA:
+//   Bildirdikten sonra denetim_gunlukleri'ne "SUPER_BILDIRIM_*" eylemi + VarlikId=adminId
+//   yazilir; tekrar bildirmeden once o admin icin o eylem penceresinde var mi diye bakilir.
+//   (HatirlatmaGorevi/DiskGozcusu ile ayni audit-tabanli desen.)
 //
 // SESSIZ SAAT (D4): anlik bildirimler sessiz saate TABIDIR (PushGonderici erteler).
-// Yalniz hayati durumlar (disk acil) dinlemez; o DiskGozcusu'nda.
-//
-// Destek talebi bu gorevde ISLENMEZ: DestekUclari zaten olay aninda push atar; burada
-// tekrar bildirmek cift bildirim olurdu.
+// Gunluk ozet DEGILDIR (sabit saatte gider). Destek bu gorevde ISLENMEZ (DestekUclari
+// zaten olay aninda push atar - cift bildirim olmasin).
 public sealed class SuperBildirimGorevi : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -29,7 +32,7 @@ public sealed class SuperBildirimGorevi : BackgroundService
 
     private static readonly TimeSpan Aralik = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan HataPenceresi = TimeSpan.FromHours(3);
-    private const int OzetSaatiTR = 9; // gunluk ozet TR 09:00'da gider
+    private const int VarsayilanOzetSaatiTR = 9; // ayar yoksa TR 09:00
 
     public SuperBildirimGorevi(IServiceScopeFactory scopeFactory, ILogger<SuperBildirimGorevi> log)
     {
@@ -61,14 +64,22 @@ public sealed class SuperBildirimGorevi : BackgroundService
             .ToListAsync(ct);
         if (yoneticiler.Count == 0) return; // kime bildirecegiz?
 
-        await GecikmisImhaKontrol(db, push, yoneticiler, ct);
-        await SistemHatasiKontrol(db, push, yoneticiler, ct);
-        await GunlukOzetKontrol(db, push, yoneticiler, ct);
+        // Tercih + ayar tablolarini bir kez yukle (per-admin cozumleme icin).
+        var tercihSatirlari = await db.BildirimTercihleri.AsNoTracking().ToListAsync(ct);
+        var tercihler = tercihSatirlari
+            .ToDictionary(t => (t.KullaniciId, t.OlayKodu), t => t.Kanal);
+        var ayarlar = (await db.BildirimAyarlari.AsNoTracking().ToListAsync(ct))
+            .ToDictionary(a => a.KullaniciId, a => a.OzetSaati);
+
+        await GecikmisImhaKontrol(db, push, yoneticiler, tercihler, ct);
+        await SistemHatasiKontrol(db, push, yoneticiler, tercihler, ct);
+        await GunlukOzetKontrol(db, push, yoneticiler, tercihler, ayarlar, ct);
     }
 
-    // ---- GECIKMIS IMHA (gunde bir kez) ----
+    // ---- GECIKMIS IMHA (gunde bir kez, admin basina) ----
     private async Task GecikmisImhaKontrol(
-        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler, CancellationToken ct)
+        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler,
+        Dictionary<(Guid, string), string> tercihler, CancellationToken ct)
     {
         var simdi = DateTimeOffset.UtcNow;
 
@@ -83,30 +94,21 @@ public sealed class SuperBildirimGorevi : BackgroundService
         var gecikmis = adaylar.Count(e => Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun) <= simdi);
         if (gecikmis == 0) return;
 
-        // Gunde bir kez: bugun bu eylem yazildiysa sus.
-        var eylem = BildirimKurallari.AuditEylem(BildirimKurallari.GecikmisImha);
-        var gunBasi = new DateTimeOffset(simdi.UtcDateTime.Date, TimeSpan.Zero);
-        if (await db.DenetimGunlukleri.AnyAsync(d => d.Eylem == eylem && d.CreatedAt >= gunBasi, ct))
-            return;
-
         var baslik = $"Gecikmiş imha: {gecikmis} defter";
         var govde =
             $"{gecikmis} defter imha süresi geçtiği hâlde hâlâ duruyor. İmha görevi aksıyor "
             + "olabilir; Ölçüm sekmesinden \"Şimdi imha et\" ile temizleyebilirsiniz. "
             + "(Bekledikçe KVKK ve disk riski büyür.)";
 
-        foreach (var yid in yoneticiler)
-            await push.GonderAsync(
-                yid, baslik, govde, BildirimKurallari.GecikmisImha.Url, null,
-                sessizSaateTabi: BildirimKurallari.GecikmisImha.SessizSaatDinle, ct);
-
-        await IzYaz(db, eylem, new { sayi = gecikmis }, ct);
-        _log.LogWarning("Super bildirim: gecikmis imha {Sayi}", gecikmis);
+        var gunBasi = new DateTimeOffset(simdi.UtcDateTime.Date, TimeSpan.Zero);
+        await AnlikGonder(db, push, BildirimKurallari.GecikmisImha, yoneticiler, tercihler,
+            baslik, govde, gunBasi, new { sayi = gecikmis }, ct);
     }
 
-    // ---- SISTEM HATASI (3 saatte bir tavan) ----
+    // ---- SISTEM HATASI (3 saatte bir tavan, admin basina) ----
     private async Task SistemHatasiKontrol(
-        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler, CancellationToken ct)
+        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler,
+        Dictionary<(Guid, string), string> tercihler, CancellationToken ct)
     {
         var simdi = DateTimeOffset.UtcNow;
         var pencereBasi = simdi - HataPenceresi;
@@ -114,55 +116,96 @@ public sealed class SuperBildirimGorevi : BackgroundService
         var yeniHata = await db.SistemHatalari.CountAsync(h => h.CreatedAt >= pencereBasi, ct);
         if (yeniHata == 0) return;
 
-        // Uc saatte bir tavan: son 3 saatte bu eylem yazildiysa sus (rolling rate-limit).
-        var eylem = BildirimKurallari.AuditEylem(BildirimKurallari.SistemHatasi);
-        if (await db.DenetimGunlukleri.AnyAsync(d => d.Eylem == eylem && d.CreatedAt >= pencereBasi, ct))
-            return;
-
         var baslik = yeniHata == 1 ? "1 yeni sistem hatası" : $"{yeniHata} yeni sistem hatası";
         var govde =
             $"Son 3 saatte {yeniHata} yakalanmamış hata oluştu. Hatalar sekmesinden zaman, uç ve "
             + "mesajıyla inceleyebilirsiniz.";
 
-        foreach (var yid in yoneticiler)
-            await push.GonderAsync(
-                yid, baslik, govde, BildirimKurallari.SistemHatasi.Url, null,
-                sessizSaateTabi: BildirimKurallari.SistemHatasi.SessizSaatDinle, ct);
-
-        await IzYaz(db, eylem, new { sayi = yeniHata }, ct);
-        _log.LogWarning("Super bildirim: sistem hatasi {Sayi} (son 3s)", yeniHata);
+        await AnlikGonder(db, push, BildirimKurallari.SistemHatasi, yoneticiler, tercihler,
+            baslik, govde, pencereBasi, new { sayi = yeniHata }, ct);
     }
 
-    // ---- GUNLUK OZET (her gun TR 09:00, sessiz saatten bagimsiz - D4) ----
+    // ANLIK olay gonderim cekirdegi (per-admin). Kanali "anlik" cozulen her admine gonderir;
+    // idempotency admin basina (audit VarlikId=adminId), pencere pencereBasi'ndan itibaren.
+    private async Task AnlikGonder(
+        BiAniBirakDbContext db, PushGonderici push, BildirimKurallari.Kural kural,
+        List<Guid> yoneticiler, Dictionary<(Guid, string), string> tercihler,
+        string baslik, string govde, DateTimeOffset pencereBasi, object gunluk, CancellationToken ct)
+    {
+        var eylem = BildirimKurallari.AuditEylem(kural);
+        var gonderilen = 0;
+        foreach (var yid in yoneticiler)
+        {
+            var kanal = BildirimKurallari.Coz(kural, Tercih(tercihler, yid, kural.Kod));
+            if (kanal != BildirimKurallari.Kanal.Anlik) continue; // ozet -> digest; kapali -> atla
+
+            if (await db.DenetimGunlukleri.AnyAsync(
+                    d => d.Eylem == eylem && d.VarlikId == yid && d.CreatedAt >= pencereBasi, ct))
+                continue; // bu admin icin bu pencerede zaten bildirildi
+
+            await push.GonderAsync(yid, baslik, govde, kural.Url, null,
+                sessizSaateTabi: kural.SessizSaatDinle, ct);
+            await IzYaz(db, eylem, yid, gunluk, ct);
+            gonderilen++;
+        }
+        if (gonderilen > 0)
+            _log.LogWarning("Super bildirim: {Kod} -> {Sayi} admine", kural.Kod, gonderilen);
+    }
+
+    // ---- GUNLUK OZET (her admin kendi saatinde, kendi tercihleriyle) ----
     // Tek bildirimde toplulastirir; kaynak GunlukOzetHesabi (mail FAZ 4 sonrasi ayni hesabi kullanir).
     private async Task GunlukOzetKontrol(
-        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler, CancellationToken ct)
+        BiAniBirakDbContext db, PushGonderici push, List<Guid> yoneticiler,
+        Dictionary<(Guid, string), string> tercihler, Dictionary<Guid, int> ayarlar,
+        CancellationToken ct)
     {
         var simdi = DateTimeOffset.UtcNow;
         var trSaat = simdi.UtcDateTime.AddHours(3).Hour; // TR = UTC+3
-        if (trSaat < OzetSaatiTR) return; // ozet saati gelmedi
-
-        // Gunde bir kez: bugun ozet gonderildiyse sus.
-        var eylem = BildirimKurallari.AuditEylem(BildirimKurallari.GunlukOzet);
         var gunBasi = new DateTimeOffset(simdi.UtcDateTime.Date, TimeSpan.Zero);
-        if (await db.DenetimGunlukleri.AnyAsync(d => d.Eylem == eylem && d.CreatedAt >= gunBasi, ct))
-            return;
+        var eylem = BildirimKurallari.AuditEylem(BildirimKurallari.GunlukOzet);
 
-        var ozet = await GunlukOzetHesabi.HesaplaAsync(db, ct);
-        var (baslik, govde) = GunlukOzetHesabi.Metin(ozet);
+        GunlukOzet? ozet = null; // yalniz gonderilecek admin varsa hesapla
 
         foreach (var yid in yoneticiler)
-            await push.GonderAsync(
-                yid, baslik, govde, BildirimKurallari.GunlukOzet.Url, null,
-                // OZET sessiz saate TABI DEGIL: sabit saatte gider (D4).
-                sessizSaateTabi: BildirimKurallari.GunlukOzet.SessizSaatDinle, ct);
+        {
+            var ozetSaati = ayarlar.TryGetValue(yid, out var s) ? s : VarsayilanOzetSaatiTR;
+            if (trSaat < ozetSaati) continue; // bu adminin ozet saati gelmedi
 
-        await IzYaz(db, eylem, new { ozet.BekleyenToplam }, ct);
-        _log.LogInformation("Super bildirim: gunluk ozet gonderildi (bekleyen {Toplam})", ozet.BekleyenToplam);
+            if (await db.DenetimGunlukleri.AnyAsync(
+                    d => d.Eylem == eylem && d.VarlikId == yid && d.CreatedAt >= gunBasi, ct))
+                continue; // bugun bu admine gonderildi
+
+            ozet ??= await GunlukOzetHesabi.HesaplaAsync(db, ct);
+
+            // Bu adminin ozetine hangi olaylar girer: "ozet"e cozulenler + bekleyen destek
+            // (bilgi). Bir olayi "anlik" secen admin onu anlik alir, ozette TEKRAR gormez;
+            // "kapali" secen hic gormez.
+            var dahil = new HashSet<string> { "bekleyen_destek" };
+            if (BildirimKurallari.Coz(BildirimKurallari.BekleyenOdeme, Tercih(tercihler, yid, BildirimKurallari.BekleyenOdeme.Kod)) == BildirimKurallari.Kanal.Ozet)
+                dahil.Add(BildirimKurallari.BekleyenOdeme.Kod);
+            if (BildirimKurallari.Coz(BildirimKurallari.BekleyenKvkk, Tercih(tercihler, yid, BildirimKurallari.BekleyenKvkk.Kod)) == BildirimKurallari.Kanal.Ozet)
+                dahil.Add(BildirimKurallari.BekleyenKvkk.Kod);
+            if (BildirimKurallari.Coz(BildirimKurallari.GecikmisImha, Tercih(tercihler, yid, BildirimKurallari.GecikmisImha.Kod)) == BildirimKurallari.Kanal.Ozet)
+                dahil.Add(BildirimKurallari.GecikmisImha.Kod);
+            if (BildirimKurallari.Coz(BildirimKurallari.SistemHatasi, Tercih(tercihler, yid, BildirimKurallari.SistemHatasi.Kod)) == BildirimKurallari.Kanal.Ozet)
+                dahil.Add(BildirimKurallari.SistemHatasi.Kod);
+
+            var (baslik, govde) = GunlukOzetHesabi.Metin(ozet, dahil);
+
+            await push.GonderAsync(yid, baslik, govde, BildirimKurallari.GunlukOzet.Url, null,
+                sessizSaateTabi: BildirimKurallari.GunlukOzet.SessizSaatDinle, ct);
+            await IzYaz(db, eylem, yid, new { ozet.BekleyenToplam }, ct);
+            _log.LogInformation("Super bildirim: gunluk ozet -> admin (bekleyen {Toplam})", ozet.BekleyenToplam);
+        }
     }
 
-    // Idempotency izi: append-only denetim kaydi. SistemEylemi=true (cift ekraninda gorunmez).
-    private static async Task IzYaz(BiAniBirakDbContext db, string eylem, object gunluk, CancellationToken ct)
+    private static string? Tercih(Dictionary<(Guid, string), string> tercihler, Guid yid, string kod)
+        => tercihler.TryGetValue((yid, kod), out var v) ? v : null;
+
+    // Idempotency izi: append-only denetim kaydi. VarlikId=adminId (per-admin idempotency).
+    // SistemEylemi=true (cift ekraninda gorunmez).
+    private static async Task IzYaz(
+        BiAniBirakDbContext db, string eylem, Guid varlikId, object gunluk, CancellationToken ct)
     {
         db.DenetimGunlukleri.Add(new DenetimGunlugu
         {
@@ -171,7 +214,7 @@ public sealed class SuperBildirimGorevi : BackgroundService
             KullaniciId = null,
             Eylem = eylem,
             Varlik = "sistem",
-            VarlikId = null,
+            VarlikId = varlikId,
             DegisenAlanlar = System.Text.Json.JsonSerializer.Serialize(gunluk),
             SistemEylemi = true,
             CreatedAt = DateTimeOffset.UtcNow,

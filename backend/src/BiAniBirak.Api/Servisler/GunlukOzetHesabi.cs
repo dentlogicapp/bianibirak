@@ -5,10 +5,10 @@ namespace BiAniBirak.Api.Servisler;
 
 // GUNLUK OZET - TEK KAYNAK (Bolum 4-D, "ozet-hazir").
 //
-// "Bugun ne durumda?" sorusunun YAPISAL cevabi. Push gunluk ozeti (D-B) SIMDI bunu
-// kullanir; MAIL gunluk ozeti (FAZ 4 sonrasi) AYNI hesaptan beslenir - toplulastirma
-// mantigi iki kez yazilmaz. Veri kaynagi TEK; sunum katmanlari (push / mail / PDF) ayri.
-// "Bir sayi tek yerden uretilir" ilkesi: nabizla AYNI sorgular kullanilir.
+// "Bugun ne durumda?" sorusunun YAPISAL cevabi. Push gunluk ozeti bunu kullanir;
+// MAIL gunluk ozeti (FAZ 4 sonrasi) AYNI hesaptan beslenir - toplulastirma mantigi
+// iki kez yazilmaz. Veri kaynagi TEK; sunum katmanlari (push / mail / PDF) ayri.
+// Nabizla (SuperUclari.Ozet) AYNI sorgular - iki yerde iki sayi olmaz.
 public sealed record GunlukOzet(
     int BekleyenOdeme,
     int BekleyenKvkk,
@@ -24,8 +24,6 @@ public sealed record GunlukOzet(
 
 public static class GunlukOzetHesabi
 {
-    // Bugunku durumu hesaplar. Nabizla (SuperUclari.Ozet) AYNI sorgular - panel ile
-    // ozet ayni sayiyi soyler.
     public static async Task<GunlukOzet> HesaplaAsync(BiAniBirakDbContext db, CancellationToken ct)
     {
         var simdi = DateTimeOffset.UtcNow;
@@ -56,15 +54,21 @@ public static class GunlukOzetHesabi
             sistemHatasiBugun, yeniDefterBugun, yeniDilekBugun);
     }
 
-    // Bildirim/mail METNI - TEK yer. Push simdi bunu render eder; mail (FAZ 4 sonrasi)
-    // ayni ozetten render edecek (PDF brief zenginlestirebilir ama sayilar buradan gelir).
-    public static (string Baslik, string Govde) Metin(GunlukOzet o)
+    // Bildirim/mail METNI - TEK yer. "dahil" = bu adminin ozetinde GORUNECEK olay kodlari
+    // (gorev, per-admin tercihlerden uretir). Bir olay dahil degilse ozette gorunmez
+    // (ornek: admin onu "anlik" secmisse ozette TEKRAR gostermeyiz; "kapali" ise hic).
+    // Anahtarlar: "bekleyen_odeme","bekleyen_kvkk","bekleyen_destek","gecikmis_imha","sistem_hatasi".
+    public static (string Baslik, string Govde) Metin(GunlukOzet o, ISet<string> dahil)
     {
         var isler = new System.Collections.Generic.List<string>();
-        if (o.BekleyenOdeme > 0) isler.Add($"{o.BekleyenOdeme} bekleyen ödeme");
-        if (o.BekleyenKvkk > 0) isler.Add($"{o.BekleyenKvkk} KVKK talebi");
-        if (o.BekleyenDestek > 0) isler.Add($"{o.BekleyenDestek} açık destek");
-        if (o.GecikmisImha > 0) isler.Add($"{o.GecikmisImha} gecikmiş imha");
+        if (dahil.Contains("bekleyen_odeme") && o.BekleyenOdeme > 0)
+            isler.Add($"{o.BekleyenOdeme} bekleyen ödeme");
+        if (dahil.Contains("bekleyen_kvkk") && o.BekleyenKvkk > 0)
+            isler.Add($"{o.BekleyenKvkk} KVKK talebi");
+        if (dahil.Contains("bekleyen_destek") && o.BekleyenDestek > 0)
+            isler.Add($"{o.BekleyenDestek} açık destek");
+        if (dahil.Contains("gecikmis_imha") && o.GecikmisImha > 0)
+            isler.Add($"{o.GecikmisImha} gecikmiş imha");
 
         var baslik = isler.Count == 0
             ? "Günlük özet · bekleyen iş yok"
@@ -75,9 +79,9 @@ public static class GunlukOzetHesabi
             ? "Bekleyen bir iş yok - her şey yolunda. "
             : "Bugün ilgilenmen gerekenler: " + string.Join(", ", isler) + ". ");
 
-        // Gunun aktivitesi (bilgi - mudahale gerektirmez).
+        // Gunun aktivitesi (bilgi - mudahale gerektirmez; her ozette gorunur).
         govde.Append($"Son 24 saatte {o.YeniDilekBugun} yeni dilek, {o.YeniDefterBugun} yeni defter");
-        if (o.SistemHatasiBugun > 0)
+        if (dahil.Contains("sistem_hatasi") && o.SistemHatasiBugun > 0)
             govde.Append($"; {o.SistemHatasiBugun} sistem hatası");
         govde.Append('.');
 
