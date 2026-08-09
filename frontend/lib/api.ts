@@ -493,6 +493,10 @@ export type DenetimKaydi = {
   varlik: string;
   degisen_alanlar: string | null;
   created_at: string;
+  // OZNE: kaydi yazan kullanicinin adi (sistem olaylarinda null) ve bu kaydin
+  // oturumdaki kullaniciya ait olup olmadigi. Arayuz cumleyi bunlarla kurar.
+  aktor: string | null;
+  ben_mi: boolean;
 };
 
 export const api = {

@@ -1245,7 +1245,7 @@ function CopSekmesi() {
 }
 
 // ---------------- CANLI AKIS ----------------
-import { eylemEtiketi as akisEylemEtiketi, ayrintiMetni, zamanKisa } from "@/lib/denetim";
+import { ayrintiMetni, zamanKisa, akisFiili } from "@/lib/denetim";
 
 function AkisSekmesi() {
   // CANLI SAAT (Bolum 0.1): "az once / 3 dk once" ifadeleri donup kalmasin.
@@ -1335,7 +1335,7 @@ function AkisSekmesi() {
             <div className="min-w-0 flex-1">
               <p className="min-w-0 font-govde text-sm text-murekkep">
                 <span className="font-medium">{k.aktor}</span>{" "}
-                <span className="text-ikincil">{akisEylemEtiketi(k.eylem)}</span>
+                <span className="text-ikincil">{akisFiili(k.eylem)}</span>
                 {k.defter && <span className="text-ikincil"> · {k.defter}</span>}
               </p>
               {/* AYRINTI (E1): "ne degisti" - kayitli JSON okunur hale gelir. */}

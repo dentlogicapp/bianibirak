@@ -146,12 +146,9 @@ const ALAN_ETIKET: Record<string, string> = {
   EtkinlikTarihi: "özel gün",
 };
 
-// OPERASYONEL GURULTU - EKRANDA GORUNMEZ.
-// "basarili: 19 - temizlenen: 0 - cihaz sayisi: 19" kimseye bir sey anlatmaz;
-// push altyapisinin ic sayaclaridir. Anlamli satirlarin arasinda yer kaplayinca
-// goz tum ayrinti satirlarini atlamaya baslar - ve GERCEKTEN bilgi tasiyanlar
-// da kaybolur. Kayitta dururlar (denetim izi bozulmaz), yalnizca GOSTERILMEZLER.
-const GIZLI_ALANLAR = new Set(["basarili", "temizlenen", "cihaz_sayisi", "tip"]);
+// OPERASYONEL GURULTU - EKRANDA GORUNMEZ. Push altyapisinin ic sayaclaridir;
+// kayitta dururlar (denetim izi bozulmaz), yalnizca GOSTERILMEZLER.
+const GIZLI_ALANLAR = new Set(["basarili", "temizlenen", "cihaz_sayisi", "tip", "kaynak_es"]);
 
 function esAdi(v: unknown): string {
   if (v === "es1") return "1. eş";
@@ -249,9 +246,6 @@ export function ayrintiMetni(eylem: string, degisenAlanlar: string | null): stri
 }
 
 // ---- ZAMAN (denetimde DAKIKA kesinligi) ----
-// "1 sa once" bir denetim kaydinda yetersizdir: iki olayin sirasini ve arasindaki
-// mesafeyi soylemez. Denetim, ne zaman olduguna DAKIKA duzeyinde yanit vermelidir.
-// Bugunku kayitlarda tarih tekrarlanmaz (saat yeter), eskilerde tarih de yazilir.
 export function zamanKisa(iso: string): string {
   const t = new Date(iso);
   if (isNaN(t.getTime())) return "-";
@@ -264,4 +258,149 @@ export function zamanKisa(iso: string): string {
   if (ayniGun) return saat;
   const gun = t.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
   return `${gun} ${saat}`;
+}
+
+// ============================================================================
+// OZNE DILI - "kim yapti?" once gelir.
+//
+// CANLIDA OGRENILDI: denetim satirlari OZNESIZ yaziliyordu ("Bir dilek reddedildi")
+// ve olayin sahibi ham kodla ekrana dusuyordu ("taraf: 2. es"). Bir aktivite akisinin
+// ILK sorusu "kim yapti"dir; elimizde isim varken kod gostermek savunulamaz.
+//
+// Uc ozne turu var:
+//   SEN     -> ikinci tekil, cekimli: "bir dilegi deftere aldin"
+//   ESIN    -> adiyla, ucuncu tekil: "Aysegul baskiya hazir defteri indirdi"
+//   SISTEM  -> oznesiz/edilgen: "Defter suresi doldu ve imha edildi"
+//
+// kaynak_es ARTIK EKRANA CIKMAZ (GIZLI_ALANLAR): gorevi yalnizca izolasyon
+// filtresidir ve o filtre BACKEND'de calisir.
+// ============================================================================
+
+// [sen, o] cekimleri. Yeni eylem eklendiginde YALNIZCA burasi guncellenir.
+const FIIL: Record<string, [string, string]> = {
+  KATKI_ONAYLANDI: ["bir dileği deftere aldın", "bir dileği deftere aldı"],
+  KATKI_REDDEDILDI: ["bir dileği reddettin", "bir dileği reddetti"],
+  KATKI_GERI_ALINDI: ["bir dileği geri aldın", "bir dileği geri aldı"],
+  KATKI_ONAYLI_COPE_TASINDI: ["onaylı bir dileği çöpe taşıdın", "onaylı bir dileği çöpe taşıdı"],
+  KATKI_KALICI_SILINDI: ["bir dileği kalıcı olarak sildin", "bir dileği kalıcı olarak sildi"],
+
+  ESER_INDIRILDI: ["baskıya hazır defteri indirdin", "baskıya hazır defteri indirdi"],
+  ESER_ONIZLENDI: ["eserin önizlemesini aldın", "eserin önizlemesini aldı"],
+  KURASYON_BASLATILDI: ["baskı stüdyosunu açtın", "baskı stüdyosunu açtı"],
+  KURASYON_GUNCELLENDI: ["defter düzenini güncelledin", "defter düzenini güncelledi"],
+  MIRAS_TAMAMLANDI: ["mirası tamamladın", "mirası tamamladı"],
+
+  AYAR_GUNCELLENDI: ["defter ayarlarını güncelledin", "defter ayarlarını güncelledi"],
+  ETKINLIK_OLUSTURULDU: ["defteri oluşturdun", "defteri oluşturdu"],
+  ETKINLIK_GUNCELLENDI: ["defter bilgilerini güncelledin", "defter bilgilerini güncelledi"],
+  GORSEL_EKLENDI: ["görsel ekledin", "görsel ekledi"],
+  GORSEL_KALDIRILDI: ["görsel kaldırdın", "görsel kaldırdı"],
+
+  ES_DAVETI_OLUSTURULDU: ["eş daveti oluşturdun", "eş daveti oluşturdu"],
+  ES_KATILDI: ["deftere katıldın", "deftere katıldı"],
+
+  ODEME_BASLATILDI: ["ödeme başlattın", "ödeme başlattı"],
+  ODEME_BILDIRILDI: ["havale bildirimi yaptın", "havale bildirimi yaptı"],
+
+  DEFTER_COPE_ATILDI: ["defteri çöp kutusuna taşıdın", "defteri çöp kutusuna taşıdı"],
+  ETKINLIK_COPE_TASINDI: ["defteri çöp kutusuna taşıdın", "defteri çöp kutusuna taşıdı"],
+  DEFTER_GERI_ALINDI: ["defteri geri aldın", "defteri geri aldı"],
+  ETKINLIK_GERI_ALINDI: ["defteri geri aldın", "defteri geri aldı"],
+  DEFTER_DONDURULDU: ["defteri dondurdun", "defteri dondurdu"],
+  DEFTER_COZULDU: ["defteri yeniden açtın", "defteri yeniden açtı"],
+  DEFTER_KALICI_SILINDI: ["defteri kalıcı olarak sildin", "defteri kalıcı olarak sildi"],
+  ETKINLIK_KALICI_SILINDI: ["defteri kalıcı olarak sildin", "defteri kalıcı olarak sildi"],
+  DEFTER_SAKLAMA_DEGISTIRILDI: ["saklama süresini değiştirdin", "saklama süresini değiştirdi"],
+  SUPER_DEFTER_RONTGEN: ["defter röntgeni aldın", "defter röntgeni aldı"],
+  DEFTER_GORUNTULEME_BASLADI: ["defteri görüntülemeye başladın", "defteri görüntülemeye başladı"],
+  DEFTER_GORUNTULEME_BITTI: ["görüntülemeyi bitirdin", "görüntülemeyi bitirdi"],
+  GIRIS: ["giriş yaptın", "giriş yaptı"],
+  KAYIT: ["hesap oluşturdun", "hesap oluşturdu"],
+  PROFIL_GUNCELLENDI: ["profil bilgilerini güncelledin", "profil bilgilerini güncelledi"],
+  DENEME_DEFTERI_URETILDI: ["deneme defteri ürettin", "deneme defteri üretti"],
+};
+
+export type DenetimCumlesi = {
+  /** Ozne: "Sen" | esin/davetli adi | null (sistem olayi) */
+  ozne: string | null;
+  /** Cumlenin geri kalani. Ozne null ise tek basina edilgen cumle olur. */
+  fiil: string;
+  /** Rozet turu - gorsel ayrim icin. */
+  tur: "sen" | "kisi" | "sistem";
+};
+
+// Bir denetim kaydini OZNE + CEKIMLI FIIL olarak kurar.
+//
+//   aktor : kaydi yazan kullanicinin adi (backend'den; sistem olaylarinda null)
+//   benMi : bu kaydin aktoru oturumdaki kullanici mi
+export function denetimCumlesi(
+  eylem: string,
+  degisenAlanlar: string | null,
+  aktor: string | null,
+  benMi: boolean
+): DenetimCumlesi {
+  // DAVETLI OLAYI: ozne davetlinin KENDISIDIR - "sen" ya da "esin" degil.
+  if (eylem === "KATKI_BIRAKILDI") {
+    let ad: string | null = null;
+    try {
+      const c = degisenAlanlar ? JSON.parse(degisenAlanlar) : null;
+      if (c && typeof c === "object" && typeof c.davetli === "string") ad = c.davetli;
+    } catch {
+      /* bozuk govde cumleyi bozmaz */
+    }
+    return { ozne: ad, fiil: "bir dilek bıraktı", tur: "kisi" };
+  }
+
+  const cekim = FIIL[eylem];
+
+  // SISTEM OLAYI (aktor yok): edilgen cumle - uydurma bir ozne YAZILMAZ.
+  if (!aktor) {
+    return { ozne: null, fiil: eylemEtiketi(eylem), tur: "sistem" };
+  }
+
+  if (!cekim) {
+    // Cekimi olmayan eylem: ozne + edilgen etiket. Ekran bozulmaz, eksik olan
+    // yalnizca dilin akiciligidir - ve hangi eylemin eklenmesi gerektigi bellidir.
+    return { ozne: benMi ? "Sen" : aktor, fiil: eylemEtiketi(eylem).toLocaleLowerCase("tr-TR"), tur: benMi ? "sen" : "kisi" };
+  }
+
+  return {
+    ozne: benMi ? "Sen" : aktor,
+    fiil: benMi ? cekim[0] : cekim[1],
+    tur: benMi ? "sen" : "kisi",
+  };
+}
+
+// Super panel (yonetici gorusu): ozne HER ZAMAN ucuncu tekil - "Sen" yoktur,
+// yonetici baskalarinin islemlerini izler.
+export function akisFiili(eylem: string): string {
+  const cekim = FIIL[eylem];
+  return cekim ? cekim[1] : eylemEtiketi(eylem).toLocaleLowerCase("tr-TR");
+}
+
+// ---- GUN BASLIGI (B1) ----
+// "Bugün / Dün / 21 Temmuz". Satirlarda yalniz saat kalir; tarih her satirda
+// tekrarlanmaz - goz tarihi degil, OLAYI okur.
+export function gunBasligi(iso: string): string {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return "-";
+  const bugun = new Date();
+  const dun = new Date(bugun);
+  dun.setDate(dun.getDate() - 1);
+  const ayniGun = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  if (ayniGun(t, bugun)) return "Bugün";
+  if (ayniGun(t, dun)) return "Dün";
+  return t.toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: t.getFullYear() === bugun.getFullYear() ? undefined : "numeric",
+  });
+}
+
+// Yalniz saat ("14:32") - gun basligi altindaki satirlar icin.
+export function saatMetni(iso: string): string {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return "-";
+  return t.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }

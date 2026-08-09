@@ -903,14 +903,30 @@ public static class EtkinlikUclari
             // gordu. "basarili: 19 - temizlenen: 0 - cihaz sayisi: 19" operasyonel
             // gurultudur; cifte hicbir sey anlatmaz, anlamli satirlari bogar.
             .Where(d => d.Eylem != "PUSH_GONDERILDI")
+            // IZOLASYONUN GERCEK SINIRI: esin ONAY BEKLEYEN KUYRUGU.
+            //
+            // Duz "esin her seyi gizli" kurali fazla genisti: onaylanan dilek zaten
+            // ORTAK deftere geciyor, onu gizlemek ciftin kendi eserini yarim gormesi
+            // demekti. Gizlenmesi gereken, esin kuyrugundaki KARARLARDIR - ozellikle
+            // REDDETTIKLERI. Bir es digerinin neyi reddettigini ogrenirse, urunun
+            // korumak icin var oldugu sey (utanc/gerginlik yasanmamasi) yikilir.
             .Where(d =>
             {
                 if (benimRol != "es1" && benimRol != "es2") return true;
+                if (!KuyrukMahremiyeti.Contains(d.Eylem)) return true; // ortak olay
                 var kaynak = KaynakEsOku(d.DegisenAlanlar);
                 return kaynak == null || kaynak == benimRol;
             })
             .Take(denetimLimit)
             .ToList();
+
+        // AKTOR ADI: "kim yapti" sorusunun yaniti. Arayuz ham kod (kaynak_es)
+        // gostermez; ozne cumlesi kurar ("Aysegul baskiya hazir defteri indirdi").
+        var aktorIdler = kayitlar.Where(d => d.KullaniciId != null)
+            .Select(d => d.KullaniciId!.Value).Distinct().ToList();
+        var aktorAdlari = await db.Kullanicilar.AsNoTracking()
+            .Where(k => aktorIdler.Contains(k.Id))
+            .ToDictionaryAsync(k => k.Id, k => k.Ad);
 
         return Results.Json(kayitlar.Select(d => new
         {
@@ -919,8 +935,26 @@ public static class EtkinlikUclari
             varlik = d.Varlik,
             degisen_alanlar = d.DegisenAlanlar,
             created_at = d.CreatedAt,
+            aktor = d.KullaniciId != null && aktorAdlari.TryGetValue(d.KullaniciId.Value, out var ad)
+                ? ad
+                : null,
+            ben_mi = d.KullaniciId == kullaniciId,
         }));
     }
+
+    // ESIN KUYRUGUNA AIT OLAYLAR - digerinin denetim ekraninda GORUNMEZ.
+    // KATKI_ONAYLANDI BILINCLI OLARAK YOK: onaylanan dilek ortak deftere gecer,
+    // yani zaten iki tarafin da gordugu bir sonuctur. Gizlenmesi gereken KARAR
+    // degil, REDDEDILEN/BEKLEYEN icerigin kendisidir.
+    private static readonly string[] KuyrukMahremiyeti =
+    {
+        "KATKI_BIRAKILDI",
+        "KATKI_REDDEDILDI",
+        "KATKI_GERI_ALINDI",
+        "KATKI_ONAYLI_COPE_TASINDI",
+        "KATKI_KALICI_SILINDI",
+        "KATKI_COP_OTOMATIK_SILINDI",
+    };
 
     private static object AyarYaniti(EtkinlikAyari a)
         => new

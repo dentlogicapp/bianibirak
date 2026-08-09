@@ -5,29 +5,28 @@ import { useRouter } from "next/navigation";
 import { api, type DenetimKaydi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { useSenkronDinle } from "@/lib/senkron";
-import { eylemEtiketi, ayrintiMetni } from "@/lib/denetim";
+import { ayrintiMetni, denetimCumlesi, gunBasligi, saatMetni } from "@/lib/denetim";
 
-// Denetim gunlugu: aktif etkinligin islemleri (seffaflik; append-only audit).
+// DENETIM GUNLUGU - defterde ne olup bittiginin seffaf kaydi.
 //
-// SAYFALAMA (E4): onceden sabit son 100 kayit geliyordu ve 101. kayit ARAYUZDE
-// HIC YOKTU - ustelik kullaniciya bunun soylendigi bir yer de yoktu. Bir denetim
-// ekraninda sessiz kesme, "kaydin tamami burada" iddiasini curutur.
+// OZNE DILI: her satir "kim yapti" ile baslar. Sen ikinci tekil ("bir dilegi
+// deftere aldin"), esin adiyla ("Aysegul baskiya hazir defteri indirdi"), sistem
+// olaylari oznesiz. Ham kod (kaynak_es gibi) EKRANA CIKMAZ.
 //
-// Simdi: 50'lik sayfalar + IMLEC (keyset). Devam varsa "Daha fazla yukle" gorunur;
-// yoksa "Tum kayitlar gosteriliyor" YAZAR - kullanici listenin bittigini BILIR,
-// tahmin etmez. Offset kullanilmaz: append-only bir gunlukte araya giren yeni kayit
-// satir tekrarina/atlamasina yol acar (imlec bunu yapisal olarak onler).
+// ESLER ARASI IZOLASYON: esinin ONAY BEKLEYEN kuyrugundaki islemleri (birakilan,
+// reddedilen, geri alinan, cope tasinan dilekler) BACKEND hic gondermez. Onaylanan
+// dilek ortak deftere gectigi icin gorunur - sizinti degil, ortak defterin yasami.
+//
+// SAYFALAMA: 50'lik sayfalar + imlec (keyset). Listenin SONU her zaman soylenir.
 const SAYFA = 50;
 
 export default function DenetimSayfasi() {
   const router = useRouter();
   const [kayitlar, setKayitlar] = useState<DenetimKaydi[]>([]);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yok">("yukleniyor");
-  // Devam var mi: son sayfa TAM dolu geldiyse muhtemelen daha var.
   const [devamVar, setDevamVar] = useState(false);
   const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
 
-  // ILK SAYFA - senkron olayinda da bu calisir (bastan tazelenir).
   const ilkSayfa = useCallback(async () => {
     const c = await api.denetimGunlugu({ limit: SAYFA });
     if (c.ok) {
@@ -45,12 +44,10 @@ export default function DenetimSayfasi() {
     void ilkSayfa();
   }, [ilkSayfa]);
 
-  // CANLI SENKRON (Bolum 0.1): yeni bir islem olunca gunluk kendiliginden tazelensin.
-  // Sayfalama sifirlanir - dogru olan budur: en yeni kayit en ustte gorunmeli.
+  // CANLI SENKRON: yeni islem olunca gunluk kendiliginden tazelenir.
   useSenkronDinle("defter", ilkSayfa);
   useSenkronDinle("kuyruk", ilkSayfa);
 
-  // SONRAKI SAYFA - imlec: elimizdeki EN ESKI kaydin zamani.
   async function dahaYukle() {
     if (dahaYukleniyor || kayitlar.length === 0) return;
     setDahaYukleniyor(true);
@@ -58,12 +55,20 @@ export default function DenetimSayfasi() {
     const c = await api.denetimGunlugu({ limit: SAYFA, oncesi: enEski });
     setDahaYukleniyor(false);
     if (!c.ok) return;
-    // Ayni kaydin iki kez eklenmesine karsi kalkan (ag tekrari / hizli cift tiklama).
     setKayitlar((o) => {
       const varOlan = new Set(o.map((x) => x.id));
       return [...o, ...c.veri.filter((x) => !varOlan.has(x.id))];
     });
     setDevamVar(c.veri.length === SAYFA);
+  }
+
+  // GUN GRUPLARI: tarih her satirda tekrarlanmaz; baslikta bir kez yazilir.
+  const gruplar: { baslik: string; kayitlar: DenetimKaydi[] }[] = [];
+  for (const k of kayitlar) {
+    const b = gunBasligi(k.created_at);
+    const son = gruplar[gruplar.length - 1];
+    if (son && son.baslik === b) son.kayitlar.push(k);
+    else gruplar.push({ baslik: b, kayitlar: [k] });
   }
 
   return (
@@ -72,7 +77,7 @@ export default function DenetimSayfasi() {
         <p className="font-govde text-xs uppercase tracking-etiket text-yaldiz">Etkinlik</p>
         <h1 className="mt-2 font-display text-2xl text-murekkep sm:text-3xl">Denetim Günlüğü</h1>
         <p className="mt-2 font-govde text-sm leading-relaxed text-ikincil">
-          Etkinliğinizde gerçekleşen işlemlerin şeffaf kaydı. En yeni üstte.
+          Defterinizde gerçekleşen işlemlerin şeffaf kaydı. En yeni üstte.
         </p>
       </div>
 
@@ -81,7 +86,7 @@ export default function DenetimSayfasi() {
           <p className="font-govde text-sm text-ikincil">Yükleniyor...</p>
         ) : durum === "yok" ? (
           <p className="rounded-3xl border border-ayrac bg-yuzey p-8 text-center font-govde text-sm text-ikincil">
-            Aktif bir etkinlik seçili değil.
+            Aktif bir defter seçili değil.
           </p>
         ) : kayitlar.length === 0 ? (
           <p className="rounded-3xl border border-dashed border-ayrac bg-yuzey p-8 text-center font-govde text-sm text-ikincil">
@@ -89,36 +94,25 @@ export default function DenetimSayfasi() {
           </p>
         ) : (
           <>
-            <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
-              <ul className="divide-y divide-ayrac">
-                {kayitlar.map((k) => (
-                  <li key={k.id} className="flex items-start gap-3 px-5 py-4">
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-sarap" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-govde text-sm font-medium text-murekkep">
-                        {eylemEtiketi(k.eylem)}
-                      </p>
-                      {/* AYRINTI (E1): kayitli DegisenAlanlar artik OKUNUYOR.
-                          Yillardir yaziliyor ama hicbir ekranda gorunmuyordu. */}
-                      {ayrintiMetni(k.eylem, k.degisen_alanlar) && (
-                        <p className="mt-0.5 break-words font-govde text-xs text-murekkep/70">
-                          {ayrintiMetni(k.eylem, k.degisen_alanlar)}
-                        </p>
-                      )}
-                      <p className="mt-0.5 font-govde text-xs text-ikincil">
-                        {tarihSaatMetni(k.created_at)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            <div className="space-y-5">
+              {gruplar.map((g) => (
+                <section key={g.baslik}>
+                  <p className="mb-2 px-1 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
+                    {g.baslik}
+                  </p>
+                  <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
+                    <ul className="divide-y divide-ayrac">
+                      {g.kayitlar.map((k) => (
+                        <Satir key={k.id} kayit={k} />
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              ))}
             </div>
 
-            {/* SAYFALAMA - listenin SONU her zaman soylenir. */}
-            <div className="mt-4 text-center">
-              <p className="font-govde text-xs text-ikincil">
-                {kayitlar.length} kayıt gösteriliyor
-              </p>
+            <div className="mt-5 text-center">
+              <p className="font-govde text-xs text-ikincil">{kayitlar.length} kayıt gösteriliyor</p>
               {devamVar ? (
                 <button
                   onClick={() => void dahaYukle()}
@@ -128,9 +122,7 @@ export default function DenetimSayfasi() {
                   {dahaYukleniyor ? "Yükleniyor..." : "Daha fazla yükle"}
                 </button>
               ) : (
-                <p className="mt-1 font-govde text-xs text-ikincil">
-                  Tüm kayıtlar gösteriliyor.
-                </p>
+                <p className="mt-1 font-govde text-xs text-ikincil">Tüm kayıtlar gösteriliyor.</p>
               )}
             </div>
           </>
@@ -140,18 +132,45 @@ export default function DenetimSayfasi() {
   );
 }
 
-// eylemEtiketi lib/denetim.ts'e tasindi - TEK KAYNAK.
-// Onceden bu harita burada ve super panelde AYRI AYRI duruyordu (iki kopya
-// kacinilmaz olarak ayrisir). Yeni bir eylem eklendiginde artik tek yer guncellenir.
+// Tek satir: rozet + ozne cumlesi + ayrinti + saat.
+function Satir({ kayit }: { kayit: DenetimKaydi }) {
+  const c = denetimCumlesi(kayit.eylem, kayit.degisen_alanlar, kayit.aktor, kayit.ben_mi);
+  const ayrinti = ayrintiMetni(kayit.eylem, kayit.degisen_alanlar);
 
-function tarihSaatMetni(iso: string): string {
-  const t = new Date(iso);
-  if (isNaN(t.getTime())) return iso;
-  return t.toLocaleString("tr-TR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // ROZET (B3): gozun satiri okumadan "kim?" sorusuna yanit vermesi icin.
+  // Sen -> sarap, diger kisi -> yaldiz, sistem -> notr nokta.
+  const rozet =
+    c.tur === "sistem" ? null : (c.ozne ?? "?").trim().charAt(0).toLocaleUpperCase("tr-TR");
+
+  return (
+    <li className="flex items-start gap-3 px-5 py-3.5">
+      {rozet ? (
+        <span
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-display text-[0.7rem] ${
+            c.tur === "sen" ? "bg-sarap text-parsomen" : "bg-yaldiz/20 text-yaldiz"
+          }`}
+          aria-hidden
+        >
+          {rozet}
+        </span>
+      ) : (
+        <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-ikincil/50" aria-hidden />
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="font-govde text-sm text-murekkep">
+          {c.ozne && <span className="font-medium">{c.ozne}</span>}
+          {c.ozne ? " " : ""}
+          <span className={c.ozne ? "text-ikincil" : ""}>{c.fiil}</span>
+        </p>
+        {ayrinti && (
+          <p className="mt-0.5 break-words font-govde text-xs text-murekkep/70">{ayrinti}</p>
+        )}
+      </div>
+
+      <span className="mt-0.5 shrink-0 font-govde text-xs tabular-nums text-ikincil">
+        {saatMetni(kayit.created_at)}
+      </span>
+    </li>
+  );
 }
