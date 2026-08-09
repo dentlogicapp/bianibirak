@@ -457,7 +457,13 @@ function OzetIzgara({ ozet }: { ozet: SuperOzet }) {
 }
 
 // ---------------- DEFTERLER ----------------
+import { useSimdi } from "@/lib/saat";
+
 function DefterlerSekmesi() {
+  // CANLI SAAT (Bolum 0.1): defter durum rozetleri (defterDurumu) zaman ilerledikce
+  // tazelensin - yonetici, ciftin ekraninda YAZAN degeri gorsun. Panel saatlerce
+  // acik kalabilir; donmus bir rozet yanlis destek yanitina yol acar.
+  useSimdi(); // defter rozetleri canli
   const [defterler, setDefterler] = useState<SuperDefter[]>([]);
   const [detayId, setDetayId] = useState<string | null>(null);
   const [saklamaHedef, setSaklamaHedef] = useState<SuperDefter | null>(null);
@@ -994,6 +1000,8 @@ type SilmeHedefi = {
 };
 
 function CopSekmesi() {
+  // CANLI SAAT (Bolum 0.1): geri alma penceresi daraliyor; sayac canli olmali.
+  useSimdi(); // cop sayaci canli
   const [kaliciHedef, setKaliciHedef] = useState<SilmeHedefi | null>(null);
   const [cop, setCop] = useState<CopKutusu | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -1217,6 +1225,9 @@ function CopSekmesi() {
 
 // ---------------- CANLI AKIS ----------------
 function AkisSekmesi() {
+  // CANLI SAAT (Bolum 0.1): "az once / 3 dk once" ifadeleri donup kalmasin.
+  // Canli Akis'in adi gibi calismasi bunun on sartidir.
+  useSimdi(); // akis gecen sure canli
   const [akis, setAkis] = useState<AkisKaydi[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
 

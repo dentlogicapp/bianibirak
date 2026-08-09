@@ -29,7 +29,12 @@ function kisalt(metin: string): string {
   return (bosluk > 60 ? parca.slice(0, bosluk) : parca).trimEnd() + "...";
 }
 
+import { useSimdi } from "@/lib/saat";
+
 export function UserMenu() {
+  // CANLI SAAT (Bolum 0.1): bildirim listesindeki "geçen süre" ifadeleri canli kalsin.
+  // Menu her sayfada duruyor; donmus "az once" yanilticidir.
+  useSimdi(); // bildirim zamanlari canli
   const router = useRouter();
   const [kullanici, setKullanici] = useState<Kullanici | null>(null);
   const [oturum, setOturum] = useState<"bilinmiyor" | "var" | "yok">("bilinmiyor");
