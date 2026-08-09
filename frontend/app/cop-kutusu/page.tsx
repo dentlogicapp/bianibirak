@@ -12,7 +12,12 @@ import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 // Reddedilen dilekler burada 30 gun bekler, sonra otomatik kalici silinir. Geri al ->
 // onay kuyruguna doner. Kalici sil -> geri alinamaz. Planlama Defteri (Notlar) cop-kutusu
 // deseni, bu uygulamanin gorunumu.
+import { useSimdi } from "@/lib/saat";
+
 export default function CopKutusuSayfasi() {
+  // CANLI SAAT (Bolum 0.1): "kalici silinmeye N gun" sayaci zaman ilerledikce
+  // kendiliginden tazelensin; sayfa acik kalinca eski sayi donmasin.
+  useSimdi();
   const router = useRouter();
   const [dilekler, setDilekler] = useState<CopDilek[]>([]);
   const [defterler, setDefterler] = useState<CopDefter[]>([]);

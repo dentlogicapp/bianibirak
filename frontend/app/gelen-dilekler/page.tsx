@@ -30,7 +30,11 @@ function Yukleniyor() {
   );
 }
 
+import { useSimdi } from "@/lib/saat";
+
 function DefterIcerik() {
+  // CANLI SAAT (Bolum 0.1): defter durum rozeti (defterDurumu) canli kalsin.
+  useSimdi();
   const router = useRouter();
   const arama = useSearchParams();
   const yol = usePathname();

@@ -21,7 +21,12 @@ export default function PanelSayfasi() {
   );
 }
 
+import { useSimdi } from "@/lib/saat";
+
 function PanelIcerik() {
+  // CANLI SAAT (Bolum 0.1): defter durum rozetleri (defterDurumu) zaman
+  // ilerledikce tazelensin. Rozet map icinde uretildigi icin tik EBEVEYNDE.
+  useSimdi();
   const router = useRouter();
   const arama = useSearchParams();
   // Menuden "+ Yeni Etkinlik Defteri Ac" ile gelindiginde form ACIK baslar.

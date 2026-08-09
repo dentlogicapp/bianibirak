@@ -19,6 +19,8 @@ import type { Etkinlik } from "@/lib/api";
 // pasif, sakin bir cumle - kullanicinin gozunden kayar. Oysa bu, urunun EN KRITIK
 // bilgisidir. Hareketli uyari (nabiz atan nokta) ve renk (sarap) bilincli olarak
 // DIKKAT CEKER. Rahatsiz edici olmasi, mirasin kaybindan iyidir.
+import { useSimdi } from "@/lib/saat";
+
 export function ZamanCizelgesi({ etkinlik }: { etkinlik: Etkinlik }) {
   const bolumRef = useRef<HTMLElement>(null);
   const [vurgu, setVurgu] = useState(false);
@@ -40,7 +42,10 @@ export function ZamanCizelgesi({ etkinlik }: { etkinlik: Etkinlik }) {
   }, []);
 
   const adimlar = useMemo(() => kur(etkinlik), [etkinlik]);
-  const simdi = Date.now();
+  // CANLI SAAT (Bolum 0.1): Date.now() yerine useSimdi() - bu bilesen zaman
+  // ilerledikce kendiliginden tazelenir. Ekran acik kalinca "72 saat" donup
+  // kalmaz; bildirimle AYNI degeri gosterir. Kural/hesap DEGISMEDI.
+  const simdi = useSimdi();
 
   return (
     <section
