@@ -836,10 +836,27 @@ public static class EtkinlikUclari
         //
         // Kayitlar SILINMEZ - append-only adli iz korunur, super panelde gorunur.
         // Gizlenen sey iz degil, CIFTIN EKRANI.
-        var kayitlar = await db.DenetimGunlukleri.AsNoTracking()
-            .Where(d => d.EtkinlikId == etkinlikId && !d.SistemEylemi)
+        // SAYFALAMA (E4): sabit 100 kayit SESSIZCE kesiyordu - cift, defterinde
+        // olan bitenin tamamini goremiyordu ve bunun soylendigi bir yer de yoktu.
+        // Imlec (keyset) ile devami istenebilir; varsayilan sayfa 50'ye dusuruldu
+        // (daha hizli acilis), tavan 200.
+        var denetimLimit = int.TryParse(ctx.Request.Query["limit"].ToString(), out var dl)
+            ? Math.Clamp(dl, 1, 200)
+            : 50;
+        var denetimImlecHam = ctx.Request.Query["oncesi"].ToString();
+        DateTimeOffset? denetimImlec =
+            DateTimeOffset.TryParse(denetimImlecHam, out var dim) ? dim : null;
+
+        // GIZLILIK FILTRESI DEGISMEDI: !SistemEylemi (super yonetici islemleri
+        // ciftin ekraninda GORUNMEZ - iz silinmez, yalnizca bu ekranda gizlenir).
+        var denetimSorgu = db.DenetimGunlukleri.AsNoTracking()
+            .Where(d => d.EtkinlikId == etkinlikId && !d.SistemEylemi);
+        if (denetimImlec != null)
+            denetimSorgu = denetimSorgu.Where(d => d.CreatedAt < denetimImlec);
+
+        var kayitlar = await denetimSorgu
             .OrderByDescending(d => d.CreatedAt)
-            .Take(100)
+            .Take(denetimLimit)
             .ToListAsync();
 
         return Results.Json(kayitlar.Select(d => new

@@ -1079,7 +1079,16 @@ public static class SuperUclari
 
         var n = Math.Clamp(limit ?? 50, 1, 200);
 
-        var kayitlar = await db.DenetimGunlukleri.AsNoTracking()
+        // IMLEC (keyset): "bu andan ONCEKILERI getir". Istemci son gordugu kaydin
+        // created_at degerini gonderir. Offset kullanilmaz - append-only bir gunlukte
+        // araya giren yeni kayit satir tekrarina/atlamasina yol acar.
+        var imlecHam = ctx.Request.Query["oncesi"].ToString();
+        DateTimeOffset? imlec = DateTimeOffset.TryParse(imlecHam, out var im) ? im : null;
+
+        var sorguAkis = db.DenetimGunlukleri.AsNoTracking().AsQueryable();
+        if (imlec != null) sorguAkis = sorguAkis.Where(d => d.CreatedAt < imlec);
+
+        var kayitlar = await sorguAkis
             .OrderByDescending(d => d.CreatedAt)
             .Take(n)
             .ToListAsync();
