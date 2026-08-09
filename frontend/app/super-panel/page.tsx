@@ -1251,6 +1251,11 @@ function AkisSekmesi() {
   useSimdi(); // akis gecen sure canli
   const [akis, setAkis] = useState<AkisKaydi[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
+  // DURAKLAT: gecmis sayfalari yuklendiginde canli tazeleme DURUR.
+  // Yoksa 10 sn'de bir liste bastan yazilir ve kullanicinin indigi yer kaybolur.
+  const [duraklat, setDuraklat] = useState(false);
+  const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
+  const [devamVar, setDevamVar] = useState(false);
 
   useEffect(() => {
     let iptal = false;
@@ -1258,16 +1263,33 @@ function AkisSekmesi() {
       const c = await api.superAkis(60);
       if (!iptal && c.ok) {
         setAkis(c.veri);
+        setDevamVar(c.veri.length === 60);
         setYukleniyor(false);
       }
     }
     void cek();
+    if (duraklat) return () => { iptal = true; };
     const z = setInterval(cek, 10000); // canli: 10sn
     return () => {
       iptal = true;
       clearInterval(z);
     };
-  }, []);
+  }, [duraklat]);
+
+  // DAHA ESKISI - imlec: elimizdeki EN ESKI kaydin zamani (keyset).
+  async function dahaEski() {
+    if (dahaYukleniyor || akis.length === 0) return;
+    setDuraklat(true);
+    setDahaYukleniyor(true);
+    const c = await api.superAkis(60, akis[akis.length - 1].created_at);
+    setDahaYukleniyor(false);
+    if (!c.ok) return;
+    setAkis((o) => {
+      const varOlan = new Set(o.map((x) => x.id));
+      return [...o, ...c.veri.filter((x) => !varOlan.has(x.id))];
+    });
+    setDevamVar(c.veri.length === 60);
+  }
 
   if (yukleniyor) {
     return <p className="text-center font-govde text-sm text-ikincil">Yükleniyor...</p>;
@@ -1275,11 +1297,34 @@ function AkisSekmesi() {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-ayrac bg-yuzey">
-      <div className="flex items-center gap-2 border-b border-ayrac px-5 py-3">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sarap" aria-hidden />
+      <div className="flex flex-wrap items-center gap-2 border-b border-ayrac px-5 py-3">
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${duraklat ? "bg-ikincil" : "animate-pulse bg-sarap"}`}
+          aria-hidden
+        />
         <p className="font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
-          Canlı akış · tüm sistem
+          {duraklat ? "Geçmiş görünümü · canlı duraklatıldı" : "Canlı akış · tüm sistem"}
         </p>
+        <span className="ml-auto font-govde text-[0.65rem] text-ikincil">
+          {akis.length} kayıt
+        </span>
+        {duraklat && (
+          <button
+            onClick={() => setDuraklat(false)}
+            className="rounded-full border border-ayrac px-3 py-1 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+          >
+            Canlıya dön
+          </button>
+        )}
+        {devamVar && (
+          <button
+            onClick={() => void dahaEski()}
+            disabled={dahaYukleniyor}
+            className="rounded-full border border-ayrac px-3 py-1 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap disabled:opacity-50"
+          >
+            {dahaYukleniyor ? "Yükleniyor..." : "Daha eskisini yükle"}
+          </button>
+        )}
       </div>
       <div className="max-h-[32rem] divide-y divide-ayrac overflow-y-auto">
         {akis.map((k) => (

@@ -733,8 +733,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ Teyit: teyit }),
     }),
-  superAkis: (limit?: number) =>
-    istek<AkisKaydi[]>(`/api/super/akis${limit ? `?limit=${limit}` : ""}`),
+  superAkis: (limit?: number, oncesi?: string) => {
+    const p = new URLSearchParams();
+    if (limit) p.set("limit", String(limit));
+    if (oncesi) p.set("oncesi", oncesi);
+    const q = p.toString();
+    return istek<AkisKaydi[]>(`/api/super/akis${q ? `?${q}` : ""}`);
+  },
   superKvkkMetinler: () => istek<KvkkMetin[]>("/api/super/kvkk/metinler"),
   superKvkkMetinGuncelle: (anahtar: string, v: { baslik?: string; icerik?: string }) =>
     istek<{ ok: boolean }>(`/api/super/kvkk/metin/${anahtar}`, {
@@ -808,7 +813,15 @@ export const api = {
       method: "POST",
     }),
 
-  denetimGunlugu: () => istek<DenetimKaydi[]>("/api/etkinlik/aktif/denetim"),
+  // E4 SAYFALAMA: limit + imlec ("oncesi" = son gorulen kaydin created_at'i).
+  // Yanit yine DIZI - sozlesme korundu; "devam var mi" donen sayidan anlasilir.
+  denetimGunlugu: (v?: { limit?: number; oncesi?: string }) => {
+    const p = new URLSearchParams();
+    if (v?.limit) p.set("limit", String(v.limit));
+    if (v?.oncesi) p.set("oncesi", v.oncesi);
+    const q = p.toString();
+    return istek<DenetimKaydi[]>(`/api/etkinlik/aktif/denetim${q ? `?${q}` : ""}`);
+  },
 
   // Es daveti (paylasilabilir link - mail gerekmez)
   davetDurum: () =>
