@@ -5,12 +5,11 @@
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
 > repodan; bu dosya "neden / ne kararlaştırıldı / sırada ne var" hafızasıdır.
 
-**Son güncelleme: 2026-08-04** — Dördüncü büyük oturum. **FAZ 1 KAPANDI**: VIP kalıcı saklama
-(+ kritik veri-kaybı açığının üç katmanlı kapatılması), ad soyad büyük harf, aktif defter menüden
-silme, çöp filtresi düzeltmesi, **1.2 hata görünürlüğü** (tablo + global middleware + panel sekmesi),
-**D süper yönetici bildirimleri** (merkez + anlık + günlük özet + per-admin tercih sistemi), disk
-gözcüsü audit hizalaması, push↔defter geri sayım senkronu, cihaz kaydı yarışı. Ayrıca yeni
-**TEMEL KARAR: CANLI SENKRON** (Bölüm 0.1) — sayfa yenilemeden her ekranın anlık güncellenmesi.
+**Son güncelleme: 2026-08-09** — Dördüncü büyük oturum (devam). **FAZ 1 KAPANDI** + **CANLI
+SENKRON** tamamlandı (Bölüm 0.1). Ardından bir dizi ARA TALEP/DÜZELTME turu: mühürle butonunun
+gerçekten sökülmesi, **kapanış kanonunun tek kaynağa bağlanması**, röntgendeki "Invalid Date"
+sözleşme kopukluğu, imha edilmiş defter kabuklarının panelden temizlenmesi, nabız sayaçlarının
+düzeltilmesi ve **silinen defter bildirim şeffaflığı**. Ayrıntı Bölüm 3'te.
 
 Canlı: **https://www.bianibirak.com** (eski `bianibirak.dentlogicapp.com` → 301 yönlendirme)
 
@@ -108,6 +107,12 @@ kurala AYKIRI DEĞİL.
 - **İMHA ANI TEK KAYNAK `[2026-08-01]`:** `Sabitler.ImhaAni(EtkinlikTarihi, OzelSaklamaGun)`
   = özel gün + `Max(OzelSaklamaGun ?? ToplamGun, ToplamGun)`. Bu hesap **başka hiçbir yerde
   tekrarlanmaz** (7 nokta buraya hizalandı).
+- **KAPANIŞ ANI TEK KAYNAK `[2026-08-09]`:** `Sabitler.KapanisAni(EtkinlikTarihi)` = özel gün
+  + `ToplamaGun`. `etkinlikler.KapanisTarihi` sütunu **artık okunmaz** (kurulum anındaki
+  ToplamaGun'u dondurur; kanon değişince yalancı olur). Gösterim ve davetli kapı kontrolü
+  AYNI kaynaktan okur — ekran ile kapı asla ayrışamaz.
+- **TOPLAM GÜN (gösterim) `[2026-08-09]`:** `Sabitler.ToplamGunGercek(OzelSaklamaGun)` — VIP
+  dahil. Çizelge etiketi ile imha tarihi aynı gerçeği söyler.
 - `Sabitler.cs` ayrıca `SaklamaGun=5` taşır (çöp/kapanış sonrası saklama).
 
 ### KURAL E — VIP YALNIZ UZATIR `[2026-08-01, kritik açıktan doğdu]`
@@ -292,6 +297,48 @@ mekanizması `SilindiMi`'ye taşınmıştı → çöpteki defter menüde/listede
 - **Doğrulandı (canlı smoke):** iki sekmede kuyruk senkronu ✅, süper panel dondurma sayacı ✅.
 - **SSE yapılmadı** — bilinçli karar (Bölüm 0.1 tablosu).
 
+**ARA TALEP / DÜZELTME TURU** ✅ `[2026-08-09]` — Musa'nın canlı tespitleri, sırayla:
+
+- **Mühürle butonu GERÇEKTEN kaldırıldı.** Belgede 31 Temmuz'da ✅ işaretliydi ama kod hiç
+  değişmemişti — **kayıt hatası**: karar doğrulanmadan tamamlandı yazılmıştı. Buton bloğu +
+  `mirasiTamamla` + `tamamlaniyor` state'i söküldü; `tamamlandi` türetilmiş sabite çevrildi
+  (ölü kod bırakılmadı). **Ders 82.**
+- **KAPANIŞ KANONU — `Sabitler.KapanisAni(EtkinlikTarihi)`.** Çizelge "Davetli girişleri
+  kapanır · 1 Ekim · özel günden 15 gün sonra" diyordu: etiket kanonu, tarih ESKİ SAKLANMIŞ
+  sütunu (ToplamaGun=30 dönemi) gösteriyordu. Kapanış artık her yerde türetilir; **gösterim
+  ve davetli KAPI KONTROLÜ aynı yamada** değişti (yalnız ekranı düzeltmek, ekran "kapandı"
+  derken davetlinin yazabilmesi demekti). Hizalanan okuyucular: `EtkinlikYaniti`,
+  `KatkiUclari` (3 kapı), `SuperTeshisUclari` (röntgen + ölçüm), `SuperUclari`, `ImhaGorevi`.
+  Saklanan sütun geriye dönük uyum için duruyor ama **hiçbir okuyucu ona güvenmiyor**.
+- **VIP etiketi tutarsızlığı.** İmha tarihi VIP'liydi (2036) ama etiket sabit "20 gün" diyordu
+  → `Sabitler.ToplamGunGercek(OzelSaklamaGun)` eklendi; `toplam_gun` VIP dahil döner.
+- **Sağlık ucundaki VIP körlüğü.** Gecikmiş imha `KapanisTarihi + SaklamaGun` ile hesaplanıyor,
+  `OzelSaklamaGun`'u yok sayıyordu → VIP defter "gecikmiş" görünebilirdi. `Sabitler.ImhaAni`'ye
+  çekildi (EF-güvenli ön filtre + bellekte sayım).
+- **"Son çıktı: Invalid Date · undefined dilek"** — röntgende. Kök neden **sözleşme kopukluğu**:
+  kısayol projeksiyon (`c.DilekSayisi`) camelCase üretiyor, frontend snake_case bekliyordu →
+  `undefined` → `new Date(undefined)` ekrana tarayıcının İngilizce metnini basıyordu. Alan
+  adları açıkça snake_case yapıldı **+ arayüzde ikinci katman**: kayıt yoksa "Henüz indirilmedi".
+  **Ders 83.**
+- **İmha edilmiş defter kabukları panelden temizlendi.** İçeriği yok edilmiş defterler aktif
+  Defterler listesinde duruyor, üstelik "Yetim / Hareketsiz / müdahale gerekebilir" **yanlış
+  alarmı** ve işlevsiz butonlar (Dondur / Özel süre / Çöpe at) taşıyordu. Kural: **imha edilmiş
+  defter "defter" değil KANITTIR**; yeri yalnız İmha Arşivi'dir (`.Where(e => e.ImhaEdildi)`
+  sorgusu zaten hepsini gösteriyordu - kanıt kaybolmadı). Ölçüm sayaçları da `ImhaEdildi`
+  bilincine kavuştu → Ölçüm "İmha gecikmiş 3" derken nabzın "0" demesi çelişkisi bitti.
+- **Nabız defter sayaçları.** Beş sayaç imha edilmişleri sayıyordu; ayrıca **"aktif" saklanan
+  `Durum` alanından** okunuyordu — o alan kurulumda yazılıp bir daha güncellenmediği için panel
+  **her zaman "0 aktif"** diyordu. Aktiflik artık tarihlerden türetiliyor (imha/çöp/dondurulmuş
+  değil + davetli penceresi açık), `lib/durum.ts` mantığıyla aynı gerçek. **Ders 59'un tekrarı.**
+- **Silinen defter bildirim şeffaflığı.** Üç katman: (1) kalıcı silmede bildirimler sessizce
+  yok olmuyor - alıcı başına **tek özet** bildirim kalıyor (`EtkinlikId=null`; eski metinler
+  KVKK gereği yaşamıyor; `ImhaGorevi`'nin mevcut deseniyle aynı, paralel yapı kurulmadı);
+  (2) `AktifYap` çöpteki (`409 DEFTER_COPTE`) ve imha edilmiş (`404 DEFTER_ULASILAMAZ`) deftere
+  geçişi **sunucuda** reddediyor — üyelik kontrolü tek başına yetmiyordu, çünkü çöpte üyelik
+  bilinçli olarak duruyor; (3) `UserMenu` geçiş sonucunu **kontrol ediyor** — önceden sunucu
+  reddetse bile ekran ilerliyordu. **Ders 84.**
+
+
 ---
 
 ## 4. BEKLEYEN İŞLER — ONAYLI, KODLAMA SIRASINDA `[2026-07-25 kararları]`
@@ -315,7 +362,9 @@ mekanizması `SilindiMi`'ye taşınmıştı → çöpteki defter menüde/listede
 3. **"Dilek toplanıyor · 16 gün"** eksik etiket — `son-gunler` evresi. **Düzeltme:** "Dilek
    toplanıyor · Kalıcı silinmeye son: N gün" (üç ekran tek kaynak, `lib/durum.ts`).
 
-### Mühürle butonu ✅ **KALDIRILDI [2026-07-31]**
+### Mühürle butonu ✅ **GERÇEKTEN KALDIRILDI [2026-08-09]**
+> ⚠ Bu madde 31 Temmuz'da yanlışlıkla ✅ işaretlenmişti; kod o gün DEĞİŞMEMİŞTİ.
+> Karar doğrulanmadan "tamamlandı" yazmak, unutmaktan daha zararlıdır (Ders 82).
 `kurasyonTamamla` yalnız `Durum="tamamlandi"` yazıyor; hiçbir şeyi kilitlemiyor, bildirimlerle
 İLGİSİ YOK (`HatirlatmaGorevi` "tamamlandı"ya bakmıyor — kanıt). İşlevsiz buton.
 **Karar:** manuel buton kaldırılır; "tamamlandı" metriği gerçek indirmeden türetilir
@@ -432,6 +481,9 @@ yalnız **teslimat katmanı** eklenecek — toplulaştırma yeniden yazılmayaca
 (+ KURAL E) · H ✅ · F′ ✅ · çöp filtresi ✅ · **1.2 hata görünürlüğü** ✅ · **D bildirimler** ✅
 
 **BİTEN (2026-08-09):** CANLI SENKRON ✅ (1a, 1b, 2, 3a, 3b — SSE bilinçli olarak yapılmadı)
+**BİTEN (2026-08-09) — ara talep turu:** mühürle sökümü ✅ · kapanış kanonu ✅ · VIP etiketi ✅ ·
+sağlık ucu VIP körlüğü ✅ · "Invalid Date" sözleşme kopukluğu ✅ · imha kabuğu temizliği ✅ ·
+nabız sayaçları ✅ · silinen defter bildirim şeffaflığı ✅
 
 **SIRADA — FAZ 1 artığı:**
 1. **E** denetim/akış enterprise dönüşümü (E1 diff → E2 toplulaştırma → E3 filtre/arama →
@@ -619,6 +671,22 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
 81. **Hook'lar bileşenin en üst seviyesinde olmalı.** `map()` içindeki IIFE'de hesaplanan rozete
     hook konamaz; tik EBEVEYNE kurulur (React hook sayısı render'lar arasında değişemez).
 
+
+82. **Doğrulanmamış hiçbir iş "tamamlandı" yazılmaz.** Mühürle butonu belgede ✅ göründü, kodda
+    duruyordu. Belge yalan söylediğinde, unutmaktan daha kötü olur: iş bir daha hiç ele alınmaz.
+    Bir madde ancak KODDAN doğrulandıktan sonra işaretlenir.
+83. **Adlandırma sözleşmesi tek yönlüdür.** Kısayol projeksiyon (`.Select(c => new { c.DilekSayisi })`)
+    camelCase üretir; proje snake_case konuşuyorsa alan adları AÇIKÇA yazılır. Kopukluk sessiz
+    değildir - `undefined` üretir ve tarayıcının İngilizce hata metni ("Invalid Date") kullanıcı
+    ekranına düşer. Yönetim ekranı "veri yok" durumunu asla tarayıcı hatasıyla göstermez.
+84. **Bir kontrolün reddi kullanıcıya ULAŞMIYORSA o kontrol yoktur.** `bildirimeTikla` sonucu
+    kontrol etmeden yönlendiriyordu: sunucu "çöpteki defter" dese bile ekran ilerliyordu.
+    Yazma/geçiş çağrılarında dönüş DAİMA kontrol edilir; sunucunun cümlesi aynen gösterilir
+    (kendi metnimizi uydurmayız - tek doğruluk kaynağı sunucudur).
+85. **Yumuşak-silme üyeliği bilinçli olarak durur; yaşam döngüsü kontrolü ayrı yapılır.**
+    Çöpteki defterin üyeliği geri alma için korunur - bu yüzden "üye mi?" kontrolü tek başına
+    erişimi engellemez. Tenant kontrolü + yaşam döngüsü kontrolü İKİ AYRI katmandır.
+
 ---
 
 ## 10. DEPLOY RUTİNİ — referans
@@ -667,6 +735,12 @@ eşleşmezse yazmaz; `ZatenMarker` **eklenen içeriğe** bağlanır (Ders 71).
   Hepsi **bilinçli**; "bir iş için tek mekanizma" ilkesi.
 - **Yeni özellik kuralı:** veri gösteren ekran `useSenkronDinle(alan, tazele)` bağlar; geri sayım
   gösteren ekran `useSimdi()` çağırır. Yazma tarafı otomatik (api.ts/istek).
+- **Sıradaki iş: E — Denetim/Canlı Akış enterprise.** Önerilen başlangıç: **E4 sayfalama**
+  (şu an `Take(100)`/`Take(60)` sessizce kesiyor - denetimde sessiz kesme kabul edilemez) ve
+  **E1 diff** (veri `DegisenAlanlar` JSONB'de kayıtlı ama okunmuyor - en yüksek değer/çaba).
+- **Bilinçli senkron dışı bırakılanlar** (Bölüm 0.1): `DavetliKarsilama` (kendi saniyeli
+  sayacı), `DestekSekmesi` (kendi 60 sn tik'i), `VipSaklamaModal` (girdiye bağlı),
+  süper panel Bildirimler/Hatalar sekmeleri (karşılığı olan alan yok).
 - **YOL HARİTASI GÜNCELLEME RİTÜELİ:** her güncellemede **(1)** repoya push
   (`git add YOL_HARITASI.md` → commit → push), **(2)** knowledge'daki kopyayı da güncelle.
   İkisi birlikte yapılmazsa iki kaynak ayrışır.
