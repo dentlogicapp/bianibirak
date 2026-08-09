@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type DenetimKaydi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { useSenkronDinle } from "@/lib/senkron";
+import { eylemEtiketi, ayrintiMetni } from "@/lib/denetim";
 
 // Denetim gunlugu: aktif etkinligin islemleri (seffaflik; append-only audit).
 //
@@ -97,6 +98,13 @@ export default function DenetimSayfasi() {
                       <p className="font-govde text-sm font-medium text-murekkep">
                         {eylemEtiketi(k.eylem)}
                       </p>
+                      {/* AYRINTI (E1): kayitli DegisenAlanlar artik OKUNUYOR.
+                          Yillardir yaziliyor ama hicbir ekranda gorunmuyordu. */}
+                      {ayrintiMetni(k.eylem, k.degisen_alanlar) && (
+                        <p className="mt-0.5 break-words font-govde text-xs text-murekkep/70">
+                          {ayrintiMetni(k.eylem, k.degisen_alanlar)}
+                        </p>
+                      )}
                       <p className="mt-0.5 font-govde text-xs text-ikincil">
                         {tarihSaatMetni(k.created_at)}
                       </p>
@@ -132,23 +140,9 @@ export default function DenetimSayfasi() {
   );
 }
 
-function eylemEtiketi(eylem: string): string {
-  const harita: Record<string, string> = {
-    KATKI_BIRAKILDI: "Bir davetli dilek bıraktı",
-    KATKI_ONAYLANDI: "Bir dilek onaylandı",
-    ODEME_BASLATILDI: "Ödeme başlatıldı",
-    ODEME_BILDIRILDI: "Havale bildirimi yapıldı",
-    ODEME_ONAYLANDI: "Ödemeniz onaylandı",
-    KATKI_REDDEDILDI: "Bir dilek reddedildi",
-    ETKINLIK_OLUSTURULDU: "Etkinlik oluşturuldu",
-    ETKINLIK_GUNCELLENDI: "Etkinlik güncellendi",
-    AYAR_GUNCELLENDI: "Ayarlar güncellendi",
-    PUSH_GONDERILDI: "Bildirim gönderildi",
-    GIRIS: "Giriş yapıldı",
-    KAYIT: "Hesap oluşturuldu",
-  };
-  return harita[eylem] ?? eylem;
-}
+// eylemEtiketi lib/denetim.ts'e tasindi - TEK KAYNAK.
+// Onceden bu harita burada ve super panelde AYRI AYRI duruyordu (iki kopya
+// kacinilmaz olarak ayrisir). Yeni bir eylem eklendiginde artik tek yer guncellenir.
 
 function tarihSaatMetni(iso: string): string {
   const t = new Date(iso);
