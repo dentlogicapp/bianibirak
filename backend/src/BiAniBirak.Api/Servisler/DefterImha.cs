@@ -1,4 +1,5 @@
 using BiAniBirak.Api.Data;
+using BiAniBirak.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace BiAniBirak.Api.Servisler;
@@ -47,8 +48,51 @@ public static class DefterImha
         db.EtkinlikAyarlari.RemoveRange(db.EtkinlikAyarlari.Where(a => a.EtkinlikId == id));
         db.UyeDavetleri.RemoveRange(db.UyeDavetleri.Where(d => d.EtkinlikId == id));
         db.EtkinlikUyelikleri.RemoveRange(db.EtkinlikUyelikleri.Where(u => u.EtkinlikId == id));
+        // BILDIRIMLER SESSIZCE KAYBOLMAZ - OZETLENIR.
+        //
+        // CANLIDA YAKALANDI: defter kalici silinince o deftere ait TUM bildirimler
+        // iz birakmadan yok oluyordu. Kullanici, dun elinde duran bir bildirimi bugun
+        // bulamiyor ve "uygulama mi sildi, ben mi yanlis hatirliyorum?" diye dusunuyordu.
+        // Sessiz kayboluş, guveni en hizli yikan seydir.
+        //
+        // COZUM (ImhaGorevi ile AYNI desen - paralel yapi kurulmadi): eski bildirimler
+        // silinir, yerine alici basina TEK OZET birakilir. Neden ozet:
+        //   - KVKK: eski metinler davetli adi tasiyabilir; defter imha edildiyse o
+        //     metinler de yasamamalidir. Kayit kalir, ICERIK gider.
+        //   - Gurultu: 10 bildirimi olan defter icin 10 ozdes satir birakmak,
+        //     seffaflik degil kalabaliktir.
+        //   - EtkinlikId ZORUNLU olarak null: defter satiri birazdan siliniyor.
+        //
+        // Alicilar bildirimlerin KENDISINDEN turetilir: uyelik satirlari zincirde
+        // daha once silindigi icin oradan okunamaz.
+        var bildirimAlicilari = await db.Bildirimler
+            .Where(b => b.EtkinlikId == id)
+            .Select(b => b.KullaniciId)
+            .Distinct()
+            .ToListAsync(ct);
+
         db.Bildirimler.RemoveRange(db.Bildirimler.Where(b => b.EtkinlikId == id));
+        // Ertelenmis (henuz gonderilmemis) bildirimler GIDER: gonderilecek defter yok.
         db.ErtelenenBildirimler.RemoveRange(db.ErtelenenBildirimler.Where(b => b.EtkinlikId == id));
+
+        var silmeZamani = DateTimeOffset.UtcNow;
+        foreach (var aliciId in bildirimAlicilari)
+        {
+            db.Bildirimler.Add(new Bildirim
+            {
+                Id = Guid.NewGuid(),
+                KullaniciId = aliciId,
+                EtkinlikId = null,
+                Tip = "sistem",
+                Baslik = "Silinen deftere ait bildirim",
+                Mesaj = "Bu bildirimin ait olduğu defter kalıcı olarak silindi. Defterin "
+                    + "içeriği - dilekler ve fotoğraflar - geri getirilemez. Eski "
+                    + "bildirimleri artık açamazsın.",
+                Url = null,
+                OkunduMu = false,
+                CreatedAt = silmeZamani,
+            });
+        }
 
         // DENETIM IZI KALIR - adli kanit. Yalnizca etkinlik bagi kopar.
         // Kayitlar kisisel veri icermez; "bir defter vardi ve su tarihte silindi"

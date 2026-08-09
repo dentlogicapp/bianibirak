@@ -289,7 +289,18 @@ export function UserMenu() {
     if (b.etkinlik_id && aktifId && b.etkinlik_id !== aktifId) {
       if (gecis) return;
       setGecis(true);
-      void api.etkinlikAktifYap(b.etkinlik_id).then(() => {
+      // GECIS SONUCU KONTROL EDILIR.
+      //
+      // Onceden sonuca BAKILMADAN yonlendiriliyordu: sunucu "bu defter copte"
+      // dese bile ekran ilerliyordu. Bir kontrolun reddi kullaniciya ULASMIYORSA
+      // o kontrol yok demektir. Artik sunucunun cumlesi aynen gosterilir - kendi
+      // metnimizi uydurmayiz, tek dogruluk kaynagi sunucudur.
+      void api.etkinlikAktifYap(b.etkinlik_id).then((c) => {
+        if (!c.ok) {
+          setGecis(false);
+          toast.error(c.mesaj);
+          return;
+        }
         window.location.href = hedef;
       });
       return;

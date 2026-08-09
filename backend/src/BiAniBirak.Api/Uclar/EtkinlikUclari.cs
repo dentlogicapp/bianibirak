@@ -428,6 +428,22 @@ public static class EtkinlikUclari
         if (uyelik == null)
             return Hata(403, "ERISIM_YOK", "Bu etkinlige uye degilsiniz.");
 
+        // COPTEKI YA DA IMHA EDILMIS DEFTERE GECIS YOK.
+        //
+        // CANLIDA YAKALANDI: cope tasinan defter menude/listede gorunmuyordu ama
+        // ESKI BILDIRIMINE tiklayinca o deftere gecilebiliyordu - dilek baglantisi
+        // dahil her sey aciliyordu. Uyelik hala duruyor (dogru: geri alinabilsin diye),
+        // bu yuzden uyelik kontrolu TEK BASINA yetmiyordu. Yasam dongusu kontrolu
+        // burada, SUNUCUDA yapilir - arayuzde gizlemek koruma degildir.
+        var hedefDefter = await db.Etkinlikler.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == etkinlikId);
+        if (hedefDefter == null || hedefDefter.ImhaEdildi)
+            return Hata(404, "DEFTER_ULASILAMAZ",
+                "Erişmeye çalıştığınız deftere ulaşılamıyor. Kalıcı olarak silinmiş olabilir.");
+        if (hedefDefter.SilindiMi)
+            return Hata(409, "DEFTER_COPTE",
+                "Bu defter çöp kutusunda. Açmak için önce Çöp Kutusu'ndan geri alman gerekir.");
+
         // AsNoTracking KALDIRILDI: bu kayit artik GUNCELLENIYOR.
         var kullanici = await db.Kullanicilar
             .FirstOrDefaultAsync(k => k.Id == kullaniciId && k.DeletedAt == null);
