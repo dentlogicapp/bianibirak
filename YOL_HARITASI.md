@@ -40,7 +40,7 @@ Matbaaya sorulacak: **CMYK dönüşümünü siz mi yapıyorsunuz, dosyayı CMYK 
 | **Sıralı karşılama** | Yapılsın mı? Önizleme sunuldu, karar Faz 3'e bırakıldı | Faz 3.3 |
 | **Kişiselleştirme kapsamı** | Ne kadarı ücretsiz, ne kadarı premium? | Faz 5.3 |
 | **GitHub token** | `omniasistan-cli` (classic, `repo`) doluyor. Revoke mu, fine-grained yeni token mı? Önce `git remote -v` ile deploy bağımlılığı doğrulanmalı | Altyapı |
-| **B2B2C çelişkisi** `[YENİ 2026-08-04]` | Bu belge Bölüm 7'de "B2B2C İSTENMİYOR, kalıcı B2C" diyor; **Project Instructions Bölüm 3** ise "gelecek B2B2C katmanı additive (nullable `UstOrganizatorId`)" diyor. **İki metin çelişiyor** → hangisi bağlayıcı? (Öneri: bugün B2C; instructions'taki not yalnız "kapıyı kapatma" tasarım notu olarak kalsın.) | Bölüm 7 |
+| ~~B2B2C çelişkisi~~ | ✅ **ÇÖZÜLDÜ `[2026-08-09]`** — Instructions Bölüm 3 güncellendi: organizatör katmanı **istenmiyor**, lansman ve ileri aşamalar **saf B2C** (tenant = etkinlik, çift doğrudan satın alır). İki belge artık uyumlu. | — |
 
 ---
 
@@ -62,13 +62,15 @@ anından hesaplanıyordu; fark, birinin TAZE diğerinin DONMUŞ olmasıydı.
    hiç, diğer sekmelere ancak bir sonraki yoklamada (≤5 sn) ulaşıyor.
 3. **Kapsam boşluğu.** Veri gösteren her ekran ilgili damga alanını dinlemiyor.
 
-**Dört aşama:**
+**Dört aşama — DURUM `[2026-08-09]`:**
 | Aşama | Kapsam | Durum |
 |---|---|---|
-| **1. Canlı saat** (`lib/saat.ts`) | Tek tik kaynağı; tüm geri sayımlar aynı "şimdi"den. Sekme gizliyken durur, odakta anında tazeler. İki ekranın farklı sayı göstermesi yapısal olarak imkânsız. | 🔄 dosya hazır, bağlama sürüyor |
-| **2. Yerel anlık yayın** | `senkronYayinla(alan)` — yazma kendi alanını anında yayınlar (yerel olay + BroadcastChannel). Aynı sekme + diğer sekmeler anında. | ⬜ |
-| **3. Kapsam denetimi** | Veri gösteren her ekranın ilgili alanı dinlediğinin doğrulanması, eksiklerin bağlanması. | ⬜ |
-| **4. SSE** (sunucu itmesi) | Diğer cihazlar / diğer kullanıcılar için gerçek anlık. Damga yoklaması **yedek** kalır (SSE düşerse doğruluk kaybolmaz). | ⬜ |
+| **1a. Canlı saat** (`lib/saat.ts`) | Tek tik kaynağı (30 sn), tüm aboneler aynı "şimdi". `ZamanCizelgesi` (asıl şikâyet), `cop-kutusu`, `etkinliklerim`, `gelen-dilekler`. | ✅ canlıda |
+| **1b. Canlı saat — yönetici** | Süper panel (defter rozetleri, çöp sayacı, Canlı Akış "geçen süre") + `UserMenu` bildirim zamanları. | ✅ canlıda |
+| **2. Yerel anlık yayın** | `senkron.ts → senkronYayinla(yol)` + alan-bilinçli BroadcastChannel; **`api.ts/istek()` içinde TEK NOKTA** — başarılı her GET-dışı istek kendi alanlarını anında yayınlar. Bilinmeyen yol → tüm alanlar (yeni özellik sessizce kaçamaz). | ✅ canlıda |
+| **3a. Dinleyiciler — ana ekranlar** | `gelen-dilekler` (kuyruk+defter), süper panel özet/nabız (defterler+ayar), `cop-kutusu`, `etkinliklerim`. **Tazeleme sayacı deseni**: mevcut `useEffect` aynen yeniden çalışır, çekme kodunun tek satırı değişmez. | ✅ canlıda |
+| **3b. Dinleyiciler — süper panel sekmeleri** | Defterler, Kullanıcılar, Çöp → kendi `useCallback cek`'lerine doğrudan abone. (Bildirim tercihleri ve Hatalar: karşılığı olan senkron alanı yok — bilinçli kapsam dışı.) | ✅ canlıda |
+| **4. SSE (sunucu itmesi)** | ❌ **YAPILMAYACAK `[2026-08-09, Musa kararı]`** — diğer cihaz/eş ekranında mevcut ≤5 sn (damga yoklaması) yeterli görüldü. SSE'nin bedeli (kalıcı bağlantı yönetimi, ters vekil tamponlama, yeniden bağlanma, sunucuda sekme başına bağlantı) kazancına değmiyor. **Aynı cihazda zaten anında.** İhtiyaç doğarsa yeniden değerlendirilir. |
 
 **Bağlayıcı kural:** Bundan sonra eklenen **her** özellik böyle kurulur. Veri gösteren ekran o
 verinin değişimini dinlemek, geri sayım gösteren ekran canlı saate bağlanmak zorundadır.
@@ -274,10 +276,21 @@ mekanizması `SilindiMi`'ye taşınmıştı → çöpteki defter menüde/listede
 - **Cihaz kaydı yarışı** ✅ — iki sekme aynı PushToken'ı eşzamanlı ekleyip `23505`'e takılıyordu
   → yarış yakalanıp sessizce başarılı dönülüyor.
 
-**Canlı senkron — Aşama 1 (başladı)**
-- Yeni `frontend/lib/saat.ts` (`useSimdi()`): modül düzeyinde tek zamanlayıcı, 30 sn tik, tüm
-  aboneler aynı "şimdi", sekme gizliyken durur, odakta anında tazeler, SSR güvenli.
-  **Bağlama (geri sayım gösteren ekranlar) sürüyor.**
+**CANLI SENKRON** ✅ `[2026-08-09]` — Bölüm 0.1'in kod karşılığı, beş pakette:
+- **`lib/saat.ts` (yeni)** — `useSimdi()`: modül düzeyinde TEK zamanlayıcı (30 sn), tüm aboneler
+  aynı "şimdi", sekme gizliyken durur, odakta anında tazeler, SSR güvenli. İki ekranın farklı
+  sayı göstermesi artık yapısal olarak imkânsız.
+- **1a** `ZamanCizelgesi` (asıl şikâyet: `Date.now()` → `useSimdi()`), `cop-kutusu`,
+  `etkinliklerim`, `gelen-dilekler`.
+- **1b** Süper panel (Defterler rozetleri, Çöp sayacı, Canlı Akış "geçen süre") + `UserMenu`.
+- **2** `senkron.ts`: alan-bilinçli BroadcastChannel + `senkronYayinla(yol)`; **`api.ts/istek()`
+  içinde TEK ÇAĞRI** — başarılı her yazma ilgili alanları anında yayınlar. Yol→alan haritası,
+  bilinmeyen yol tüm alanları yayınlar (yeni özellik sessizce senkron dışı kalamaz).
+- **3a** Ana ekranlara dinleyici — **tazeleme sayacı deseni** (mevcut `useEffect` aynen yeniden
+  çalışır; çekme kodunun tek satırı değişmedi).
+- **3b** Süper panel sekmeleri (Defterler, Kullanıcılar, Çöp) kendi `cek`'lerine abone.
+- **Doğrulandı (canlı smoke):** iki sekmede kuyruk senkronu ✅, süper panel dondurma sayacı ✅.
+- **SSE yapılmadı** — bilinçli karar (Bölüm 0.1 tablosu).
 
 ---
 
@@ -418,27 +431,23 @@ yalnız **teslimat katmanı** eklenecek — toplulaştırma yeniden yazılmayaca
 **BİTENLER (2026-07-31 → 08-04):** Paket F ✅ · G-1 ✅ · G-2 ✅ · Tam ekran (x) ✅ · I VIP ✅
 (+ KURAL E) · H ✅ · F′ ✅ · çöp filtresi ✅ · **1.2 hata görünürlüğü** ✅ · **D bildirimler** ✅
 
-**Hemen — CANLI SENKRON (Bölüm 0.1):**
-1. **Aşama 1** canlı saat bağlama (geri sayım gösteren tüm ekranlar) 🔄
-2. **Aşama 2** yerel anlık yayın (`senkronYayinla`)
-3. **Aşama 3** kapsam denetimi (her ekran ilgili alanı dinliyor mu)
-4. **Aşama 4** SSE (diğer cihazlar / diğer kullanıcılar için gerçek anlık)
+**BİTEN (2026-08-09):** CANLI SENKRON ✅ (1a, 1b, 2, 3a, 3b — SSE bilinçli olarak yapılmadı)
 
-**FAZ 1 artığı:**
-5. **E** denetim/akış enterprise dönüşümü (E1 diff → E2 toplulaştırma → E3 filtre/arama →
+**SIRADA — FAZ 1 artığı:**
+1. **E** denetim/akış enterprise dönüşümü (E1 diff → E2 toplulaştırma → E3 filtre/arama →
    E4 sayfalama → E5 CSV; E6 eklenmedi)
 
 **Sonra:**
-6. **B** baskıya hazır menü düzeni (küçük, frontend, tek dosya)
-7. **C** akıllı sıralama + sayfa düzeni (C1-C4) + **İLAVE** anı sonu noktalama (büyük, PDF motoru)
-8. **A** salon karekod seti (A1-A5 bonuslarıyla)
+2. **B** baskıya hazır menü düzeni (küçük, frontend, tek dosya)
+3. **C** akıllı sıralama + sayfa düzeni (C1-C4) + **İLAVE** anı sonu noktalama (büyük, PDF motoru)
+4. **A** salon karekod seti (A1-A5 bonuslarıyla)
 
 **FAZ 3 — davetli deneyimi (tek blok):**
-9. Davetli karşılama görsel güçlendirme (3.3) + fotoğrafı öne çıkarma/teşvik + gönderim
+5. Davetli karşılama görsel güçlendirme (3.3) + fotoğrafı öne çıkarma/teşvik + gönderim
    sonrası teşekkür/satış motoru sayfası (3.4). Parça parça değil, tek bütün.
 
 **FAZ 4 sonrası:**
-10. Mail altyapısı → günlük özet motoru (push + uygulama + PDF mail; `GunlukOzetHesabi` hazır).
+6. Mail altyapısı → günlük özet motoru (push + uygulama + PDF mail; `GunlukOzetHesabi` hazır).
 
 ---
 
@@ -501,8 +510,7 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
 ## 7. KAPSAM DIŞI — kalıcı kararlar
 
 - **B2B2C organizatör katmanı** — İSTENMİYOR. Sistem kalıcı olarak B2C: tenant = etkinlik.
-  ⚠ **Çelişki `[2026-08-04]`:** Project Instructions Bölüm 3 "gelecek B2B2C katmanı additive
-  (nullable `UstOrganizatorId`)" diyor. İki metin çelişiyor → Bölüm 0-D'de karar bekliyor.
+  ✅ `[2026-08-09]` Project Instructions Bölüm 3 de bu yönde güncellendi — iki belge uyumlu.
 - **Dijital Arşiv ZIP** (orijinal çözünürlüklü fotoğraflar) — İSTENMİYOR.
 - **Sabit fiyat kaydı** — kodda tutulmaz; süper panelden girilir.
 - **Test bildirimi düğmesi** — gerek görülmedi.
@@ -596,6 +604,21 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
 77. **Eklemeli aşamalandırma riski böler.** D-C-1a (veri katmanı, davranış değişmez) → D-C-1b
     (görev per-admin) → D-C-2 (ekran); çalışan görev tek turda yeniden yazılmadı.
 
+
+78. **Yayın kurmak yetmez, DİNLEYEN olmalı.** Aşama 2'de merkezî yayını kurup smoke'ta
+    "artık anında" dedim; hiçbir ekran dinlemediği için görünürde hiçbir şey değişmedi.
+    Altyapı katmanı tek başına kullanıcıya değer üretmez — tüketici katmanı aynı planda olmalı,
+    ve smoke beklentisi ancak zincirin TAMAMI bağlandıktan sonra yazılmalı.
+79. **Aynı dosyada birden çok yamada `ZatenMarker` metinleri BENZERSİZ olmalı.** 3b'de üç edit
+    aynı marker'ı kullanıyordu; ilki uygulandıktan sonra ikincisi "zaten var" sanıp atlanacaktı.
+    Marker, o edit'in kendi eklediği benzersiz yorum satırı olmalı.
+80. **`useEffect` içine gömülü veri çekme, dışarıdan tetiklenemez.** Çözüm, çekme kodunu
+    `useCallback`'e taşımak (riskli) değil, **tazeleme sayacı**: bir state bağımlılık dizisine
+    eklenir, dinleyici sayacı artırır; mevcut effect AYNEN yeniden çalışır. Çalışan mantığa
+    dokunmadan senkron kazanılır.
+81. **Hook'lar bileşenin en üst seviyesinde olmalı.** `map()` içindeki IIFE'de hesaplanan rozete
+    hook konamaz; tik EBEVEYNE kurulur (React hook sayısı render'lar arasında değişemez).
+
 ---
 
 ## 10. DEPLOY RUTİNİ — referans
@@ -638,10 +661,14 @@ eşleşmezse yazmaz; `ZatenMarker` **eklenen içeriğe** bağlanır (Ders 71).
 - **Madde 8 (uçak modu → giriş):** Paket F üç dosyayı düzeltti. Hâlâ atıyorsa aday `OnayKapisi.tsx`
   (AppShell'de `onayGerekli` başlangıçta true; fetch başarısızsa davranışı bilinmiyor) — o zaman
   istenecek.
-- **Canlı senkron Aşama 1 bağlama:** geri sayım gösteren dosyalar taranacak
-  (`defterDurumu(` / `kalanMetin(` / `Date.now()`), her birine `useSimdi()`.
-- **Aşama 4 (SSE) tasarımı:** tek `/api/akis` SSE ucu mu, alan başına mı; yeniden bağlanma +
-  damga yoklamasının yedek kalması.
-- **B2B2C çelişkisi:** Bölüm 7 ile Project Instructions Bölüm 3 çelişiyor → karar bekliyor.
+- **Canlı senkron:** ✅ tamamlandı (Bölüm 0.1). Senkron dışı bırakılanlar — `DavetliKarsilama`
+  (kendi saniyeli sayacı var), `DestekSekmesi` (kendi 60 sn tik'i), `VipSaklamaModal` (girdiye
+  bağlı, kısa ömürlü), süper panel Bildirimler/Hatalar sekmeleri (karşılığı olan alan yok).
+  Hepsi **bilinçli**; "bir iş için tek mekanizma" ilkesi.
+- **Yeni özellik kuralı:** veri gösteren ekran `useSenkronDinle(alan, tazele)` bağlar; geri sayım
+  gösteren ekran `useSimdi()` çağırır. Yazma tarafı otomatik (api.ts/istek).
+- **YOL HARİTASI GÜNCELLEME RİTÜELİ:** her güncellemede **(1)** repoya push
+  (`git add YOL_HARITASI.md` → commit → push), **(2)** knowledge'daki kopyayı da güncelle.
+  İkisi birlikte yapılmazsa iki kaynak ayrışır.
 - **YOL_HARITASI güncelliği:** bu dosya push sonrası knowledge SYNC ile tazelenir; repo değiştikçe
   elle sync gerekir (otomatik değil).
