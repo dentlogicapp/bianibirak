@@ -502,6 +502,11 @@ function DefterlerSekmesi() {
     return () => clearTimeout(z);
   }, [cek, ara]);
 
+  // SENKRON (Bolum 0.1 - Asama 3): dondurma/cozme, VIP suresi, silme/geri alma -
+  // hangi ekrandan yapilirsa yapilsin liste aninda dogru olsun.
+  useSenkronDinle("defterler", cek);
+  useSenkronDinle("ayar", cek);
+
   async function goruntule(d: SuperDefter) {
     setIslenen(d.id);
     const c = await api.superGoruntule(d.id);
@@ -837,6 +842,9 @@ function KullanicilarSekmesi() {
     return () => clearTimeout(z);
   }, [cek, ara]);
 
+  // Yetki/defter degisimleri kullanici listesine de yansir.
+  useSenkronDinle("defterler", cek);
+
   async function yetkiDegistir(k: SuperKullanici) {
     const c = await api.superAdminAta(k.id, !k.super_admin);
     if (!c.ok) {
@@ -1026,6 +1034,10 @@ function CopSekmesi() {
   useEffect(() => {
     void cek();
   }, [cek]);
+
+  // Cope dusen/geri alinan dilek ve defterler aninda gorunsun.
+  useSenkronDinle("kuyruk", cek);
+  useSenkronDinle("defterler", cek);
 
   async function defterGeriAl(id: string) {
     const c = await api.superDefterGeriAl(id);
