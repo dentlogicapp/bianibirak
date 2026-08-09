@@ -1088,6 +1088,44 @@ public static class SuperUclari
         var sorguAkis = db.DenetimGunlukleri.AsNoTracking().AsQueryable();
         if (imlec != null) sorguAkis = sorguAkis.Where(d => d.CreatedAt < imlec);
 
+        // ============ ARAMA (E3) ============
+        // Bir denetim gunlugunde asil bulma araci KAYDIRMA degil ARAMADIR: "su
+        // kisi ne yapti", "su defterde ne oldu", "kim odeme onayladi". 60 satiri
+        // gozle taramak yontem degildir.
+        //
+        // Uc yuzeyde arar: EYLEM kodu, AKTOR (ad/e-posta), DEFTER (es adlari).
+        // Ad ve defter adi baska tablolarda oldugu icin once ID'ler cozulur,
+        // sonra tek sorguda filtrelenir - N+1 yok.
+        var ara = ctx.Request.Query["ara"].ToString().Trim();
+        if (!string.IsNullOrWhiteSpace(ara))
+        {
+            var kucuk = ara.ToLower();
+            var buyuk = ara.ToUpperInvariant();
+            var aktorEsles = await db.Kullanicilar.AsNoTracking()
+                .Where(k => k.Ad.ToLower().Contains(kucuk) || k.Email.ToLower().Contains(kucuk))
+                .Select(k => k.Id)
+                .ToListAsync();
+            var defterEsles = await db.Etkinlikler.AsNoTracking()
+                .Where(e => e.Es1Ad.ToLower().Contains(kucuk) || e.Es2Ad.ToLower().Contains(kucuk))
+                .Select(e => e.Id)
+                .ToListAsync();
+
+            sorguAkis = sorguAkis.Where(d =>
+                d.Eylem.Contains(buyuk)
+                || (d.KullaniciId != null && aktorEsles.Contains(d.KullaniciId.Value))
+                || (d.EtkinlikId != null && defterEsles.Contains(d.EtkinlikId.Value)));
+        }
+
+        // ============ TARIH ARALIGI (E3) ============
+        // Serbest tarih secici yerine HIZLI ARALIK: "bugun / 7 gun / 30 gun".
+        // Denetimde sorulan soru neredeyse her zaman "son sunlarda ne oldu"dur;
+        // iki takvim acmak surtunmedir. gun=0 (ya da bos) -> sinir yok.
+        if (int.TryParse(ctx.Request.Query["gun"].ToString(), out var gunSayisi) && gunSayisi > 0)
+        {
+            var araligEsik = DateTimeOffset.UtcNow.AddDays(-gunSayisi);
+            sorguAkis = sorguAkis.Where(d => d.CreatedAt >= araligEsik);
+        }
+
         var kayitlar = await sorguAkis
             .OrderByDescending(d => d.CreatedAt)
             .Take(n)

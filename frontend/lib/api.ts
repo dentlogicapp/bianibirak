@@ -737,10 +737,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ Teyit: teyit }),
     }),
-  superAkis: (limit?: number, oncesi?: string) => {
+  // Parametreler bir NESNEDE: sirali argumanlar dorde cikinca cagri yerinde
+  // hangisinin ne oldugu okunmaz hale gelir (superAkis(60, undefined, "", 7)).
+  superAkis: (v?: { limit?: number; oncesi?: string; ara?: string; gun?: number }) => {
     const p = new URLSearchParams();
-    if (limit) p.set("limit", String(limit));
-    if (oncesi) p.set("oncesi", oncesi);
+    if (v?.limit) p.set("limit", String(v.limit));
+    if (v?.oncesi) p.set("oncesi", v.oncesi);
+    if (v?.ara) p.set("ara", v.ara);
+    if (v?.gun) p.set("gun", String(v.gun));
     const q = p.toString();
     return istek<AkisKaydi[]>(`/api/super/akis${q ? `?${q}` : ""}`);
   },

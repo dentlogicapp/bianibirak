@@ -1259,31 +1259,46 @@ function AkisSekmesi() {
   const [dahaYukleniyor, setDahaYukleniyor] = useState(false);
   const [devamVar, setDevamVar] = useState(false);
 
+  // FILTRE (E3): arama metni + hizli tarih araligi. Arama yazilirken her tusa
+  // istek atilmaz - 350 ms beklenir (debounce).
+  const [ara, setAra] = useState("");
+  const [gunAralik, setGunAralik] = useState(0); // 0 = tumu
+
   useEffect(() => {
     let iptal = false;
     async function cek() {
-      const c = await api.superAkis(60);
+      const c = await api.superAkis({ limit: 60, ara: ara || undefined, gun: gunAralik || undefined });
       if (!iptal && c.ok) {
         setAkis(c.veri);
         setDevamVar(c.veri.length === 60);
         setYukleniyor(false);
       }
     }
-    void cek();
-    if (duraklat) return () => { iptal = true; };
+    // Filtre degisince sayfalama sifirlanir: yeni sonuc kumesinin ICINDE
+        // gezilir, eski sayfalarin artiklari listede kalmaz.
+    const gecikme = setTimeout(() => void cek(), ara ? 350 : 0);
+    if (duraklat) {
+      return () => { iptal = true; clearTimeout(gecikme); };
+    }
     const z = setInterval(cek, 10000); // canli: 10sn
     return () => {
       iptal = true;
+      clearTimeout(gecikme);
       clearInterval(z);
     };
-  }, [duraklat]);
+  }, [duraklat, ara, gunAralik]);
 
   // DAHA ESKISI - imlec: elimizdeki EN ESKI kaydin zamani (keyset).
   async function dahaEski() {
     if (dahaYukleniyor || akis.length === 0) return;
     setDuraklat(true);
     setDahaYukleniyor(true);
-    const c = await api.superAkis(60, akis[akis.length - 1].created_at);
+    const c = await api.superAkis({
+      limit: 60,
+      oncesi: akis[akis.length - 1].created_at,
+      ara: ara || undefined,
+      gun: gunAralik || undefined,
+    });
     setDahaYukleniyor(false);
     if (!c.ok) return;
     setAkis((o) => {
@@ -1328,7 +1343,40 @@ function AkisSekmesi() {
           </button>
         )}
       </div>
+      {/* FILTRE CUBUGU (E3) - asil bulma araci. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-ayrac px-5 py-2.5">
+        <input
+          value={ara}
+          onChange={(e) => setAra(e.target.value)}
+          placeholder="Kişi, defter ya da işlem ara"
+          className="min-w-0 flex-1 rounded-full border border-ayrac bg-parsomen px-4 py-1.5 font-govde text-xs text-murekkep outline-none focus:border-sarap"
+        />
+        {[
+          { d: 0, e: "Tümü" },
+          { d: 1, e: "Bugün" },
+          { d: 7, e: "7 gün" },
+          { d: 30, e: "30 gün" },
+        ].map((s) => (
+          <button
+            key={s.d}
+            onClick={() => setGunAralik(s.d)}
+            className={`shrink-0 rounded-full px-3 py-1 font-govde text-[0.65rem] transition-colors ${
+              gunAralik === s.d
+                ? "bg-sarap text-parsomen"
+                : "border border-ayrac text-ikincil hover:border-sarap hover:text-sarap"
+            }`}
+          >
+            {s.e}
+          </button>
+        ))}
+      </div>
+
       <div className="max-h-[32rem] divide-y divide-ayrac overflow-y-auto">
+        {akis.length === 0 && (
+          <p className="px-5 py-8 text-center font-govde text-sm text-ikincil">
+            Bu filtreyle kayıt bulunamadı.
+          </p>
+        )}
         {akis.map((k) => (
           <div key={k.id} className="flex min-w-0 items-start gap-3 px-5 py-3">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yaldiz" aria-hidden />
