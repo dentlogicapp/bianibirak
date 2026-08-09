@@ -145,11 +145,31 @@ public static class SuperUclari
 
         var yediGunOnce = DateTimeOffset.UtcNow.AddDays(-7);
 
-        var defterToplam = await db.Etkinlikler.CountAsync(e => !e.SilindiMi);
-        var defterAktif = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && e.Durum == "aktif");
-        var defterDonduruldu = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && e.Donduruldu);
-        var defterCopte = await db.Etkinlikler.CountAsync(e => e.SilindiMi);
-        var defterYeni = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && e.CreatedAt >= yediGunOnce);
+        // ---- DEFTER SAYACLARI ----
+        //
+        // IKI KUSUR BIRDEN DUZELTILDI (canlida yakalandi):
+        //
+        // 1) IMHA EDILMISLER SAYILIYORDU. Icerigi yok edilmis bir kabuk "defter"
+        //    degil KANITTIR; aktif sayaclarda yer almaz (yeri Imha Arsivi'dir).
+        //    Panel "6 defter" diyordu ama yasayan defter 3'tu.
+        //
+        // 2) "AKTIF" SAKLANAN ALANDAN OKUNUYORDU. Etkinlik.Durum defter kurulurken
+        //    yazilir ve BIR DAHA HIC GUNCELLENMEZ; dolayisiyla hicbir defter hicbir
+        //    zaman "aktif" olmuyordu -> panel her zaman "0 aktif" diyordu. Turetilebilen
+        //    deger saklanmaz (Ders 59): aktiflik TARIHLERDEN hesaplanir, tipki
+        //    lib/durum.ts'in kullaniciya gosterdigi evre gibi. Iki taraf ayni gercegi soyler.
+        //
+        // AKTIF = imha edilmemis + cope atilmamis + dondurulmamis + davetli penceresi
+        //         (ozel gun + ToplamaGun) HENUZ KAPANMAMIS.
+        // EF-guvenli: gun sayisi SABIT (Sabitler.ToplamaGun), kolon-bagimli degil.
+        var simdiSayac = DateTimeOffset.UtcNow;
+        var defterToplam = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && !e.ImhaEdildi);
+        var defterAktif = await db.Etkinlikler.CountAsync(e =>
+            !e.SilindiMi && !e.ImhaEdildi && !e.Donduruldu
+            && e.EtkinlikTarihi.AddDays(Sabitler.ToplamaGun) >= simdiSayac);
+        var defterDonduruldu = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && !e.ImhaEdildi && e.Donduruldu);
+        var defterCopte = await db.Etkinlikler.CountAsync(e => e.SilindiMi && !e.ImhaEdildi);
+        var defterYeni = await db.Etkinlikler.CountAsync(e => !e.SilindiMi && !e.ImhaEdildi && e.CreatedAt >= yediGunOnce);
 
         var kullaniciToplam = await db.Kullanicilar.CountAsync(k => k.DeletedAt == null);
         var superAdminSayi = await db.Kullanicilar.CountAsync(k => k.SuperAdmin && k.DeletedAt == null);
