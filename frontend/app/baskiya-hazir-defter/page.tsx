@@ -105,7 +105,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   // Ogeler (yerel - anlik guncelleme)
   const [ogeler, setOgeler] = useState<KurasyonOgesi[]>(ilk.ogeler);
   const [inceleme, setInceleme] = useState<KurasyonOgesi | null>(null);
-  const [tamamlaniyor, setTamamlaniyor] = useState(false);
+  // tamamlaniyor state KALDIRILDI (muhurle butonuyla birlikte).
   const [uretiliyor, setUretiliyor] = useState<"onizleme" | "baski" | null>(null);
 
   // BOYUT SECIMI: indirmeden once sorulur. Sonradan telafisi olmayan bir karar -
@@ -141,7 +141,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       iptal = true;
     };
   }, []);
-  const [tamamlandi, setTamamlandi] = useState(ilk.durum === "tamamlandi");
+  // tamamlandi: state degil, TURETILMIS deger (muhurle butonu kaldirildi).
+  const tamamlandi = ilk.durum === "tamamlandi";
 
   // OTO-KAYDET SUSTURULUR: inceleme oturumunda "degisti" ASLA true olmaz.
   //
@@ -275,19 +276,9 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     setOdemeAcik(true);
   }
 
-  async function mirasiTamamla() {
-    if (saltOkunur) return;
-    setTamamlaniyor(true);
-    const c = await api.kurasyonTamamla();
-    setTamamlaniyor(false);
-    if (!c.ok) {
-      toast.error(c.mesaj);
-      return;
-    }
-    setTamamlandi(true);
-    toast.success(`Mirasın hazır - ${c.veri.dilek_sayisi} dilek esere alındı.`);
-    void yenile();
-  }
+  // mirasiTamamla KALDIRILDI - manuel muhurleme kaldirildigi icin sahipsiz kaldi.
+  // (api.kurasyonTamamla ucu backend'de duruyor; ileride "indirildi" turetimi
+  // icin kullanilabilir - ama ARTIK KULLANICIYA TOREN YAPTIRMIYORUZ.)
 
   const dahilOgeler = useMemo(() => ogeler.filter((o) => o.dahil), [ogeler]);
 
@@ -750,22 +741,14 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           uretiliyor={uretiliyor === "baski"}
         />
 
-        {/* Muhurleme - YAZIM, inceleme oturumunda kilitli. */}
-        {!tamamlandi && (
-          <div className="mt-5 border-t border-yaldiz/30 pt-5 text-center">
-            <p className="metin-yasli mx-auto max-w-md font-govde text-xs leading-relaxed text-ikincil">
-              Kurgun bittiğinde mirasını mühürle. Bu bir kilit değil, bir imza - sonrasında
-              da düzenlemeye devam edebilirsin.
-            </p>
-            <button
-              onClick={mirasiTamamla}
-              disabled={saltOkunur || tamamlaniyor || dahilOgeler.length === 0}
-              className="mt-3 rounded-full border border-sarap px-7 py-2.5 font-govde text-sm font-medium text-sarap transition-colors hover:bg-sarap/10 disabled:opacity-50"
-            >
-              {tamamlaniyor ? "Mühürleniyor..." : "Mirasımı tamamla"}
-            </button>
-          </div>
-        )}
+        {/* MUHURLE BUTONU KALDIRILDI (25 Temmuz karari, uygulama 9 Agustos).
+            "Mirasimi tamamla" yalnizca kurasyon durumunu "tamamlandi" yaziyordu:
+            hicbir sey kilitlenmiyor, hicbir bildirim degismiyor, hicbir cikti
+            uretilmiyordu. Kullaniciya toren sunup arkasinda hicbir sey olmamasi
+            urunun en pahali yalanidir.
+
+            "Tamamlandi" artik GERCEK isten turetilir: eser INDIRILDIYSE
+            (KurasyonCiktilari kaydi) miras tamamlanmistir. Toren degil, kanit. */}
       </div>
 
       {/* INCELEME - dilegin kagittaki tam hali (defter ekraniyla ayni bilesen).
