@@ -205,6 +205,20 @@ public static class Sabitler
     public const int CopDilekGun = 30;
     public const int CopDefterGun = 5;
 
+    // DENETIM GUNLUGU SAKLAMA - KATMANLI (DenetimTemizlemeGorevi okur).
+    //
+    // RUTIN (30 gun): push, hatirlatma, dilek birakildi, ayar/gorsel/profil
+    // duzenlemeleri, gorev idempotency izleri. Hacmi ureten %95; hukuki
+    // agirligi yok.
+    //
+    // KALICI IZ (2 yil): silme/kalici silme/imha, odeme, onam-kanit, yetki
+    // degisikligi, super yonetici erisim izleri VE listelenmemis HER SEY.
+    // Kalici silme onay penceresi kullaniciya "denetim kayitlari adli iz olarak
+    // korunur" diye soz verir - bu sure o sozun karsiligidir. Sonsuz degildir:
+    // KVKK belirli sure ister, tablo da sinirsiz buyuyemez.
+    public const int DenetimRutinGun = 30;
+    public const int DenetimKaliciGun = 730;
+
     // Bildirim saatleri (Turkiye saati, UTC+3). Sabah ve aksam - insanin telefonuna
     // baktigi saatler.
     public const int BildirimSabahSaat = 10;
