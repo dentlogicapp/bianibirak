@@ -23,10 +23,14 @@ export default function PanelSayfasi() {
 
 import { useSimdi } from "@/lib/saat";
 
+import { useSenkronDinle } from "@/lib/senkron";
+
 function PanelIcerik() {
   // CANLI SAAT (Bolum 0.1): defter durum rozetleri (defterDurumu) zaman
   // ilerledikce tazelensin. Rozet map icinde uretildigi icin tik EBEVEYNDE.
   useSimdi();
+  // TAZELEME SAYACI (Bolum 0.1 - Asama 3).
+  const [tazele, setTazele] = useState(0);
   const router = useRouter();
   const arama = useSearchParams();
   // Menuden "+ Yeni Etkinlik Defteri Ac" ile gelindiginde form ACIK baslar.
@@ -77,7 +81,10 @@ function PanelIcerik() {
     function agGeldi() { void yukle(); }
     window.addEventListener("online", agGeldi);
     return () => { iptal = true; window.removeEventListener("online", agGeldi); };
-  }, [router]);
+  }, [router, tazele]);
+
+  // Defter olusturma/silme/geri alma - baska sekmede ya da cihazda olsa da.
+  useSenkronDinle("defterler", () => setTazele((t) => t + 1));
 
   // YENI DEFTER -> ZORUNLU ES DAVET ADIMI.
   //

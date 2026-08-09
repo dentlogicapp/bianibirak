@@ -42,7 +42,12 @@ const SEKMELER: { kod: Sekme; etiket: string }[] = [
   { kod: "bildirimler", etiket: "Bildirimler" },
 ];
 
+import { useSenkronDinle } from "@/lib/senkron";
+
 export default function SuperPanelSayfasi() {
+  // TAZELEME SAYACI (Bolum 0.1 - Asama 3): ozet/nabiz sayaclari (dondurulmus
+  // defter, bekleyen kuyruklar) sayfa yenilemeden guncellensin.
+  const [tazele, setTazele] = useState(0);
   const router = useRouter();
   const [ozet, setOzet] = useState<SuperOzet | null>(null);
   const [durum, setDurum] = useState<"yukleniyor" | "hazir" | "yetkisiz" | "aglanamadi">("yukleniyor");
@@ -102,7 +107,11 @@ export default function SuperPanelSayfasi() {
     function agGeldi() { void yukle(); }
     window.addEventListener("online", agGeldi);
     return () => { iptal = true; window.removeEventListener("online", agGeldi); };
-  }, [router]);
+  }, [router, tazele]);
+
+  // Dondurma/cozme, defter olusturma/silme, ayar degisimi - ozet aninda dogru olsun.
+  useSenkronDinle("defterler", () => setTazele((t) => t + 1));
+  useSenkronDinle("ayar", () => setTazele((t) => t + 1));
 
   if (durum === "yukleniyor") {
     return (

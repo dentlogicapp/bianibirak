@@ -14,10 +14,14 @@ import { TehlikeliEylem } from "@/components/site/TehlikeliEylem";
 // deseni, bu uygulamanin gorunumu.
 import { useSimdi } from "@/lib/saat";
 
+import { useSenkronDinle } from "@/lib/senkron";
+
 export default function CopKutusuSayfasi() {
   // CANLI SAAT (Bolum 0.1): "kalici silinmeye N gun" sayaci zaman ilerledikce
   // kendiliginden tazelensin; sayfa acik kalinca eski sayi donmasin.
   useSimdi();
+  // TAZELEME SAYACI (Bolum 0.1 - Asama 3).
+  const [tazele, setTazele] = useState(0);
   const router = useRouter();
   const [dilekler, setDilekler] = useState<CopDilek[]>([]);
   const [defterler, setDefterler] = useState<CopDefter[]>([]);
@@ -37,7 +41,11 @@ export default function CopKutusuSayfasi() {
       setDilekler(c.veri.dilekler);
       setDurum("hazir");
     })();
-  }, [router]);
+  }, [router, tazele]);
+
+  // Cope dusen/geri alinan dilek ve defterler aninda yansisin.
+  useSenkronDinle("kuyruk", () => setTazele((t) => t + 1));
+  useSenkronDinle("defterler", () => setTazele((t) => t + 1));
 
   async function geriAl(id: string) {
     if (islenen) return;

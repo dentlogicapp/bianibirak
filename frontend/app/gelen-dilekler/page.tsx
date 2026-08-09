@@ -32,9 +32,14 @@ function Yukleniyor() {
 
 import { useSimdi } from "@/lib/saat";
 
+import { useSenkronDinle } from "@/lib/senkron";
+
 function DefterIcerik() {
   // CANLI SAAT (Bolum 0.1): defter durum rozeti (defterDurumu) canli kalsin.
   useSimdi();
+  // TAZELEME SAYACI (Bolum 0.1 - Asama 3): senkron olayi gelince artar ve
+  // asagidaki veri cekme useEffect'i AYNEN yeniden calisir.
+  const [tazele, setTazele] = useState(0);
   const router = useRouter();
   const arama = useSearchParams();
   const yol = usePathname();
@@ -64,7 +69,12 @@ function DefterIcerik() {
       if (d.ok) setDefter(d.veri);
       setDurum("hazir");
     })();
-  }, [router]);
+  }, [router, tazele]);
+
+  // SENKRON TUKETICISI: kendi onay/red islemin, esinin islemi ya da baska bir
+  // cihaz - hepsi burayi tazeler. "kuyruk" KISIYE OZEL, "defter" ORTAK.
+  useSenkronDinle("kuyruk", () => setTazele((t) => t + 1));
+  useSenkronDinle("defter", () => setTazele((t) => t + 1));
 
   // Odak: dilek yuklendikten sonra scroll + vurgu
   useOdakKatki(durum === "hazir");
