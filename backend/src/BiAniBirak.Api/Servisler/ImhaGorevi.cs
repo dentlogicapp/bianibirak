@@ -204,7 +204,7 @@ public sealed class ImhaGorevi : BackgroundService
                 dilek_sayisi = dilekSayisi,
                 gorsel_sayisi = gorselSayisi,
                 saklama_gun = Sabitler.SaklamaGun,
-                kapanis = e.KapanisTarihi,
+                kapanis = Sabitler.KapanisAni(e.EtkinlikTarihi),
             }),
             SistemEylemi = true,
             CreatedAt = DateTimeOffset.UtcNow,

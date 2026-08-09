@@ -318,7 +318,7 @@ public static class SuperUclari
             etkinlik_tarihi = e.EtkinlikTarihi,
             // Evre hesabi icin (lib/durum.ts): kullanicinin gordugu ile
             // yoneticinin gordugu AYNI cumle olmali.
-            kapanis_tarihi = e.KapanisTarihi,
+            kapanis_tarihi = Sabitler.KapanisAni(e.EtkinlikTarihi),
             imha_tarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun),
             ozel_saklama_gun = e.OzelSaklamaGun,
             imha_edildi = e.ImhaEdildi,

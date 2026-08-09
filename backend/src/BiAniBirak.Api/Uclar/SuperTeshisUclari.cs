@@ -135,11 +135,13 @@ public static class SuperTeshisUclari
             .Where(c => c.EtkinlikId == id)
             .OrderByDescending(c => c.CreatedAt)
             .Take(5)
+            // ALAN ADLARI ACIKCA snake_case: kisayol yazim (c.DilekSayisi) camelCase
+            // uretir ve frontend sozlesmesiyle tutmaz (bkz. "Invalid Date" hatasi).
             .Select(c => new
             {
-                c.Tip,
-                c.DilekSayisi,
-                c.CreatedAt,
+                tip = c.Tip,
+                dilek_sayisi = c.DilekSayisi,
+                created_at = c.CreatedAt,
             })
             .ToListAsync();
 
@@ -162,7 +164,9 @@ public static class SuperTeshisUclari
         var aktif30 = sonHareket >= esik30;
 
         // Yasam dongusu: acik / kapanmis / imhaya kalan gun
-        var kapandi = simdi > e.KapanisTarihi;
+        // KANON: kapanis saklanan sutundan DEGIL, ozel gunden turetilir
+        // (Sabitler.KapanisAni). Sutun eski ToplamaGun ile yazilmis olabilir.
+        var kapandi = simdi > Sabitler.KapanisAni(e.EtkinlikTarihi);
         var imhaTarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun);
         var imhayaKalanGun = (int)Math.Ceiling((imhaTarihi - simdi).TotalDays);
 
@@ -181,7 +185,7 @@ public static class SuperTeshisUclari
             // Yasam dongusu
             acilis_tarihi = e.AcilisTarihi,
             etkinlik_tarihi = e.EtkinlikTarihi,
-            kapanis_tarihi = e.KapanisTarihi,
+            kapanis_tarihi = Sabitler.KapanisAni(e.EtkinlikTarihi),
             kapandi,
             imha_tarihi = imhaTarihi,
             imhaya_kalan_gun = imhayaKalanGun,
@@ -331,8 +335,8 @@ public static class SuperTeshisUclari
             .ToList();
 
         // YASAM DONGUSU TAKVIMI
-        var acik = defterler.Count(d => simdi <= d.KapanisTarihi);
-        var kapali = defterler.Count(d => simdi > d.KapanisTarihi);
+        var acik = defterler.Count(d => simdi <= Sabitler.KapanisAni(d.EtkinlikTarihi));
+        var kapali = defterler.Count(d => simdi > Sabitler.KapanisAni(d.EtkinlikTarihi));
 
         // Imhaya yaklasanlar (kapanis + saklama suresi). KVKK gorunurlugu:
         // "veri ne zaman yok olacak" sorusunun cevabi PANELDE durmali.

@@ -331,9 +331,16 @@ app.MapGet("/api/saglik", async (HttpContext ctx, BiAniBirakDbContext db, Depola
     // IMHA GOREVI CALISIYOR MU?
     // "Suresi dolmus ama hala duran" defter varsa gorev ya durmustur ya hata aliyordur.
     // Bu, sessizce birikip diski dolduran en tehlikeli arizadir - fark edilmesi gerekir.
-    var imhaGecikmis = await db.Etkinlikler.CountAsync(e =>
-        !e.ImhaEdildi && !e.SilindiMi &&
-        e.KapanisTarihi.AddDays(Sabitler.SaklamaGun) <= simdi);
+    // IMHA ANI TEK KAYNAK (Sabitler.ImhaAni) - VIP dahil. EF kolon-bagimli
+    // AddDays'i SQL'e ceviremedigi icin: sabit on filtre + bellekte kesin sayim.
+    var imhaAdaylari = await db.Etkinlikler.AsNoTracking()
+        .Where(e => !e.ImhaEdildi && !e.SilindiMi
+                    && (e.EtkinlikTarihi.AddDays(Sabitler.ToplamGun) <= simdi
+                        || e.OzelSaklamaGun != null))
+        .Select(e => new { e.EtkinlikTarihi, e.OzelSaklamaGun })
+        .ToListAsync();
+    var imhaGecikmis = imhaAdaylari.Count(x =>
+        Sabitler.ImhaAni(x.EtkinlikTarihi, x.OzelSaklamaGun) <= simdi);
     var sonImha = await db.Etkinlikler.AsNoTracking()
         .Where(e => e.ImhaZamani != null)
         .OrderByDescending(e => e.ImhaZamani)

@@ -206,11 +206,17 @@ export function DefterDetayModal({
                     <Satir etiket="Durum" deger={veri.kurasyon.durum} />
                     <Satir etiket="Tema" deger={veri.kurasyon.tema} />
                     <Satir etiket="Esere dahil" deger={`${veri.kurasyon.esere_dahil} dilek`} />
-                    {veri.ciktilar.length > 0 && (
+                    {/* Cikti YOKSA da satir gorunur ve ACIKCA soyler. Onceden satir
+                        yalniz kayit varken ciziliyordu ama alan adlari tutmayinca
+                        "Invalid Date - undefined dilek" yaziyordu. Iki katman: adlar
+                        duzeltildi (backend) + burada deger dogrulanir. */}
+                    {veri.ciktilar.length > 0 && veri.ciktilar[0].created_at ? (
                       <Satir
                         etiket="Son çıktı"
-                        deger={`${tarih(veri.ciktilar[0].created_at)} · ${veri.ciktilar[0].dilek_sayisi} dilek`}
+                        deger={`${tarih(veri.ciktilar[0].created_at)} · ${veri.ciktilar[0].dilek_sayisi ?? 0} dilek`}
                       />
+                    ) : (
+                      <Satir etiket="Son çıktı" deger="Henüz indirilmedi" />
                     )}
                   </div>
                 ) : (
