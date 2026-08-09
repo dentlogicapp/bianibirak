@@ -4,6 +4,8 @@ type ApiCevap<T> =
   | { ok: true; veri: T }
   | { ok: false; hata: string; mesaj: string; durum: number };
 
+import { senkronYayinla } from "@/lib/senkron";
+
 async function istek<T>(yol: string, secenek?: RequestInit): Promise<ApiCevap<T>> {
   try {
     const yanit = await fetch(yol, {
@@ -20,6 +22,12 @@ async function istek<T>(yol: string, secenek?: RequestInit): Promise<ApiCevap<T>
         durum: yanit.status,
       };
     }
+    // CANLI SENKRON (Bolum 0.1 - Asama 2): basarili her YAZMA isleminden sonra
+    // ilgili alanlar ANINDA yayinlanir - bu sekmedeki diger bilesenler ve ayni
+    // tarayicinin diger sekmeleri beklemez. TEK NOKTA: yeni eklenen her uc
+    // kendiliginden kapsanir (ekran ekran baglamak gerekmez).
+    const metot = (secenek?.method ?? "GET").toUpperCase();
+    if (metot !== "GET") senkronYayinla(yol);
     return { ok: true, veri: govde as T };
   } catch {
     return { ok: false, hata: "AG_HATASI", mesaj: "Sunucuya ulaşılamadı.", durum: 0 };

@@ -299,7 +299,15 @@ export function useSenkron() {
     // Bir sekme defter degistirdiginde digeri 5 saniye beklemez.
     try {
       kanal = new BroadcastChannel(KANAL_ADI);
-      kanal.onmessage = () => {
+      kanal.onmessage = (olay) => {
+        // ALAN BILINCLI YAYIN (Bolum 0.1 - Asama 2): mesaj { alan } tasiyorsa o
+        // alanin dinleyicileri ANINDA tetiklenir - sunucuya sorup damga beklemeden.
+        // Eski biçim ("degisti") de calisir: yalniz kontrol kuyruga alinir.
+        const veri = olay?.data as { alan?: SenkronAlan } | string | null;
+        if (veri && typeof veri === "object" && veri.alan && ALANLAR.includes(veri.alan)) {
+          window.dispatchEvent(new CustomEvent(olayAdi(veri.alan)));
+        }
+        // Sunucu SON SOZ: damga dogrulamasi icin kontrol yine calisir.
         anindaKontrol();
       };
     } catch {
@@ -315,6 +323,56 @@ export function useSenkron() {
       kanal?.close();
     };
   }, []);
+}
+
+// ---------------------------------------------------------------------------
+// YEREL ANLIK YAYIN (Bolum 0.1 - Asama 2)
+//
+// NEDEN: damga yoklamasi en fazla 5 saniyede bir doner; AYNI SEKMEDEKI baska bir
+// bilesen ise hic haberdar olmayabilirdi. Bir kullanici kendi yaptigi degisikligi
+// bir baska ekranda gecikmeli gormemelidir - kendi eylemi kendisine aninda donmeli.
+//
+// NASIL: api.ts icindeki TEK istek() yardimcisi, basarili her YAZMA isleminden
+// (GET disi) sonra bunu cagirir. Boylece bugunku ve YARIN EKLENECEK her mutasyon
+// kendiliginden yayinlanir - ekran ekran baglamak gerekmez, unutulan yer kalmaz.
+//
+// SUNUCU SON SOZDUR: bu yalnizca HIZ katmanidir. Dinleyiciler kendi uclarindan
+// taze veriyi ceker; damga yoklamasi da calismaya devam eder (dogruluk katmani).
+
+// Yol -> etkilenen alanlar. Bilinmeyen yol TUM alanlari yayinlar: yeni bir ozellik
+// eklendiginde "haritaya yazmayi unuttuk" diye sessizce senkron disi kalmasin.
+function alanlariCoz(yol: string): SenkronAlan[] {
+  if (yol.includes("/bildirim")) return ["bildirim"];
+  if (yol.includes("/ayar")) return ["ayar"];
+  if (
+    yol.includes("/katki") || yol.includes("/onay") ||
+    yol.includes("/cop") || yol.includes("/kurasyon")
+  ) {
+    return ["kuyruk", "defter"];
+  }
+  if (yol.includes("/etkinlik")) return ["defterler", "defter", "ayar"];
+  return ALANLAR;
+}
+
+// Basarili bir yazmadan sonra cagirilir (api.ts/istek). Once BU SEKME, sonra
+// digerleri; ikisi de sunucuya ugramadan.
+export function senkronYayinla(yol: string) {
+  if (typeof window === "undefined") return;
+  const alanlar = alanlariCoz(yol);
+  for (const alan of alanlar) {
+    try {
+      window.dispatchEvent(new CustomEvent(olayAdi(alan)));
+    } catch {
+      /* olay yayinlanamadi - polling yedegi devrede */
+    }
+  }
+  try {
+    const k = new BroadcastChannel(KANAL_ADI);
+    for (const alan of alanlar) k.postMessage({ alan });
+    k.close();
+  } catch {
+    /* BroadcastChannel yoksa (eski Safari) diger sekmeler polling ile ogrenir */
+  }
 }
 
 // Bu sekmede bir sey degistiginde diger SEKMELERI uyar (sunucuya ugramadan).
