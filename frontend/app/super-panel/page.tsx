@@ -1245,7 +1245,7 @@ function CopSekmesi() {
 }
 
 // ---------------- CANLI AKIS ----------------
-import { eylemEtiketi as akisEylemEtiketi, ayrintiMetni } from "@/lib/denetim";
+import { eylemEtiketi as akisEylemEtiketi, ayrintiMetni, zamanKisa } from "@/lib/denetim";
 
 function AkisSekmesi() {
   // CANLI SAAT (Bolum 0.1): "az once / 3 dk once" ifadeleri donup kalmasin.
@@ -1344,7 +1344,10 @@ function AkisSekmesi() {
                   {ayrintiMetni(k.eylem, k.degisen_alanlar)}
                 </p>
               )}
-              <p className="font-govde text-xs text-ikincil">{gecenSure(k.created_at)}</p>
+              {/* DAKIKA KESINLIGI: "1 sa once" iki olayin sirasini soylemez. */}
+              <p className="font-govde text-xs tabular-nums text-ikincil">
+                {zamanKisa(k.created_at)}
+              </p>
             </div>
           </div>
         ))}

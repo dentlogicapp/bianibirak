@@ -146,6 +146,13 @@ const ALAN_ETIKET: Record<string, string> = {
   EtkinlikTarihi: "özel gün",
 };
 
+// OPERASYONEL GURULTU - EKRANDA GORUNMEZ.
+// "basarili: 19 - temizlenen: 0 - cihaz sayisi: 19" kimseye bir sey anlatmaz;
+// push altyapisinin ic sayaclaridir. Anlamli satirlarin arasinda yer kaplayinca
+// goz tum ayrinti satirlarini atlamaya baslar - ve GERCEKTEN bilgi tasiyanlar
+// da kaybolur. Kayitta dururlar (denetim izi bozulmaz), yalnizca GOSTERILMEZLER.
+const GIZLI_ALANLAR = new Set(["basarili", "temizlenen", "cihaz_sayisi", "tip"]);
+
 function esAdi(v: unknown): string {
   if (v === "es1") return "1. eş";
   if (v === "es2") return "2. eş";
@@ -226,6 +233,7 @@ export function ayrintiMetni(eylem: string, degisenAlanlar: string | null): stri
 
   // 3) GENEL: anlamli alanlari "etiket: deger" olarak birlestir.
   const parcalar = Object.entries(veri)
+    .filter(([k]) => !GIZLI_ALANLAR.has(k))
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => {
       const etiket = ALAN_ETIKET[k] ?? k.replace(/_/g, " ");
@@ -238,4 +246,22 @@ export function ayrintiMetni(eylem: string, degisenAlanlar: string | null): stri
     .filter(Boolean);
 
   return parcalar.length > 0 ? parcalar.join(" · ") : null;
+}
+
+// ---- ZAMAN (denetimde DAKIKA kesinligi) ----
+// "1 sa once" bir denetim kaydinda yetersizdir: iki olayin sirasini ve arasindaki
+// mesafeyi soylemez. Denetim, ne zaman olduguna DAKIKA duzeyinde yanit vermelidir.
+// Bugunku kayitlarda tarih tekrarlanmaz (saat yeter), eskilerde tarih de yazilir.
+export function zamanKisa(iso: string): string {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return "-";
+  const simdi = new Date();
+  const ayniGun =
+    t.getDate() === simdi.getDate() &&
+    t.getMonth() === simdi.getMonth() &&
+    t.getFullYear() === simdi.getFullYear();
+  const saat = t.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  if (ayniGun) return saat;
+  const gun = t.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+  return `${gun} ${saat}`;
 }

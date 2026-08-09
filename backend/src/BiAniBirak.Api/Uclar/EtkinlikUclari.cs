@@ -854,10 +854,63 @@ public static class EtkinlikUclari
         if (denetimImlec != null)
             denetimSorgu = denetimSorgu.Where(d => d.CreatedAt < denetimImlec);
 
-        var kayitlar = await denetimSorgu
+        // ============ ESLER ARASI IZOLASYON - DENETIM EKRANI ============
+        //
+        // KIRMIZI CIZGI: bir es, digerinin ONAY/RED kararlarini GOREMEZ. Urunun
+        // wedge'i budur: her esin kendi kuyrugu vardir, onaylananlar ortak deftere
+        // birlesir. Denetim gunlugu bu duvarin ARKASINDAN dolasan bir yol olamaz.
+        //
+        // CANLIDA YAKALANDI: denetim satirlari zaten her iki esin islemlerini
+        // listeliyordu (etiketsiz oldugu icin fark edilmiyordu); ayrinti katmani
+        // eklenince "taraf: 2. es" YAZAR hale geldi ve sizinti gorunur oldu.
+        // Filtre ARAYUZDE degil BURADA: gizlemek koruma degildir.
+        //
+        // KURAL: kayit bir tarafa aitse (kaynak_es) ve o taraf BENIM tarafim
+        // degilse, satir HIC DONMEZ. Tarafi olmayan olaylar (defter ayari, indirme,
+        // es katildi, odeme) ortaktir - iki tarafta da gorunur.
+        //
+        // Super yonetici salt-okunur inceleme oturumunda (rol es1/es2 degil) filtre
+        // UYGULANMAZ: teshis icin tam gorunum gerekir ve o ekran zaten ciftin degildir.
+        var benimRol = await db.EtkinlikUyelikleri.AsNoTracking()
+            .Where(u => u.EtkinlikId == etkinlikId && u.KullaniciId == kullaniciId)
+            .Select(u => u.Rol)
+            .FirstOrDefaultAsync();
+
+        // Filtre BELLEKTE calisir (JSON icindeki kaynak_es). Bu yuzden sayfayi
+        // doldurabilmek icin fazladan cekilir: elenen satirlar yuzunden sayfa yari
+        // bos kalmasin.
+        var hamKayitlar = await denetimSorgu
             .OrderByDescending(d => d.CreatedAt)
-            .Take(denetimLimit)
+            .Take(denetimLimit * 3)
             .ToListAsync();
+
+        static string? KaynakEsOku(string? govde)
+        {
+            if (string.IsNullOrWhiteSpace(govde)) return null;
+            try
+            {
+                using var belge = JsonDocument.Parse(govde);
+                if (belge.RootElement.ValueKind != JsonValueKind.Object) return null;
+                return belge.RootElement.TryGetProperty("kaynak_es", out var alan)
+                    ? alan.GetString()
+                    : null;
+            }
+            catch { return null; } // bozuk govde ekrani bozmaz
+        }
+
+        var kayitlar = hamKayitlar
+            // PUSH GONDERIMI CIFTIN GUNLUGUNDE YER ALMAZ: bildirimi zaten telefonunda
+            // gordu. "basarili: 19 - temizlenen: 0 - cihaz sayisi: 19" operasyonel
+            // gurultudur; cifte hicbir sey anlatmaz, anlamli satirlari bogar.
+            .Where(d => d.Eylem != "PUSH_GONDERILDI")
+            .Where(d =>
+            {
+                if (benimRol != "es1" && benimRol != "es2") return true;
+                var kaynak = KaynakEsOku(d.DegisenAlanlar);
+                return kaynak == null || kaynak == benimRol;
+            })
+            .Take(denetimLimit)
+            .ToList();
 
         return Results.Json(kayitlar.Select(d => new
         {
