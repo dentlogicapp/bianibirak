@@ -50,7 +50,9 @@ public static class KatkiUclari
         // Yasam dongusu: kapali/arsiv -> yazim kapali (nazik ekran icin durum doner)
         var simdi = DateTimeOffset.UtcNow;
         var acildiMi = simdi >= etkinlik.AcilisTarihi;
-        var kapandiMi = simdi > etkinlik.KapanisTarihi || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv";
+        // KAPI = KANON (Sabitler.KapanisAni). Saklanan sutun eskiyebilir; ekranla
+        // kapinin ayrilmamasi icin ikisi de AYNI kaynaktan okur.
+        var kapandiMi = simdi > Sabitler.KapanisAni(etkinlik.EtkinlikTarihi) || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv";
 
         var ayar = await db.EtkinlikAyarlari.AsNoTracking()
             .FirstOrDefaultAsync(a => a.EtkinlikId == etkinlik.Id);
@@ -121,8 +123,8 @@ public static class KatkiUclari
 
         if (simdi < etkinlik.AcilisTarihi)
             return Hata(403, "ETKINLIK_ACILMADI", "Bu defter henüz açılmadı.");
-        if (simdi > etkinlik.KapanisTarihi || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
-            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı; yeni anı eklenemiyor.");
+        if (simdi > Sabitler.KapanisAni(etkinlik.EtkinlikTarihi) || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
+            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı; yeni anı eklenemiyor."); // kanon
 
         // Dogrulama (ad+email+telefon+mesaj zorunlu - Belge 08)
         var ad = (istek.DavetliAd ?? "").Trim();
@@ -282,8 +284,8 @@ public static class KatkiUclari
         var simdi = DateTimeOffset.UtcNow;
         if (etkinlik.SilindiMi || etkinlik.Donduruldu)
             return Hata(403, "ETKINLIK_KAPALI", "Bu deftere şu an ekleme yapılamıyor.");
-        if (simdi > etkinlik.KapanisTarihi || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
-            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı.");
+        if (simdi > Sabitler.KapanisAni(etkinlik.EtkinlikTarihi) || etkinlik.Durum == "kapali" || etkinlik.Durum == "arsiv")
+            return Hata(403, "ETKINLIK_KAPALI", "Bu defter kapandı."); // kanon
 
         // Katki BU tokenden mi geldi? (izolasyon: baska esin katkisina foto eklenemez)
         var katki = await db.Katkilar

@@ -78,7 +78,8 @@ public static class EtkinlikUclari
             es2_ad = e.Es2Ad,
             etkinlik_tarihi = e.EtkinlikTarihi,
             acilis_tarihi = e.AcilisTarihi,
-            kapanis_tarihi = e.KapanisTarihi,
+            // KAPANIS DA TEK KANONDAN (saklanan sutun degil - eskiyebilir).
+            kapanis_tarihi = Sabitler.KapanisAni(e.EtkinlikTarihi),
 
             // IMHA TARIHI BACKEND'DEN GELIR - TEK KANON.
             //
@@ -91,7 +92,10 @@ public static class EtkinlikUclari
             imha_tarihi = Sabitler.ImhaAni(e.EtkinlikTarihi, e.OzelSaklamaGun),
             toplama_gun = Sabitler.ToplamaGun,
             indirme_gun = Sabitler.IndirmeGun,
-            toplam_gun = Sabitler.ToplamGun,
+            // VIP DAHIL: cizelge etiketi ("ozel gunden N gun sonra") imha tarihiyle
+            // ayni gercegi soylesin. Onceden sabit 20 yaziyordu ama tarih 3650 gunluk
+            // VIP defterde 10 yil sonrasini gosteriyordu.
+            toplam_gun = Sabitler.ToplamGunGercek(e.OzelSaklamaGun),
             imha_edildi = e.ImhaEdildi,
             // DONDURULDU - cift bunu GORMELI. Onceden super admin dondurunca cift
             // hicbir fark hissetmiyordu; davetliler sessizce reddediliyor, cift

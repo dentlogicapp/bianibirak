@@ -179,6 +179,24 @@ public static class Sabitler
     public static DateTimeOffset ImhaAni(DateTimeOffset etkinlikTarihi, int? ozelSaklamaGun)
         => etkinlikTarihi.AddDays(Math.Max(ozelSaklamaGun ?? ToplamGun, ToplamGun));
 
+    // KAPANIS ANI - TEK KAYNAK (davetli girislerinin kapandigi an).
+    //
+    // Etkinlik.KapanisTarihi sutunu SAKLANIYOR ama artik OKUNMUYOR: sutun,
+    // defterin kuruldugu andaki ToplamaGun degerini dondurur. Sabit 30'dan 15'e
+    // cekildiginde eski defterlerin sutunu guncellenmedi ve cizelge "ozel gunden
+    // 15 gun sonra" etiketiyle +30 bir tarih gosterdi (CANLIDA YAKALANDI).
+    //
+    // Turetilebilen deger saklanmaz (Ders 59). Kapanis her yerde BURADAN okunur:
+    // gosterim de, davetli kapi kontrolu de. Boylece ekran ile kapi ASLA ayrisamaz.
+    public static DateTimeOffset KapanisAni(DateTimeOffset etkinlikTarihi)
+        => etkinlikTarihi.AddDays(ToplamaGun);
+
+    // TOPLAM GUN (gosterim) - VIP dahil gercek yasam suresi. Cizelgedeki
+    // "ozel gunden N gun sonra" etiketi bunu yazar; imha tarihi VIP'li olup
+    // etiketin sabit 20 demesi tutarsizligini kapatir.
+    public static int ToplamGunGercek(int? ozelSaklamaGun)
+        => Math.Max(ozelSaklamaGun ?? ToplamGun, ToplamGun);
+
     // COP KUTUSU SURELERI - iki farkli saat, tek cop kutusu.
     //
     // DILEK 30 gun: tek bir dilegin kaybi sinirlidir; bolca dusunme payi verilir.
