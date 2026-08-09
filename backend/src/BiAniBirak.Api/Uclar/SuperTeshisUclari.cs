@@ -264,8 +264,12 @@ public static class SuperTeshisUclari
         var esik30 = simdi.AddDays(-30);
         var esik7 = simdi.AddDays(-7);
 
+        // IMHA EDILMISLER OLCUME GIRMEZ: icerigi yok edilmis defter ne "acik" ne
+        // "kapanmis"tir, hele hic "imhasi gecikmis" degildir - imhasi TAMAMLANMISTIR.
+        // Onceden elenmedigi icin Olcum "Imha gecikmis 3" derken nabiz "0" diyordu.
+        // Huni sayilari da artik YASAYAN defterleri olcer (yok edilmis icerik olculemez).
         var defterler = await db.Etkinlikler.AsNoTracking()
-            .Where(e => !e.SilindiMi)
+            .Where(e => !e.SilindiMi && !e.ImhaEdildi)
             .Select(e => new
             {
                 e.Id,

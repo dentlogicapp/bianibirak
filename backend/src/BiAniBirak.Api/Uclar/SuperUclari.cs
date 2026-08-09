@@ -255,7 +255,11 @@ public static class SuperUclari
         var (ok, _) = await SuperAdminMi(ctx, db);
         if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalnız sistem yöneticisi erişebilir.");
 
-        var sorgu = db.Etkinlikler.AsNoTracking().Where(e => e.SilindiMi == cop);
+        // IMHA EDILMISLER BU LISTEDE YOK - ne aktifte ne copte. Icerigi yok edilmis
+        // bir kabuga "Dondur / Ozel sure / Cope at" sunmak, olmayan bir seyi yonetmeye
+        // davettir. Onlar Imha Arsivi bolumunde (asagida, .Where(e => e.ImhaEdildi))
+        // AYRI dille ve geri yukleme OLMADAN durur - kanit kaybolmaz, gurultu kalkar.
+        var sorgu = db.Etkinlikler.AsNoTracking().Where(e => e.SilindiMi == cop && !e.ImhaEdildi);
 
         if (!string.IsNullOrWhiteSpace(ara))
         {
