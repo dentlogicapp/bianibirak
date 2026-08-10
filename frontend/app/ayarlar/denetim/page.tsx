@@ -5,19 +5,22 @@ import { useRouter } from "next/navigation";
 import { api, type DenetimKaydi } from "@/lib/api";
 import { AppShell } from "@/components/site/AppShell";
 import { useSenkronDinle } from "@/lib/senkron";
-import { ayrintiMetni, denetimCumlesi, gunBasligi, saatMetni } from "@/lib/denetim";
+import {
+  ayrintiMetni,
+  denetimCumlesi,
+  gunBasligi,
+  saatMetni,
+  gruplaArdisik,
+  topluFiil,
+  type DenetimGrubu,
+} from "@/lib/denetim";
 
 // DENETIM GUNLUGU - defterde ne olup bittiginin seffaf kaydi.
 //
-// OZNE DILI: her satir "kim yapti" ile baslar. Sen ikinci tekil ("bir dilegi
-// deftere aldin"), esin adiyla ("Aysegul baskiya hazir defteri indirdi"), sistem
-// olaylari oznesiz. Ham kod (kaynak_es gibi) EKRANA CIKMAZ.
-//
-// ESLER ARASI IZOLASYON: esinin ONAY BEKLEYEN kuyrugundaki islemleri (birakilan,
-// reddedilen, geri alinan, cope tasinan dilekler) BACKEND hic gondermez. Onaylanan
-// dilek ortak deftere gectigi icin gorunur - sizinti degil, ortak defterin yasami.
-//
-// SAYFALAMA: 50'lik sayfalar + imlec (keyset). Listenin SONU her zaman soylenir.
+// OZNE DILI: her satir "kim yapti" ile baslar (Sen / esinin adi / davetli adi).
+// ESLER ARASI IZOLASYON: esinin onay bekleyen kuyrugundaki islemler BACKEND'den
+// hic gelmez. TOPLULASTIRMA (E2): ayni kisinin ust uste ayni islemi tek satirda
+// toplanir; kritik olaylar (silme/imha/odeme) ASLA toplanmaz.
 const SAYFA = 50;
 
 export default function DenetimSayfasi() {
@@ -44,7 +47,6 @@ export default function DenetimSayfasi() {
     void ilkSayfa();
   }, [ilkSayfa]);
 
-  // CANLI SENKRON: yeni islem olunca gunluk kendiliginden tazelenir.
   useSenkronDinle("defter", ilkSayfa);
   useSenkronDinle("kuyruk", ilkSayfa);
 
@@ -62,14 +64,20 @@ export default function DenetimSayfasi() {
     setDevamVar(c.veri.length === SAYFA);
   }
 
-  // GUN GRUPLARI: tarih her satirda tekrarlanmaz; baslikta bir kez yazilir.
-  const gruplar: { baslik: string; kayitlar: DenetimKaydi[] }[] = [];
+  // GUN GRUPLARI -> her gunun ICINDE ardisik toplulastirma.
+  const gunler: { baslik: string; gruplar: DenetimGrubu<DenetimKaydi>[] }[] = [];
   for (const k of kayitlar) {
     const b = gunBasligi(k.created_at);
-    const son = gruplar[gruplar.length - 1];
-    if (son && son.baslik === b) son.kayitlar.push(k);
-    else gruplar.push({ baslik: b, kayitlar: [k] });
+    const son = gunler[gunler.length - 1];
+    if (son && son.baslik === b) son.gruplar.push({ anahtar: k.id, kayitlar: [k], toplu: false });
+    else gunler.push({ baslik: b, gruplar: [{ anahtar: k.id, kayitlar: [k], toplu: false }] });
   }
+  // Gun icindeki duz listeyi toplulastir (gun siniri gruplari ASMAZ - bir grup
+  // gece yarisini gecerse iki ayri gun basligina bolunmesi dogrudur).
+  const gorunum = gunler.map((g) => ({
+    baslik: g.baslik,
+    gruplar: gruplaArdisik(g.gruplar.map((x) => x.kayitlar[0])),
+  }));
 
   return (
     <AppShell>
@@ -95,15 +103,15 @@ export default function DenetimSayfasi() {
         ) : (
           <>
             <div className="space-y-5">
-              {gruplar.map((g) => (
+              {gorunum.map((g) => (
                 <section key={g.baslik}>
                   <p className="mb-2 px-1 font-govde text-[0.65rem] uppercase tracking-etiket text-ikincil">
                     {g.baslik}
                   </p>
                   <div className="overflow-hidden rounded-3xl border border-ayrac bg-yuzey">
                     <ul className="divide-y divide-ayrac">
-                      {g.kayitlar.map((k) => (
-                        <Satir key={k.id} kayit={k} />
+                      {g.gruplar.map((grup) => (
+                        <GrupSatiri key={grup.anahtar} grup={grup} />
                       ))}
                     </ul>
                   </div>
@@ -132,19 +140,70 @@ export default function DenetimSayfasi() {
   );
 }
 
+// Bir grup: tek kayit ise duz satir, birden fazlaysa toplu satir (tiklayinca acilir).
+function GrupSatiri({ grup }: { grup: DenetimGrubu<DenetimKaydi> }) {
+  const [acik, setAcik] = useState(false);
+  const ilk = grup.kayitlar[0];
+  const adet = grup.kayitlar.length;
+  const c = denetimCumlesi(ilk.eylem, ilk.degisen_alanlar, ilk.aktor, ilk.ben_mi);
+
+  if (!grup.toplu) return <Satir kayit={ilk} />;
+
+  // Toplu satirda zaman ARALIK olarak yazilir: "14:32–14:35". Tek bir an degil,
+  // bir sure boyunca yapilmis bir is oldugu gorunur.
+  const enEski = grup.kayitlar[adet - 1];
+  const aralik = `${saatMetni(enEski.created_at)}–${saatMetni(ilk.created_at)}`;
+
+  return (
+    <li>
+      <button
+        onClick={() => setAcik((o) => !o)}
+        className="flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors hover:bg-yuzeyKoyu"
+      >
+        <span
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-display text-[0.7rem] ${
+            c.tur === "sen" ? "bg-sarap text-parsomen" : "bg-yaldiz/20 text-yaldiz"
+          }`}
+          aria-hidden
+        >
+          {adet}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-govde text-sm text-murekkep">
+            {c.ozne && <span className="font-medium">{c.ozne}</span>}
+            {c.ozne ? " " : ""}
+            <span className={c.ozne ? "text-ikincil" : ""}>{topluFiil(c.fiil, adet)}</span>
+          </p>
+          <p className="mt-0.5 font-govde text-xs text-ikincil">
+            {acik ? "Ayrıntıları gizle" : "Ayrıntıları göster"}
+          </p>
+        </div>
+        <span className="mt-0.5 shrink-0 font-govde text-xs tabular-nums text-ikincil">{aralik}</span>
+      </button>
+
+      {acik && (
+        <ul className="divide-y divide-ayrac border-t border-ayrac bg-yuzeyKoyu/40">
+          {grup.kayitlar.map((k) => (
+            <Satir key={k.id} kayit={k} icerde />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 // Tek satir: rozet + ozne cumlesi + ayrinti + saat.
-function Satir({ kayit }: { kayit: DenetimKaydi }) {
+function Satir({ kayit, icerde = false }: { kayit: DenetimKaydi; icerde?: boolean }) {
   const c = denetimCumlesi(kayit.eylem, kayit.degisen_alanlar, kayit.aktor, kayit.ben_mi);
   const ayrinti = ayrintiMetni(kayit.eylem, kayit.degisen_alanlar);
-
-  // ROZET (B3): gozun satiri okumadan "kim?" sorusuna yanit vermesi icin.
-  // Sen -> sarap, diger kisi -> yaldiz, sistem -> notr nokta.
   const rozet =
     c.tur === "sistem" ? null : (c.ozne ?? "?").trim().charAt(0).toLocaleUpperCase("tr-TR");
 
   return (
-    <li className="flex items-start gap-3 px-5 py-3.5">
-      {rozet ? (
+    <li className={`flex items-start gap-3 px-5 py-3.5 ${icerde ? "pl-14" : ""}`}>
+      {icerde ? (
+        <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ikincil/40" aria-hidden />
+      ) : rozet ? (
         <span
           className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-display text-[0.7rem] ${
             c.tur === "sen" ? "bg-sarap text-parsomen" : "bg-yaldiz/20 text-yaldiz"

@@ -470,6 +470,105 @@ export function denetimCsvIndir(dosyaAdi: string, satirlar: CsvSatiri[]) {
   URL.revokeObjectURL(url);
 }
 
+// ============================================================================
+// TOPLULASTIRMA (E2)
+//
+// Ayni kisinin ust uste yaptigi ayni islem TEK SATIRDA toplanir:
+// "3 dilegi deftere aldin - 14:32-14:35". Sekiz ayri "gorsel eklendi" satiri
+// hicbir sey anlatmaz, yalnizca gercekten onemli olan satirlari asagi iter.
+//
+// KRITIK OLAYLAR ASLA TOPLANMAZ: silme, kalici silme, imha, odeme, yetki.
+// Bunlarin HER BIRI tek basina anlamlidir; katlamak denetimi korlestirir.
+// "3 defter kalici olarak silindi" cumlesi, ucunun de ayri ayri gorulmesi
+// gereken bir olayi gizler.
+// ============================================================================
+
+const GRUPLANMAZ = new Set([
+  "DEFTER_KALICI_SILINDI",
+  "ETKINLIK_KALICI_SILINDI",
+  "ETKINLIK_COPTEN_KALICI_SILINDI",
+  "KATKI_KALICI_SILINDI",
+  "DEFTER_IMHA_EDILDI",
+  "DEFTER_COPE_ATILDI",
+  "ETKINLIK_COPE_TASINDI",
+  "DEFTER_GERI_ALINDI",
+  "ETKINLIK_GERI_ALINDI",
+  "DEFTER_DONDURULDU",
+  "DEFTER_COZULDU",
+  "DEFTER_SAKLAMA_DEGISTIRILDI",
+  "ODEME_BASLATILDI",
+  "ODEME_BILDIRILDI",
+  "ODEME_ONAYLANDI",
+  "ODEME_REDDEDILDI",
+  "KULLANICI_ASKIYA_ALINDI",
+  "KULLANICI_GERI_ACILDI",
+  "KULLANICI_SILINDI",
+  "ES_KATILDI",
+  "ETKINLIK_OLUSTURULDU",
+  "KVKK_METNI_GUNCELLENDI",
+  "ONAM_KAYITLARI_DISA_AKTARILDI",
+]);
+
+export type GruplanabilirKayit = {
+  id: string;
+  eylem: string;
+  created_at: string;
+  aktor: string | null;
+  ben_mi: boolean;
+  degisen_alanlar: string | null;
+};
+
+export type DenetimGrubu<T> = {
+  /** React anahtari - grubun ilk kaydinin kimligi. */
+  anahtar: string;
+  /** Gruptaki kayitlar (en yeniden en eskiye). */
+  kayitlar: T[];
+  /** true ise birden fazla kayit toplandi. */
+  toplu: boolean;
+};
+
+// Ardisik kayitlari grupla. Liste EN YENIDEN eskiye sirali gelir.
+// Kosullar: ayni eylem + ayni aktor + pencere icinde + kritik degil.
+export function gruplaArdisik<T extends GruplanabilirKayit>(
+  kayitlar: T[],
+  pencereDk = 10
+): DenetimGrubu<T>[] {
+  const gruplar: DenetimGrubu<T>[] = [];
+  for (const k of kayitlar) {
+    const son = gruplar[gruplar.length - 1];
+    const birlesir =
+      son != null &&
+      !GRUPLANMAZ.has(k.eylem) &&
+      son.kayitlar[0].eylem === k.eylem &&
+      son.kayitlar[0].aktor === k.aktor &&
+      son.kayitlar[0].ben_mi === k.ben_mi &&
+      // Pencere: grubun EN ESKI kaydiyla arasindaki fark. Boylece uzun bir
+      // seri (ornek 40 dakikaya yayilan 20 fotograf) sonsuza kadar buyumez;
+      // her 10 dakikada yeni bir grup baslar ve zaman bilgisi anlamli kalir.
+      Math.abs(
+        new Date(son.kayitlar[son.kayitlar.length - 1].created_at).getTime() -
+          new Date(k.created_at).getTime()
+      ) <=
+        pencereDk * 60_000;
+
+    if (birlesir && son) {
+      son.kayitlar.push(k);
+      son.toplu = son.kayitlar.length > 1;
+    } else {
+      gruplar.push({ anahtar: k.id, kayitlar: [k], toplu: false });
+    }
+  }
+  return gruplar;
+}
+
+// Toplu satirin fiili: "bir dilegi deftere aldin" -> "3 dilegi deftere aldin".
+// "bir" ile baslamayan fiillerde sayi one alinir: "3 kez gorsel ekledin".
+export function topluFiil(fiil: string, adet: number): string {
+  if (adet <= 1) return fiil;
+  if (fiil.startsWith("bir ")) return `${adet} ${fiil.slice(4)}`;
+  return `${adet} kez ${fiil}`;
+}
+
 // Tam zaman damgasi (CSV icin) - siralanabilir ve okunur.
 export function tamZaman(iso: string): string {
   const t = new Date(iso);
