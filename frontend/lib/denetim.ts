@@ -404,3 +404,68 @@ export function saatMetni(iso: string): string {
   if (isNaN(t.getTime())) return "-";
   return t.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
+
+// ============================================================================
+// CSV DISA AKTARIM (E5)
+//
+// Toplu inceleme gozle yapilmaz: 500 satiri kaydirarak "ne oldu" anlasilmaz.
+// Indirilir, suzulur, siralanir.
+//
+// YALNIZ SUPER PANELDE: cifte CSV verilmez. Denetim ekrani onlar icin bir
+// SEFFAFLIK sayfasidir; tabloya dokup suzmek bir YONETIM eylemidir. Karsiligi
+// olmayan bir buton, kullaniciya "bunu ne yapacagim?" diye sordurur ve arayuzu
+// kalabalastirir. (KVKK veri tasinabilirligi ayri bir akistir - onam kayitlari.)
+// Indirilir, suzulur, siralanir. KVKK/hukuki bir talepte de istenen budur.
+//
+// EXCEL VE TURKCE: dosya UTF-8 BOM ile yazilir. BOM olmadan Excel dosyayi
+// sistem kod sayfasiyla acar ve "Ayşegül" -> "AyÅŸegÃ¼l" olur. Tek karakterlik
+// bir onek, raporun okunur olmasiyla cop olmasi arasindaki farktir.
+//
+// AYIRAC NOKTALI VIRGUL: Turkce Windows Excel'inde varsayilan ayirac ";"dir;
+// virgul kullanilirsa tum satir tek hucreye duser.
+// ============================================================================
+
+function csvHucre(v: string | number | null | undefined): string {
+  const s = v == null ? "" : String(v);
+  // Tirnak ikilenir, alan tirnak icine alinir: icindeki ; ve satir sonu
+  // hucreyi bolmez. (fromCharCode(34) = cift tirnak - ic ice kacis gerekmez,
+  // boylece bu satir hicbir arac zincirinde bozulmaz.)
+  const t = String.fromCharCode(34);
+  return t + s.split(t).join(t + t) + t;
+}
+
+export type CsvSatiri = Record<string, string | number | null | undefined>;
+
+// Tarayicida dosya uretir ve indirir. Sunucuya UGRAMAZ: veri zaten ekranda,
+// ikinci bir uc acmak ayni bilgiyi iki yerden uretmek olurdu.
+export function denetimCsvIndir(dosyaAdi: string, satirlar: CsvSatiri[]) {
+  if (satirlar.length === 0) return;
+  const basliklar = Object.keys(satirlar[0]);
+  const govde = [
+    basliklar.map(csvHucre).join(";"),
+    ...satirlar.map((s) => basliklar.map((b) => csvHucre(s[b])).join(";")),
+  ].join("\\r\\n");
+
+  const blob = new Blob(["\\uFEFF" + govde], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = dosyaAdi;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Tam zaman damgasi (CSV icin) - siralanabilir ve okunur.
+export function tamZaman(iso: string): string {
+  const t = new Date(iso);
+  if (isNaN(t.getTime())) return iso;
+  return t.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

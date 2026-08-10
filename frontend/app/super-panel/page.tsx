@@ -1245,7 +1245,13 @@ function CopSekmesi() {
 }
 
 // ---------------- CANLI AKIS ----------------
-import { ayrintiMetni, zamanKisa, akisFiili } from "@/lib/denetim";
+import {
+  ayrintiMetni,
+  zamanKisa,
+  akisFiili,
+  denetimCsvIndir as akisCsvIndir,
+  tamZaman as akisTamZaman,
+} from "@/lib/denetim";
 
 function AkisSekmesi() {
   // CANLI SAAT (Bolum 0.1): "az once / 3 dk once" ifadeleri donup kalmasin.
@@ -1369,6 +1375,25 @@ function AkisSekmesi() {
             {s.e}
           </button>
         ))}
+        {/* CSV (E5): FILTRELENMIS gorunum inen dosyaya birebir yansir. */}
+        <button
+          onClick={() =>
+            akisCsvIndir(
+              `akis-${new Date().toISOString().slice(0, 10)}.csv`,
+              akis.map((k) => ({
+                Zaman: akisTamZaman(k.created_at),
+                Kim: k.aktor,
+                İşlem: akisFiili(k.eylem),
+                Defter: k.defter ?? "",
+                Ayrıntı: ayrintiMetni(k.eylem, k.degisen_alanlar) ?? "",
+                Kod: k.eylem,
+              }))
+            )
+          }
+          className="shrink-0 rounded-full border border-ayrac px-3 py-1 font-govde text-[0.65rem] text-ikincil transition-colors hover:border-sarap hover:text-sarap"
+        >
+          CSV
+        </button>
       </div>
 
       <div className="max-h-[32rem] divide-y divide-ayrac overflow-y-auto">
