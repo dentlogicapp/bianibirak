@@ -144,6 +144,14 @@ const ALAN_ETIKET: Record<string, string> = {
   Es1Ad: "1. eş adı",
   Es2Ad: "2. eş adı",
   EtkinlikTarihi: "özel gün",
+  // Bildirim / gorev govdeleri - ham anahtar olarak ekrana dusuyorlardi.
+  baslik: "başlık",
+  sayi: "adet",
+  BekleyenToplam: "bekleyen iş",
+  uye_mi: "üye",
+  goruntuleme_modu: "görüntüleme modu",
+  gruplama: "gruplama",
+  donduruldu: "donduruldu",
 };
 
 // OPERASYONEL GURULTU - EKRANDA GORUNMEZ. Push altyapisinin ic sayaclaridir;
@@ -444,9 +452,14 @@ export function denetimCsvIndir(dosyaAdi: string, satirlar: CsvSatiri[]) {
   const govde = [
     basliklar.map(csvHucre).join(";"),
     ...satirlar.map((s) => basliklar.map((b) => csvHucre(s[b])).join(";")),
-  ].join("\\r\\n");
+  // Satir sonu KOD NOKTASIYLA: kacis dizileri arac zincirinde (yama ->
+  // PowerShell -> dosya) bozulabiliyor, kod noktasi hicbir katmanda yorumlanmaz.
+  ].join(String.fromCharCode(13) + String.fromCharCode(10));
 
-  const blob = new Blob(["\\uFEFF" + govde], { type: "text/csv;charset=utf-8;" });
+  // Excel, BOM olmadan dosyayi sistem kod sayfasiyla acar ve Turkce karakterleri
+  // bozar ("Ayşegül" -> "AyÅŸegÃ¼l"). BOM da kod noktasiyla uretilir.
+  const bom = String.fromCharCode(0xfeff);
+  const blob = new Blob([bom + govde], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
