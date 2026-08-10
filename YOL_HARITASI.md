@@ -5,11 +5,11 @@
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
 > repodan; bu dosya "neden / ne kararlaştırıldı / sırada ne var" hafızasıdır.
 
-**Son güncelleme: 2026-08-09** — Dördüncü büyük oturum (devam). **FAZ 1 KAPANDI** + **CANLI
-SENKRON** tamamlandı (Bölüm 0.1). Ardından bir dizi ARA TALEP/DÜZELTME turu: mühürle butonunun
-gerçekten sökülmesi, **kapanış kanonunun tek kaynağa bağlanması**, röntgendeki "Invalid Date"
-sözleşme kopukluğu, imha edilmiş defter kabuklarının panelden temizlenmesi, nabız sayaçlarının
-düzeltilmesi ve **silinen defter bildirim şeffaflığı**. Ayrıntı Bölüm 3'te.
+**Son güncelleme: 2026-08-10** — **E (Denetim / Canlı Akış enterprise) KAPANDI.** Bu turda:
+okunurluk katmanı (kayıtlı JSON → Türkçe ayrıntı), **eşler arası izolasyonun denetim ekranında
+zorunlu kılınması** (canlıda yakalanan sızıntı), özne dili (Sen / eşinin adı), toplulaştırma,
+filtre + arama, keyset sayfalama, **katmanlı saklama** (rutin 30 gün / kalıcı iz 2 yıl) ve
+CSV dışa aktarım. Ayrıntı Bölüm 3'te; alınan dersler 86-89.
 
 Canlı: **https://www.bianibirak.com** (eski `bianibirak.dentlogicapp.com` → 301 yönlendirme)
 
@@ -38,6 +38,8 @@ Matbaaya sorulacak: **CMYK dönüşümünü siz mi yapıyorsunuz, dosyayı CMYK 
 | **Konfeti** | Tek seferlik (~2,5 sn, önerilen) mi, sürekli döngü mü? | Faz 3.2 |
 | **Sıralı karşılama** | Yapılsın mı? Önizleme sunuldu, karar Faz 3'e bırakıldı | Faz 3.3 |
 | **Kişiselleştirme kapsamı** | Ne kadarı ücretsiz, ne kadarı premium? | Faz 5.3 |
+| **`GIRIS` saklama süresi** `[YENİ 2026-08-10]` | Giriş kayıtları (en kalabalık ikinci grup) şu an 2 yıl saklanıyor. Güvenlik izi ile hacim arasında denge: **90 gün önerisi** bekliyor. | Bölüm 3-E4 |
+| **E1-b gerçek diff** `[YENİ 2026-08-10]` | `AYAR/ETKINLIK_GUNCELLENDI` yalnız YENİ değeri yazıyor; "önce → sonra" için denetim yazan ~15 nokta değişmeli. Ayrı ve dikkatli bir iş. | Bölüm 4-E |
 | **GitHub token** | `omniasistan-cli` (classic, `repo`) doluyor. Revoke mu, fine-grained yeni token mı? Önce `git remote -v` ile deploy bağımlılığı doğrulanmalı | Altyapı |
 | ~~B2B2C çelişkisi~~ | ✅ **ÇÖZÜLDÜ `[2026-08-09]`** — Instructions Bölüm 3 güncellendi: organizatör katmanı **istenmiyor**, lansman ve ileri aşamalar **saf B2C** (tenant = etkinlik, çift doğrudan satın alır). İki belge artık uyumlu. | — |
 
@@ -339,6 +341,76 @@ mekanizması `SilindiMi`'ye taşınmıştı → çöpteki defter menüde/listede
   reddetse bile ekran ilerliyordu. **Ders 84.**
 
 
+### `[2026-08-10]` E — DENETİM / CANLI AKIŞ ENTERPRISE ✅ KAPANDI
+
+**E1-a Okunurluk** — `frontend/lib/denetim.ts` (yeni, TEK KAYNAK): `DegisenAlanlar` JSONB'si
+yıllardır yazılıp hiçbir ekranda okunmuyordu. Artık Türkçe ayrıntıya çevriliyor
+("Güncellenen: davet metni, karşılama metni" · "100 gün → varsayılan" · "tema: klasik · A4 · 3 dilek").
+Eylem etiketleri iki ekranda ayrı ayrı duruyordu (kaçınılmaz ayrışma) → tek kaynağa taşındı.
+Bilinmeyen eylem sessiz kalmaz, okunur hale getirilir.
+- *Dürüstlük notu:* kayıtların çoğu "önce → sonra" DEĞİL (yalnız `DEFTER_SAKLAMA_DEGISTIRILDI`
+  gerçek diff). `AYAR/ETKINLIK_GUNCELLENDI` yalnız yeni değeri yazıyor → gerçek diff için
+  **yazma tarafı** değişmeli (**E1-b**, Bölüm 4'te bekliyor).
+
+**🔴 EŞLER ARASI İZOLASYON — CANLIDA YAKALANDI VE KAPATILDI** `[kritik]`
+Denetim ekranı zaten her iki eşin işlemlerini listeliyordu (etiketsiz olduğu için görülmüyordu);
+ayrıntı katmanı eklenince "taraf: 2. eş" yazar hale geldi ve **sızıntı görünür oldu**. Bu, ürünün
+wedge'inin (birleşim-öncesi izolasyon) ihlaliydi.
+- **Kural (backend'de zorunlu):** eşin **onay bekleyen kuyruğuna** ait olaylar (dilek bırakıldı,
+  reddedildi, geri alındı, çöpe taşındı, kalıcı silindi) diğer eşe **hiç dönmez**.
+- **Bilinçli istisna:** `KATKI_ONAYLANDI` görünür — onaylanan dilek zaten ortak deftere geçer;
+  gizlenmesi çiftin kendi eserini yarım görmesi olurdu. Gizlenmesi gereken **reddedilen**dir.
+- Süper yönetici salt-okunur incelemede filtre uygulanmaz (teşhis; o ekran çiftin değil).
+- **Ders 86.**
+
+**Özne dili** — satırlar artık "kim yaptı" ile başlıyor: **Sen** ikinci tekil ("bir dileği deftere
+aldın"), **eşin adıyla** ("Ayşegül baskıya hazır defteri indirdi"), davetli adıyla, sistem olayları
+öznesiz. `kaynak_es` **ekrana hiç çıkmaz** (yalnız izolasyon filtresi). Aktör rozeti + gün başlıkları
+(Bugün / Dün / 21 Temmuz), satırlarda yalnız saat.
+
+**Gürültü temizliği** — `PUSH_GONDERILDI` çiftin günlüğünden tümüyle çıktı (bildirimi zaten
+telefonunda gördü); `basarili / temizlenen / cihaz_sayisi / tip / kaynak_es` hiçbir ekranda
+gösterilmiyor (kayıtta duruyorlar - iz bozulmadı).
+
+**E2 Toplulaştırma** — ardışık aynı işlem tek satırda: "3 dileği deftere aldın · 14:32–14:35",
+tıklayınca açılır. **Kritik olaylar ASLA toplanmaz** (silme, kalıcı silme, imha, ödeme, yetki,
+dondurma, defter oluşturma): her biri tek başına anlamlıdır, katlamak denetimi körleştirir.
+Kural: aynı eylem + aynı aktör + 10 dk pencere.
+
+**E3 Filtre + arama** — üç yüzeyde arar: eylem kodu, aktör (ad/e-posta), defter (eş adları).
+Ad/defter aramaları önce ID'ye çözülür (N+1 yok). Hızlı tarih aralığı: Tümü / Bugün / 7 / 30 gün
+(takvim açtırmak sürtünme). 350 ms debounce; sonuç yoksa açıkça söylenir.
+
+**E4 Sayfalama** — sabit `Take(100)`/`Take(60)` kaydı **sessizce kesiyordu**; bir denetim aracında
+sessiz kesme, "kaydın tamamı burada" iddiasını çürütür. **Keyset (imleç)** kullanıldı, offset DEĞİL:
+append-only bir günlükte araya giren yeni kayıt offset'te satır tekrarı/atlaması üretir. Yanıt
+biçimi **dizi olarak korundu** → backend tek başına güvenle yayına alındı, arayüz sonra eklendi.
+Canlı akışta geçmişe inildiğinde **canlı tazeleme duraklatılır** ve bu açıkça yazılır
+("Geçmiş görünümü · canlı duraklatıldı" + "Canlıya dön") - yoksa 10 sn'de bir zemin kayardı.
+
+**E4 Katmanlı saklama** `[Musa kararı]` — `Servisler/DenetimTemizlemeGorevi.cs` (yeni):
+rutin gürültü **30 gün**, kalıcı iz **2 yıl**, 2 yılı geçen her kayıt silinir.
+- **KARA LİSTE, beyaz liste DEĞİL:** yalnız açıkça "rutin" işaretlenenler 30 günde silinir;
+  **listelenmemiş ve yarın eklenecek her eylem korunan tarafta** kalır. Envanter taraması
+  eylem adını değişkenle yazan yerleri (SUPER_BILDIRIM_*, DISK_UYARI_*, `Denetim(...)` yardımcısı)
+  hiç göstermemişti - beyaz liste kursaydık 20+ eylem sessizce silinecekti. **Ders 87.**
+- Görev kendi işlemini denetime YAZMAZ (kendi kuyruğunu besleyip döngü yapmasın); sayılar loga.
+
+**E5 CSV** — **yalnız süper panelde**: filtrelenmiş görünüm birebir dosyaya yansır. Çifte CSV
+verilmedi (bilinçli: denetim onlar için bir şeffaflık sayfasıdır, tabloya döküp süzmek bir
+YÖNETİM eylemidir; KVKK taşınabilirliği ayrı akış). Excel için **UTF-8 BOM** + **noktalı virgül**
+ayraç zorunlu.
+- **CSV kaçış hatası (v1'de yapıldı, v2'de düzeltildi):** BOM ve satır sonu `\uFEFF` / `\r\n`
+  olarak dosyaya düz metin yazılmıştı → dosya tek satır, başında görünür "\uFEFF". Kök neden:
+  üretilen kodun kaçış dizileri, üreten aracın (PowerShell) kaçış kurallarıyla karıştırıldı.
+  Artık `String.fromCharCode` ile üretiliyor - hiçbir katmanda yorumlanmaz. **Ders 88.**
+- Ayrıca ZatenMarker bir **ifade** olarak yazılınca (`'x' + [char]13 + ...`) PowerShell argüman
+  konumunda hesaplamadı ve **yanlış pozitif** üretti (fail-safe ters çalıştı). **Ders 89.**
+
+**E6 IP + cihaz** — EKLENMEDİ (önceki karar korundu: çiftin ekranında IP tedirginlik üretir).
+
+---
+
 ---
 
 ## 4. BEKLEYEN İŞLER — ONAYLI, KODLAMA SIRASINDA `[2026-07-25 kararları]`
@@ -449,14 +521,14 @@ katmanı. Bonuslar:
 - **Reddedilenler:** her dilek/giriş için bildirim, e-posta kanalı (FAZ 4 gelmeden).
 - **NOT:** D, günlük özet mail'e HAZIR kurulur ("bu olay özete girer" bayrağı baştan).
 
-### E) Denetim günlüğü + Canlı akış enterprise dönüşümü `[onaylı]`
+### E) Denetim günlüğü + Canlı akış ✅ **TAMAMLANDI [2026-08-10]** (ayrıntı Bölüm 3)
 Veri zaten kayıtlı (`DegisenAlanlar` JSONB okunmuyor). Bonuslar:
-- **E1** Yapılandırılmış anlatı + fark (eski→yeni diff).
-- **E2** Toplulaştırma (8 fotoğraf → tek satır, tıkla-aç).
-- **E3** Filtre + arama (kim, eylem, tarih, defter).
+- **E1-a** Okunurluk ✅ · **E1-b** gerçek eski→yeni diff (yazma tarafı) ⬜ **BEKLİYOR**
+- **E2** Toplulaştırma ✅ (kritik olaylar hariç)
+- **E3** Filtre + arama ✅
 - **E4** Sayfalama — şu an `Take(100)`/`Take(60)` sessizce kesiyor; denetimde sessiz kesme kabul
   edilemez.
-- **E5** CSV dışa aktarım (`onamCsvIndir` deseni).
+- **E5** CSV ✅ (yalnız süper panel)
 - **E6** IP + cihaz kaydı — **EKLENMEDİ** (Musa kararı: çiftin ekranında IP tedirginlik üretir;
   veri minimizasyonu).
 
@@ -485,9 +557,10 @@ yalnız **teslimat katmanı** eklenecek — toplulaştırma yeniden yazılmayaca
 sağlık ucu VIP körlüğü ✅ · "Invalid Date" sözleşme kopukluğu ✅ · imha kabuğu temizliği ✅ ·
 nabız sayaçları ✅ · silinen defter bildirim şeffaflığı ✅
 
-**SIRADA — FAZ 1 artığı:**
-1. **E** denetim/akış enterprise dönüşümü (E1 diff → E2 toplulaştırma → E3 filtre/arama →
-   E4 sayfalama → E5 CSV; E6 eklenmedi)
+**BİTEN (2026-08-10):** **E** denetim/akış enterprise ✅ (E1-a, E2, E3, E4 + katmanlı saklama, E5;
+E1-b bekliyor, E6 eklenmedi) · eşler arası izolasyon kapatıldı 🔴
+
+**SIRADA:**
 
 **Sonra:**
 2. **B** baskıya hazır menü düzeni (küçük, frontend, tek dosya)
@@ -686,6 +759,26 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
 85. **Yumuşak-silme üyeliği bilinçli olarak durur; yaşam döngüsü kontrolü ayrı yapılır.**
     Çöpteki defterin üyeliği geri alma için korunur - bu yüzden "üye mi?" kontrolü tek başına
     erişimi engellemez. Tenant kontrolü + yaşam döngüsü kontrolü İKİ AYRI katmandır.
+
+
+**E turundan `[2026-08-10]`:**
+86. **BİR EKRANA VERİ EKLERKEN "BU SATIR KİME AİT VE KİM GÖRMELİ?" SORULMADAN GEÇİLMEZ.**
+    Denetim ayrıntısını eklerken `kaynak_es` ekrana çıktı ve bir eş, diğerinin onay/red
+    kararlarını okuyabilir hâle geldi - ürünün BİRİNCİ kuralı olan izolasyon, bir "okunurluk
+    iyileştirmesi" yüzünden delindi. Görünürlük artıran her değişiklik bir mahremiyet
+    değişikliğidir; izolasyon sınırı her seferinde açıkça sorgulanır.
+87. **Silme kuralı KARA LİSTE olmalı, beyaz liste değil.** "Sadece şunları sakla" kurulursa
+    listede olmayan (ve yarın eklenecek) her şey sessizce silinir. "Şunları sil, gerisi kalsın"
+    kurulursa hata yönü güvenli tarafa döner: yanlışlıkla fazla saklarız, asla eksik saklamayız.
+    Aynı ilke `senkronYayinla`'da da var (bilinmeyen yol → tüm alanları yayınla).
+88. **Üretilen kodun kaçış dizileri, üreten aracın kaçış kurallarıyla karıştırılamaz.**
+    Yamaya `\\r\\n` yazılınca dosyaya düz metin olarak düştü ve CSV tek satır oldu.
+    Belirsizlik varsa kaçış dizisi yerine KOD NOKTASI kullan (`String.fromCharCode`).
+    Ve çıktı dosyası **açılıp bakılmadan** "tamam" denmez.
+89. **Fail-safe kontrolün kendisi hatalı yazılabilir.** `ZatenMarker` argüman konumunda ifade
+    olarak yazıldı (`'x' + [char]13`), PowerShell hesaplamadı, marker'a yalnız ilk parça bağlandı
+    ve yama "zaten uygulanmış" sanıp atladı - koruma ters çalıştı. Marker DAİMA tek parça düz
+    metin olmalı; koruma mekanizmasının kendisi de doğrulanmalı.
 
 ---
 
