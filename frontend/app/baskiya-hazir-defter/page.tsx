@@ -18,12 +18,13 @@ import { useSaltOkunur } from "@/lib/salt-okunur";
 // KURASYON STUDYOSU (Belge 03 - Akis 6): "Toplayici degil, kurasyon studyosu."
 // Sol: kurgu (dilek secimi/sira, kapak, ithaf, tema, gruplama)
 // Sag: CANLI ESER ONIZLEMESI (gercek sayfa gorunumu - kagit hissi)
-type Sekme = "dilekler" | "kapak" | "duzen";
+// SIRA ONEMLI: once ESER, sonra is. Kullanici defterini gorur, sonra duzenler.
+type Sekme = "defterin" | "dilekler" | "cerceve";
 
 const SEKMELER: { kod: Sekme; etiket: string }[] = [
+  { kod: "defterin", etiket: "Defterin" },
   { kod: "dilekler", etiket: "Dilekler" },
-  { kod: "kapak", etiket: "Kapak & İthaf" },
-  { kod: "duzen", etiket: "Düzen" },
+  { kod: "cerceve", etiket: "Çerçeve" },
 ];
 
 const TEMALAR: { kod: string; ad: string; aciklama: string }[] = [
@@ -76,7 +77,8 @@ export default function KurasyonSayfasi() {
 }
 
 function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> }) {
-  const [sekme, setSekme] = useState<Sekme>("dilekler");
+  // VARSAYILAN "Defterin": ilk acilista eser gorunur. Once gurur, sonra kurgu.
+  const [sekme, setSekme] = useState<Sekme>("defterin");
 
   // SALT OKUNUR INCELEME - super yonetici uyesi olmadigi bir defteri inceliyor.
   //
@@ -324,7 +326,14 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
 
       {/* min-w-0: grid item varsayilan min-width AUTO'dur, icerigi kucultmez.
           Zincir kirilirsa genis icerik (onizleme kagidi) sayfayi yatay tasirir. */}
-      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-2">
+      {/* "Defterin" sekmesinde SAG SUTUN YOK: sayfa cevirme defteri zaten hemen
+          asagida TAM GENISLIKTE duruyor. Ayni anda iki onizleme gostermek hem
+          ekrani boler hem de kullaniciya "hangisi gercek defter?" diye sordurur. */}
+      <div
+        className={`mt-6 grid min-w-0 gap-6 ${
+          sekme === "defterin" ? "" : "lg:grid-cols-2"
+        }`}
+      >
         {/* ---------- SOL: KURGU ---------- */}
         <div className="min-w-0 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           {sekme === "dilekler" && (
@@ -450,7 +459,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </div>
           )}
 
-          {sekme === "kapak" && (
+          {sekme === "cerceve" && (
             <div className="space-y-5">
               <Alan etiket="Kapak başlığı">
                 <input
@@ -492,7 +501,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </div>
           )}
 
-          {sekme === "duzen" && (
+          {sekme === "defterin" && (
             <div className="space-y-6">
               {/* Tema */}
               <div>
@@ -586,26 +595,31 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           )}
         </div>
 
-        {/* ---------- SAG: CANLI ESER ONIZLEMESI ---------- */}
-        <div className="min-w-0">
-          <p className="mb-3 font-govde text-xs uppercase tracking-etiket text-ikincil">
-            Eserin canlı önizlemesi
-          </p>
-          <EserOnizleme
-            tema={tema}
-            gruplama={gruplama}
-            kapakBaslik={kapakBaslik}
-            kapakAltBaslik={kapakAltBaslik}
-            ithaf={ithaf}
-            kapanis={kapanis}
-            ogeler={dahilOgeler}
-            gorseller={ilk.gorseller}
-            tarihGoster={tarihGoster}
-            es1Ad={ilk.es1_ad}
-            es2Ad={ilk.es2_ad}
-            sekme={sekme}
-          />
-        </div>
+        {/* ---------- SAG: CANLI ESER ONIZLEMESI ----------
+            Yalniz kurgu sekmelerinde: burada kullanici bir SECIM yapiyor ve
+            secimin sayfaya nasil dustugunu ANINDA gormeli. "Defterin" sekmesinde
+            defterin kendisi zaten acik - ikinci bir onizleme gurultudur. */}
+        {sekme !== "defterin" && (
+          <div className="min-w-0">
+            <p className="mb-3 font-govde text-xs uppercase tracking-etiket text-ikincil">
+              Eserin canlı önizlemesi
+            </p>
+            <EserOnizleme
+              tema={tema}
+              gruplama={gruplama}
+              kapakBaslik={kapakBaslik}
+              kapakAltBaslik={kapakAltBaslik}
+              ithaf={ithaf}
+              kapanis={kapanis}
+              ogeler={dahilOgeler}
+              gorseller={ilk.gorseller}
+              tarihGoster={tarihGoster}
+              es1Ad={ilk.es1_ad}
+              es2Ad={ilk.es2_ad}
+              sekme={sekme}
+            />
+          </div>
+        )}
       </div>
 
       {/* ONIZLEME - defterin kendisi. FILIGRAN YOK.
@@ -615,7 +629,10 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
           INCELEME OTURUMUNDA DA ACIK: teshis icin gereken TAM OLARAK budur -
           "defterim bozuk cikiyor" diyen bir cifte, defterin nasil ciktigini
           gormeden yanit verilemez. */}
-      {dahilOgeler.length > 0 && (
+      {/* DEFTERIN KENDISI - artik "Defterin" sekmesinin icerigi. Onceden her
+          sekmenin ALTINDA duruyordu; kullanici dilek secerken bile ekranin
+          dibinde bekliyordu ve ilk acilista gorunmuyordu. */}
+      {sekme === "defterin" && dahilOgeler.length > 0 && (
         <section className="mt-6 rounded-3xl border border-ayrac bg-yuzey p-6 sm:p-8">
           <div className="text-center">
             <p className="font-display text-xl text-murekkep">Defterin</p>
@@ -811,7 +828,7 @@ function EserOnizleme({
   tarihGoster: boolean;
 }) {
   // Kapak sekmesinde kapak sayfasi, digerlerinde ic sayfa gosterilir
-  const kapakGoster = sekme === "kapak";
+  const kapakGoster = sekme === "cerceve";
 
   const gruplu = useMemo(() => {
     if (gruplama !== "taraf") return [{ baslik: null as string | null, ogeler }];
@@ -1062,7 +1079,7 @@ function IcSayfa({
 }
 
 // KAPANIS GOVDESI - defterin son sayfasi.
-// Hem "Kapak & Ithaf" sekmesinde (ayri sayfa olarak) hem "Duzen" sekmesinde
+// Hem "Cerceve" sekmesinde (ayri sayfa olarak) hem "Defterin" sekmesinde
 // (dileklerin ardindan) AYNI bilesenden cizilir - iki kopya ayrisirdi.
 function KapanisGovdesi({
   tema,
