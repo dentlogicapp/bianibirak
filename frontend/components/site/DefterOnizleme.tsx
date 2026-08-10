@@ -52,7 +52,10 @@ import { TamEkranKatman } from "@/components/site/TamEkranKatman";
 // Tam ekran kroma cipi - tema-bagimsiz sabit koyu dolgu + acik ikon.
 const KROM = "bg-[#211a17]/90 text-[#f4ebda] shadow-lg ring-1 ring-[#f4ebda]/25 backdrop-blur-sm";
 
-export function DefterOnizleme() {
+// surum: KURGU SURUM DAMGASI. Studyo sunucuya basarili her yazimdan sonra
+// artirir; bu deger degistiginde onizleme yeniden cekilir. Prop verilmezse
+// (baska bir yerde tek basina kullanilirsa) davranis eskisi gibi kalir.
+export function DefterOnizleme({ surum = 0 }: { surum?: number }) {
   const [bilgi, setBilgi] = useState<OnizlemeBilgi | null>(null);
   const [sayfa, setSayfa] = useState(0);
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -61,13 +64,43 @@ export function DefterOnizleme() {
   const [tamEkran, setTamEkran] = useState(false);
 
   useEffect(() => {
-    void (async () => {
-      const c = await onizlemeBilgi();
-      if (c.ok) setBilgi(c.veri);
-      else { setHata(c.mesaj); setHataKodu(c.hata); }
-      setYukleniyor(false);
-    })();
-  }, []);
+    let iptal = false;
+    // Ilk yukleme mi? (bilgi henuz yoksa) - yalniz o zaman "hazirlaniyor"
+    // ekrani gosterilir. Sonraki tazelemelerde ESKI SAYFA EKRANDA KALIR
+    // (stale-while-revalidate): defter goz onunde kaybolup yeniden belirmez.
+    const ilkYukleme = bilgi === null;
+    // Hizli ardisik degisikliklerde (siralama okuna ust uste basmak) her tusa
+    // sunucuda sayfa uretmeyiz; 600 ms susup SON duruma gore bir kez ureturuz.
+    const gecikme = setTimeout(
+      () => {
+        void (async () => {
+          const c = await onizlemeBilgi();
+          if (iptal) return;
+          if (c.ok) {
+            setBilgi(c.veri);
+            setHata("");
+            setHataKodu("");
+            // SAYFA KIRPMA: dilek cikarilinca defter kisalir. Eski sayfa
+            // numarasinda kalirsak kullanici BOS bir sayfaya bakar ve
+            // "defterim bozuldu" sanir.
+            setSayfa((s) => Math.max(0, Math.min(s, c.veri.sayfa_sayisi - 1)));
+          } else {
+            setHata(c.mesaj);
+            setHataKodu(c.hata);
+          }
+          setYukleniyor(false);
+        })();
+      },
+      ilkYukleme ? 0 : 600
+    );
+    return () => {
+      iptal = true;
+      clearTimeout(gecikme);
+    };
+    // bilgi bilerek bagimlilik DEGIL: tetikleyici yalniz surumdur, yoksa
+    // her cekim kendini yeniden tetikler (sonsuz dongu).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [surum]);
 
   const ileri = useCallback(() => {
     setSayfa((s) => (bilgi && s < bilgi.sayfa_sayisi - 1 ? s + 1 : s));

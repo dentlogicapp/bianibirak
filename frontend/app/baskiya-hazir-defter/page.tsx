@@ -114,6 +114,11 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
   // yanlis boyutta indirilen defter matbaada buyutulunce fotograflar seyrelir.
   const [boyutAcik, setBoyutAcik] = useState(false);
 
+  // ONIZLEME SURUM DAMGASI: sunucuya BASARILI her yazimdan sonra artar ve
+  // sayfa cevirme defterini tazeler. Yerel state'ten cizim YAPILMAZ - defter
+  // sunucuda uretilir, biz yalniz "guncellendi" diye haber veririz.
+  const [onizlemeSurum, setOnizlemeSurum] = useState(0);
+
   /* ===================== KURAL A - ODEME ONCE, DURUSTLUK SONRA =====================
    *
    * Musa'nin kesin talimati:
@@ -178,6 +183,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       toast.error(c.mesaj);
       return false;
     }
+    // Kayit sunucuda tamamlandi -> onizleme tazelensin.
+    setOnizlemeSurum((v) => v + 1);
     return true;
   }
 
@@ -196,6 +203,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
       liste.map((x) => (x.katki_id === o.katki_id ? { ...x, dahil: yeni } : x))
     );
     const c = await api.kurasyonOgeGuncelle(o.katki_id, { dahil: yeni });
+    // dahil degisti -> onizleme tazelensin (defterin sayfa sayisi bile degisir).
+    if (c.ok) setOnizlemeSurum((v) => v + 1);
     if (!c.ok) {
       toast.error(c.mesaj);
       setOgeler((liste) =>
@@ -212,6 +221,8 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
     [yeniListe[index], yeniListe[hedef]] = [yeniListe[hedef], yeniListe[index]];
     setOgeler(yeniListe);
     const c = await api.kurasyonSirala(yeniListe.map((o) => o.katki_id));
+    // sira degisti -> onizleme tazelensin.
+    if (c.ok) setOnizlemeSurum((v) => v + 1);
     if (!c.ok) {
       toast.error(c.mesaj);
       setOgeler(ogeler);
@@ -641,7 +652,7 @@ function Studyo({ ilk, yenile }: { ilk: Kurasyon; yenile: () => Promise<void> })
             </p>
           </div>
           <div className="mx-auto mt-6 max-w-md">
-            <DefterOnizleme />
+            <DefterOnizleme surum={onizlemeSurum} />
           </div>
         </section>
       )}
