@@ -665,7 +665,10 @@ public static class BaskiServisi
 
     // Fotografin kart icindeki olcusu. Kart cizimi (DilekKarti) ve olcum
     // (KartSigarMi / SayfaPaketleyici) AYNI sonucu gormek zorundadir.
-    internal static (float G, float Y) FotoOlcusu(int g, int y)
+    // olcek: ESNEKLIK payi (1.0 = dokunulmamis). Defterin TAMAMI icin tek deger
+    // kullanilir; fotograflar sayfadan sayfaya farkli boyda gorunmez. Tipografiye
+    // ASLA dokunulmaz - degisen punto, kitapta amatorlugun en gorunur isaretidir.
+    internal static (float G, float Y) FotoOlcusu(int g, int y, float olcek = 1f)
     {
         var yon = YonBul(g, y);
         var (azamiG, azamiY) = yon switch
@@ -674,7 +677,8 @@ public static class BaskiServisi
             Yon.Kare => (216f, 216f),
             _ => (268f, 182f),
         };
-        return Olcule(g, y, azamiG, azamiY);
+        var k = Math.Clamp(olcek, 0.5f, 1f);
+        return Olcule(g, y, azamiG * k, azamiY * k);
     }
 
     // Basimda uygulanan metin bicimi (ani sonu noktalama). Olcum, CIZILEN
@@ -774,14 +778,10 @@ public static class BaskiServisi
             {
                 // BUYUK ve orana sadik. Dikey kare yukseklige, yatay kare genislige
                 // yaslanir; ikisi de sayfada nefes alir, hicbiri deforme olmaz.
-                var yon = YonBul(d.FotoGenislik, d.FotoYukseklik);
-                var (azamiG, azamiY) = yon switch
-                {
-                    Yon.Dikey => (198f, 232f),
-                    Yon.Kare => (216f, 216f),
-                    _ => (268f, 182f),
-                };
-                var (fg, fy) = Olcule(d.FotoGenislik, d.FotoYukseklik, azamiG, azamiY);
+                // OLCU TEK KAYNAKTAN: cizim ve olcum ayni hesabi gormeli, yoksa
+                // paketleyicinin sayfa plani ile gercek cizim ayrisir.
+                var (fg, fy) = FotoOlcusu(
+                    d.FotoGenislik, d.FotoYukseklik, parca?.FotoOlcek ?? 1f);
 
                 kart.Item().AlignCenter().Element(c => Cerceveli(c, d.Foto!, fg, fy, mat: 3.5f));
                 kart.Item().Height(13);

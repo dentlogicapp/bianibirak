@@ -62,6 +62,17 @@ public static class SayfaPaketleyici
     // "…devami var" / "…devami" satiri (ince, italik) - bolunmus kartin isareti.
     private const float DevamSatiri = 20f;
 
+    // ESNEKLIK (TeX'in "glue" fikri). Her ogenin dogal boyutu yaninda bir BUZULME
+    // payi vardir; dizgi motoru sayfayi doldururken bu payi kullanir.
+    //
+    // Bizde buzulen tek sey FOTOGRAF olcegidir - tipografiye DOKUNULMAZ. Sayfadan
+    // sayfaya degisen punto, bir kitapta amatorlugun en gorunur isaretidir.
+    //
+    // Olcek defterin TAMAMI icin TEKTIR: fotograflar birbirine gore tutarli kalir.
+    // %85 alt sinir, "fark edilmeyen kucultme" ile "fotograf kuculmus" arasindaki
+    // esiktir; altina inmek kaliteyi satmak olur.
+    private static readonly float[] OlcekAdaylari = { 1.00f, 0.95f, 0.90f, 0.85f };
+
     // ---- SONUC TIPLERI ----
 
     // Bir kartin sayfadaki parcasi. Normal dilek TEK parcadir; sayfaya sigmayan
@@ -72,7 +83,10 @@ public static class SayfaPaketleyici
         bool FotoGoster,   // fotograf yalniz ILK parcada
         bool ImzaGoster,   // imza blogu yalniz SON parcada
         bool DevamEdiyor,  // altta ince "devami var" satiri
-        bool DevamiDir);   // ustte ince "devami" satiri
+        bool DevamiDir,    // ustte ince "devami" satiri
+        // FOTOGRAF OLCEGI (1.0 = dokunulmamis). Defterin TAMAMI icin tek deger
+        // kullanilir - fotograflar sayfadan sayfaya farkli boyda gorunmez.
+        float FotoOlcek = 1f);
 
     public sealed record SayfaPlani(
         int No,
@@ -87,10 +101,18 @@ public static class SayfaPaketleyici
         IReadOnlyDictionary<int, int> DilekSayfasi,
         // Akilli yerlesim sirayi degistirdi mi? (arayuzdeki zarif uyari bunu kullanir)
         bool YenidenSiralandi,
+        // Defterin tamaminda kullanilan fotograf olcegi (1.0 = dokunulmadi).
+        float FotoOlcek,
+        // Iki sayfaya tasan dilekler: indeks -> tek sayfaya sigmasi icin gereken
+        // olcek (null ise makul sinirda sigdirilamiyor). Arayuzdeki
+        // "Tek sayfaya sigdir" dugmesi YALNIZ burada karsiligi olanlarda gorunur -
+        // isleyemeyecek bir dugme gostermek, guveni yikan seydir.
+        IReadOnlyDictionary<int, float> TekSayfaCaresi,
         string? Not);
 
     private static readonly Yerlesim Bos =
-        new(false, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, "olcum kurulamadi");
+        new(false, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, 1f,
+            new Dictionary<int, float>(), "olcum kurulamadi");
 
     // ---- ANA GIRIS ----
     //
@@ -105,17 +127,49 @@ public static class SayfaPaketleyici
         ISet<int>? sabitler = null)
     {
         if (dilekler.Count == 0)
-            return new Yerlesim(true, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, "dilek yok");
+            return new Yerlesim(true, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, 1f,
+                new Dictionary<int, float>(), "dilek yok");
 
         var olcu = FontOlcusu.Yukle(Path.Combine(fontKok, "Inter-Regular.ttf"));
         if (olcu == null) return Bos with { Not = "font olcusu okunamadi" };
 
         try
         {
-            // 1) Her kartin GERCEK yuksekligi
-            var yukseklikler = new float[dilekler.Count];
-            for (var i = 0; i < dilekler.Count; i++)
-                yukseklikler[i] = KartYuksekligi(dilekler[i], olcu);
+            // 1) ESNEKLIK ARAMASI - her olcek adayi icin bir kez yerlesim kurulur,
+            // en iyisi secilir. Kazanc yoksa olcek 1.0'da KALIR: gereksiz yere
+            // fotograf kucultmeyiz.
+            var sabitKumeOn = sabitler ?? new HashSet<int>();
+            float[] yukseklikler = Array.Empty<float>();
+            List<List<int>> sayfalar = new();
+            var secilenOlcek = 1f;
+            var enIyiPuan = double.MaxValue;
+
+            foreach (var olcek in OlcekAdaylari)
+            {
+                var y = new float[dilekler.Count];
+                for (var i = 0; i < dilekler.Count; i++)
+                    y[i] = KartYuksekligi(dilekler[i], olcu, olcek);
+
+                var s = akilli
+                    ? PencereliYerlesim(y, sayfaYuksekligi, sabitKumeOn, new HashSet<int>())
+                    : SiraliYerlesim(y, sayfaYuksekligi);
+
+                // Puan: once SAYFA SAYISI, sonra kotuluk (bosluk karelerinin toplami).
+                // Olcek 1.0 esitlikte KAZANIR - kucultme ancak gercek kazanc varsa.
+                var kotuluk = 0.0;
+                for (var k = 0; k < s.Count - 1; k++)
+                {
+                    var bos = sayfaYuksekligi - s[k].Sum(i => y[i]);
+                    if (bos > 0) kotuluk += bos * bos;
+                }
+                var puan = s.Count * 1_000_000.0 + kotuluk;
+
+                if (puan < enIyiPuan - 0.5)
+                {
+                    enIyiPuan = puan; secilenOlcek = olcek;
+                    yukseklikler = y; sayfalar = s;
+                }
+            }
 
             // 2) SAYFAYA SIGMAYAN DILEKLER - cumle sinirinda bolunur.
             //
@@ -126,15 +180,36 @@ public static class SayfaPaketleyici
             for (var i = 0; i < dilekler.Count; i++)
             {
                 if (yukseklikler[i] <= sayfaYuksekligi) continue;
-                var parcalar = CumleSinirindaBol(i, dilekler[i], olcu, sayfaYuksekligi);
+                var parcalar = CumleSinirindaBol(i, dilekler[i], olcu, sayfaYuksekligi, secilenOlcek);
                 if (parcalar.Count > 1) parcaliDilekler[i] = parcalar;
             }
 
-            // 3) Yerlesim
+            // 3) Bolunmus dilekler kendi sayfalarini alacak sekilde yerlesimi tazele.
             var sabitKume = sabitler ?? new HashSet<int>();
-            var sayfalar = akilli
-                ? PencereliYerlesim(yukseklikler, sayfaYuksekligi, sabitKume, parcaliDilekler.Keys.ToHashSet())
-                : SiraliYerlesim(yukseklikler, sayfaYuksekligi);
+            if (parcaliDilekler.Count > 0)
+            {
+                sayfalar = akilli
+                    ? PencereliYerlesim(yukseklikler, sayfaYuksekligi, sabitKume,
+                        parcaliDilekler.Keys.ToHashSet())
+                    : SiraliYerlesim(yukseklikler, sayfaYuksekligi);
+            }
+
+            // 4) TEK SAYFAYA SIGDIRMA CARESI - hangi tasan dilek, fotografi bir miktar
+            // kucultulerek tek sayfaya sigar? Arayuzdeki dugme YALNIZ bunlarda cikar;
+            // isleyemeyecek bir dugme gostermek guveni yikar.
+            var careler = new Dictionary<int, float>();
+            foreach (var i in parcaliDilekler.Keys)
+            {
+                if (dilekler[i].Foto == null) continue; // fotografsizda care yok
+                foreach (var olcek in OlcekAdaylari)
+                {
+                    if (olcek >= secilenOlcek) continue;
+                    if (KartYuksekligi(dilekler[i], olcu, olcek) <= sayfaYuksekligi)
+                    {
+                        careler[i] = olcek; break;
+                    }
+                }
+            }
 
             // 3) Sira degisti mi? (dilekler ardisik gelmiyorsa evet)
             var duzSira = sayfalar.SelectMany(s => s).ToList();
@@ -166,7 +241,7 @@ public static class SayfaPaketleyici
                 var dolu = sayfa.Sum(i => yukseklikler[i]);
                 var tekParcalar = sayfa
                     .Select(i => new KartParcasi(
-                        i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false))
+                        i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false, secilenOlcek))
                     .ToList();
                 foreach (var i in sayfa) esleme[i] = no;
                 planlar.Add(new SayfaPlani(no, sayfa, tekParcalar, dolu,
@@ -174,7 +249,7 @@ public static class SayfaPaketleyici
                 no++;
             }
 
-            return new Yerlesim(true, planlar, esleme, siraDegisti, null);
+            return new Yerlesim(true, planlar, esleme, siraDegisti, secilenOlcek, careler, null);
         }
         catch (Exception ex)
         {
@@ -315,7 +390,7 @@ public static class SayfaPaketleyici
     // Fotograf yalniz ILK parcada, imza blogu yalniz SON parcada gorunur:
     // bir dilek iki kez imzalanmis gibi durmamalidir.
     private static List<KartParcasi> CumleSinirindaBol(
-        int indeks, BaskiServisi.Dilek d, FontOlcusu olcu, float H)
+        int indeks, BaskiServisi.Dilek d, FontOlcusu olcu, float H, float fotoOlcek)
     {
         var metin = BaskiServisi.MetinBicimle(d.Mesaj);
         var parcalar = new List<KartParcasi>();
@@ -324,7 +399,7 @@ public static class SayfaPaketleyici
         var fotoYuksekligi = 0f;
         if (d.Foto != null)
         {
-            var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik);
+            var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik, fotoOlcek);
             fotoYuksekligi = fy + FotoMat * 2 + FotoAltBosluk;
         }
 
@@ -344,7 +419,7 @@ public static class SayfaPaketleyici
             if (MetinYuksekligi(kalanMetin, olcu) + ustPay + sonPayi <= H)
             {
                 parcalar.Add(new KartParcasi(
-                    indeks, kalanMetin, ilk, true, false, !ilk));
+                    indeks, kalanMetin, ilk, true, false, !ilk, fotoOlcek));
                 return parcalar;
             }
 
@@ -353,18 +428,18 @@ public static class SayfaPaketleyici
             if (kesme <= 0 || kesme >= kalanMetin.Length)
             {
                 // Bolunemedi (tek dev cumle): oldugu gibi birak, QuestPDF akista boler.
-                parcalar.Add(new KartParcasi(indeks, kalanMetin, ilk, true, false, !ilk));
+                parcalar.Add(new KartParcasi(indeks, kalanMetin, ilk, true, false, !ilk, fotoOlcek));
                 return parcalar;
             }
 
             parcalar.Add(new KartParcasi(
-                indeks, kalanMetin[..kesme].TrimEnd(), ilk, false, true, !ilk));
+                indeks, kalanMetin[..kesme].TrimEnd(), ilk, false, true, !ilk, fotoOlcek));
             kalanMetin = kalanMetin[kesme..].TrimStart();
             ilk = false;
         }
 
         if (kalanMetin.Length > 0)
-            parcalar.Add(new KartParcasi(indeks, kalanMetin, false, true, false, true));
+            parcalar.Add(new KartParcasi(indeks, kalanMetin, false, true, false, true, fotoOlcek));
 
         return parcalar;
     }
@@ -405,13 +480,13 @@ public static class SayfaPaketleyici
 
     // ---- TEK KARTIN YUKSEKLIGI ----
     // BaskiServisi.DilekKarti'nin cizdigi sirayla, AYNI bilesenlerle.
-    public static float KartYuksekligi(BaskiServisi.Dilek d, FontOlcusu olcu)
+    public static float KartYuksekligi(BaskiServisi.Dilek d, FontOlcusu olcu, float fotoOlcek = 1f)
     {
         var yukseklik = 0f;
 
         if (d.Foto != null)
         {
-            var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik);
+            var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik, fotoOlcek);
             yukseklik += fy + FotoMat * 2 + FotoAltBosluk;
         }
 
