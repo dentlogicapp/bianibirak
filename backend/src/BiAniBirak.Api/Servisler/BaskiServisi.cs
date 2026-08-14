@@ -613,6 +613,14 @@ public static class BaskiServisi
         // eklenen nokta bir satir tasirdiginda tahmin kayar.
         foreach (var parca in MesajBicimle(d.Mesaj).Replace("\r\n", "\n").Split('\n'))
             satirlar += Math.Max(1, (int)Math.Ceiling(parca.Length / karakterSatir));
+        // EMOJI PAYI: emoji gorseldir (~2.4 harf genisliginde), metinde ise
+        // 1-2 karakter sayilir. Fark eklenmezse emoji yogun dilek sayfayi tasirir.
+        var emojiSayisi = 0;
+        foreach (var p in EmojiServisi.Ayristir(MesajBicimle(d.Mesaj)))
+            if (p.EmojiAnahtar != null) emojiSayisi++;
+        if (emojiSayisi > 0)
+            satirlar += (int)Math.Ceiling(emojiSayisi * 1.2f / karakterSatir);
+
         yukseklik += satirlar * 18.1f;
 
         yukseklik += 54f; // imza blogu: ayrac + ad + iliski + tarih

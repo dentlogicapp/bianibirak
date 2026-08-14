@@ -123,10 +123,24 @@ public static class EmojiServisi
             }
             else
             {
-                // Emoji degil: metne ekle. (Gorunmez birlestiriciler tek baslarina
-                // kaldilarsa yazilmaz - sayfada bos kutu birakmasinlar.)
+                // TOFU KALKANI - kalici ve butunsel cozum.
+                //
+                // Bir karakter EMOJI ARALIGINDAYSA ama gorseli YOKSA, metne
+                // GERI DUSURULMEZ: hicbir metin fontu emoji tasimaz, sonuc her
+                // zaman "tofu" (siyah kutu) olur. Kagitta bu kabul edilemez.
+                //
+                // NEDEN ARALIK KONTROLU (tek tek emoji listesi degil): Unicode her
+                // yil YENI emoji ekler. Twemoji 15 Unicode 16'yi kapsamaz - bugun
+                // U+1FAE9 gibi yeni emojiler tofu basiyordu. Aralik kurali,
+                // BUGUN VAR OLMAYAN emojileri de kapsar: varlik seti guncellenmese
+                // bile defter asla bozulmaz, emoji sadece gorunmez olur.
+                //
+                // Emoji OLMAYAN her karakter (harf, rakam, noktalama, Turkce
+                // karakterler) aynen yazilmaya devam eder.
                 var kod = kodlar[i];
-                if (kod != 0xFE0F && kod != 0x200D)
+                var gorunmezBirlestirici = kod == 0xFE0F || kod == 0x200D || kod == 0xFE0E
+                    || (kod >= 0xE0020 && kod <= 0xE007F) || (kod >= 0x1F3FB && kod <= 0x1F3FF);
+                if (!gorunmezBirlestirici && !EmojiAraligiMi(kod))
                     tampon.Append(new System.Text.Rune(kod).ToString());
                 i++;
             }
@@ -135,6 +149,22 @@ public static class EmojiServisi
         if (tampon.Length > 0) parcalar.Add(new Parca(tampon.ToString(), null));
         return parcalar;
     }
+
+    // Bir kod noktasi EMOJI ARALIGINDA mi? (gorseli olmasa bile)
+    //
+    // Kaynak: Unicode emoji bloklari. Liste GENISTIR ve bilerek boyledir -
+    // amac "hangi emoji" bilmek degil, "bu bir emoji olabilir mi" sorusuna
+    // guvenli yanit vermektir. Yanlis pozitif riski dusuk: bu araliklarda
+    // gunluk metinde kullanilan harf/noktalama YOKTUR.
+    private static bool EmojiAraligiMi(int kod) =>
+        (kod >= 0x1F000 && kod <= 0x1FAFF)   // pictographs, emoticons, transport, extended
+        || (kod >= 0x1FB00 && kod <= 0x1FBFF) // symbols for legacy computing
+        || (kod >= 0x2600 && kod <= 0x27BF)   // misc symbols + dingbats
+        || (kod >= 0x2B00 && kod <= 0x2BFF)   // misc symbols and arrows
+        || (kod >= 0x1F1E6 && kod <= 0x1F1FF) // bayrak harfleri
+        || kod == 0x20E3                      // keycap birlestirici
+        || kod == 0x303D || kod == 0x3030
+        || kod == 0x3297 || kod == 0x3299;
 
     // Emoji goruntusu - ilk istekte diskten okunur, sonra bellekte kalir.
     // Bir defterde ayni emoji onlarca kez gecebilir; her seferinde disk okumak
