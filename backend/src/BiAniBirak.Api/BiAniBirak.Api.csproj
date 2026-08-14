@@ -23,6 +23,11 @@
        PDF ciktisi bunlari gomer; sistem fontuna BAGIMLI DEGILIZ (container'da font yok). -->
   <ItemGroup>
     <None Include="Varliklar\Fontlar\*.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Emoji gorselleri (Twemoji PNG). Emoji FONTLA degil GORUNTUYLE basilir
+         (bkz. EmojiServisi): font cozumlemesi devreye girmez, harf kaybi ve
+         "kutu" riski olusmaz. Bu satir olmadan klasor imajda olusmaz ve emoji
+         sessizce duz metne duser. -->
+    <None Include="Varliklar\Emoji\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
