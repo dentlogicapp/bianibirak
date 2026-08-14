@@ -184,11 +184,15 @@ public static class KurasyonUclari
         if (hata != null)
             return Hata(hata.Kod is "DILEK_YOK" or "DUZEN_HATASI" ? 400 : 404, hata.Kod, hata.Mesaj);
 
+        // PARMAK IZI - istemcinin sayfa URL'lerine koyacagi icerik kimligi.
+        // Tarayici sabit bir URL'yi ikinci kez sunucuya sormaz; iz degisince
+        // URL degisir ve guncel goruntu cekilir. Yeni hesap YOK - ayni servis.
         return Results.Json(new
         {
             sayfa_sayisi = sayfalar!.Count,
             onizleme_dpi = OnizlemeServisi.OnizlemeDpi,
             baski_dpi = OnizlemeServisi.BaskiDpi,
+            parmak = await OnizlemeServisi.ParmakIziAsync(etkinlikId, db),
         });
     }
 

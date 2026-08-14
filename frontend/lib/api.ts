@@ -996,6 +996,9 @@ export type OnizlemeBilgi = {
   sayfa_sayisi: number;
   onizleme_dpi: number;
   baski_dpi: number;
+  // Icerik kimligi: sayfa URL'lerine eklenir. Degisince tarayici onbellegi
+  // kendiliginden gecersizlesir (bkz. onizlemeSayfaUrl).
+  parmak: string;
 };
 
 export function onizlemeBilgi() {
@@ -1004,8 +1007,12 @@ export function onizlemeBilgi() {
 
 // Sayfa GORUNTUSU (PNG). Dosya degil - tarayicida goruntu olarak akar.
 // "Farkli kaydet" derse elinde 96 DPI bir PNG olur: ekranda guzel, kagitta bulanik.
-export function onizlemeSayfaUrl(sayfa: number): string {
-  return `/api/etkinlik/aktif/kurasyon/onizleme/${sayfa}.png`;
+// parmak: icerik kimligi. Ayni icerik -> ayni URL -> tarayici onbellegi calisir.
+// Icerik degisti -> yeni URL -> guncel goruntu iner. Parmak verilmezse davranis
+// eskisi gibi (onbellege takilabilir) - cagiranlar daima gecmelidir.
+export function onizlemeSayfaUrl(sayfa: number, parmak?: string): string {
+  const temel = `/api/etkinlik/aktif/kurasyon/onizleme/${sayfa}.png`;
+  return parmak ? `${temel}?s=${encodeURIComponent(parmak)}` : temel;
 }
 
 // ---------------- KVKK YONETIMI (Planlama deseni, cok metinli) ----------------

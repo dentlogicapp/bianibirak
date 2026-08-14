@@ -62,6 +62,10 @@ export function DefterOnizleme({ surum = 0 }: { surum?: number }) {
   const [hata, setHata] = useState("");
   const [hataKodu, setHataKodu] = useState("");
   const [tamEkran, setTamEkran] = useState(false);
+  // BONUS 1: tazeleme sirasinda kagidin kosesinde ince bir nabiz. Eski sayfa
+  // ekranda kaldigi icin (stale-while-revalidate) kullanici "oldu mu?" diye
+  // dusunebiliyordu. Sessiz calisan bir sistem, calismiyor sanilir.
+  const [tazeleniyor, setTazeleniyor] = useState(false);
 
   useEffect(() => {
     let iptal = false;
@@ -74,8 +78,10 @@ export function DefterOnizleme({ surum = 0 }: { surum?: number }) {
     const gecikme = setTimeout(
       () => {
         void (async () => {
+          if (!ilkYukleme) setTazeleniyor(true);
           const c = await onizlemeBilgi();
           if (iptal) return;
+          setTazeleniyor(false);
           if (c.ok) {
             setBilgi(c.veri);
             setHata("");
@@ -163,6 +169,8 @@ export function DefterOnizleme({ surum = 0 }: { surum?: number }) {
         ileri={ileri}
         geri={geri}
         tamEkran={false}
+        parmak={bilgi.parmak}
+        tazeleniyor={tazeleniyor}
       />
 
       {/* TAM EKRAN - dogrulanmis kabuk + immersif koyu zemin + tema-bagimsiz kroma */}
@@ -186,6 +194,8 @@ export function DefterOnizleme({ surum = 0 }: { surum?: number }) {
               ileri={ileri}
               geri={geri}
               tamEkran
+              parmak={bilgi.parmak}
+              tazeleniyor={tazeleniyor}
             />
             <button
               type="button"
@@ -323,12 +333,19 @@ function Kagit({
   ileri,
   geri,
   tamEkran,
+  parmak,
+  tazeleniyor,
 }: {
   sayfa: number;
   sonSayfa: number;
   ileri: () => void;
   geri: () => void;
   tamEkran: boolean;
+  // ICERIK PARMAK IZI: sayfa URL'sine girer. Ayni icerik -> ayni URL ->
+  // tarayici onbellegi calisir; icerik degisti -> yeni URL -> guncel goruntu.
+  parmak: string;
+  // Tazeleme suruyor mu (Bonus 1 nabzi). Ust bilesen bilir, Kagit cizer.
+  tazeleniyor: boolean;
 }) {
   return (
     <div className={`relative mx-auto ${tamEkran ? "w-fit max-w-full" : "max-w-md"}`}>
@@ -342,12 +359,25 @@ function Kagit({
         onContextMenu={(e) => e.preventDefault()}
       >
         <img
-          src={onizlemeSayfaUrl(sayfa)}
+          src={onizlemeSayfaUrl(sayfa, parmak)}
           alt={`Sayfa ${sayfa + 1}`}
           className={`block select-none ${tamEkran ? "mx-auto max-h-[72vh] w-auto" : "w-full"}`}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
         />
+
+        {/* GUNCELLENIYOR NABZI (Bonus 1) - sayfayi KAPATMAZ, kosesinde durur.
+            Eski sayfa ekranda kaldigi icin (stale-while-revalidate) kullanici
+            "oldu mu?" diye dusunebiliyordu; sessiz calisan sistem calismiyor
+            sanilir. Tam ekranda gizli: orada okuma var, duzenleme yok. */}
+        {tazeleniyor && !tamEkran && (
+          <span className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-murekkep/75 px-2.5 py-1 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-parsomen" aria-hidden />
+            <span className="font-govde text-[0.6rem] text-parsomen">
+              Defterin güncelleniyor
+            </span>
+          </span>
+        )}
       </div>
 
       {/* Sayfa cevirme - kagidin kenarlarinda, kitap gibi (masaustu bonus) */}
