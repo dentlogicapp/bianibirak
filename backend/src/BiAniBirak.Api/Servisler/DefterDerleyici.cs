@@ -79,6 +79,19 @@ public static class DefterDerleyici
         return (new Sonuc(pdf, veri!.Kurasyon, veri.DilekSayisi), null);
     }
 
+    // C-1b OLCUM DOGRULAMASI: paketleyici, derleyicinin GORDUGU veriyi gormeli.
+    // Yeni mantik yok - EserAsync'in sonucu disariya aciliyor.
+    internal static async Task<(BaskiServisi.EserVerisi? eser, Hata? hata)> EserVerisiAsync(
+        Guid etkinlikId,
+        BiAniBirakDbContext db,
+        DepolamaServisi depo,
+        string icerikKoku,
+        CancellationToken ct = default)
+    {
+        var (veri, hata) = await EserAsync(etkinlikId, db, depo, icerikKoku, ct);
+        return (veri?.Eser, hata);
+    }
+
     private sealed record EserVeri(
         BaskiServisi.EserVerisi Eser, Kurasyon Kurasyon, int DilekSayisi);
 

@@ -38,6 +38,8 @@ public static class SuperUclari
         // Bildirim tercihleri (D3 - per-admin kanal + ozet saati).
         app.MapGet("/api/super/bildirim-tercihleri", BildirimTercihGetir).RequireAuthorization();
         app.MapPut("/api/super/bildirim-tercihleri", BildirimTercihGuncelle).RequireAuthorization();
+        // C-1b: paketleyici olcum dogrulamasi (GECICI teshis ucu - C-2'de kaldirilacak).
+        app.MapGet("/api/super/defter/{id:guid}/paketleyici-kontrol", PaketleyiciKontrol).RequireAuthorization();
         // Deneme defteri: gercekci veriyle dolu defter uretir (yalniz super admin).
         app.MapPost("/api/super/deneme-defteri", DenemeUret).RequireAuthorization();
         app.MapDelete("/api/super/defter/{id:guid}", DefterCopeAt).RequireAuthorization();
@@ -692,6 +694,71 @@ public static class SuperUclari
 
     public record BildirimTercihIstek(BildirimTercihSatir[]? Tercihler, int? OzetSaati);
     public record BildirimTercihSatir(string Olay, string Kanal);
+
+    // ---- C-1b: PAKETLEYICI OLCUM DOGRULAMASI ----
+    //
+    // GECICI TESHIS UCU. Amaci tek bir soruyu KANITLA yanitlamak: SayfaPaketleyici'nin
+    // hesapladigi dilek sayfasi sayisi, QuestPDF'in GERCEKTEN urettigiyle tutuyor mu?
+    //
+    // Tutuyorsa olcum guvenilirdir ve sayfalama kontrolu paketleyiciye devredilebilir
+    // (C-2). Tutmuyorsa fark buradan gorulur ve olcum duzeltilir - motorun kalbine
+    // KANIT GORMEDEN dokunulmaz.
+    //
+    // C-2 tamamlandiginda BU UC KALDIRILACAK.
+    private static async Task<IResult> PaketleyiciKontrol(
+        Guid id,
+        HttpContext ctx,
+        BiAniBirakDbContext db,
+        BiAniBirak.Api.Servisler.DepolamaServisi depo,
+        IWebHostEnvironment ortam)
+    {
+        var (ok, _) = await SuperAdminMi(ctx, db);
+        if (!ok) return Hata(403, "ERISIM_YOK", "Bu alana yalniz sistem yoneticisi erisebilir.");
+
+        var kok = ortam.ContentRootPath;
+
+        // 1) Derleyicinin gordugu eser verisi
+        var (eser, hataE) = await BiAniBirak.Api.Servisler.DefterDerleyici.EserVerisiAsync(
+            id, db, depo, kok);
+        if (hataE != null) return Hata(400, hataE.Kod, hataE.Mesaj);
+
+        // 2) Paketleyicinin hesabi
+        var fontKok = System.IO.Path.Combine(kok, "Varliklar", "Fontlar");
+        var yerlesim = BiAniBirak.Api.Servisler.SayfaPaketleyici.Paketle(
+            eser!.Dilekler,
+            fontKok,
+            BiAniBirak.Api.Servisler.BaskiServisi.SayfaIcerikYuksekligiA5);
+
+        // 3) QuestPDF'in GERCEKTEN urettigi sayfa sayisi (onizleme ile ayni belge)
+        var (sayfalar, hataO) = await BiAniBirak.Api.Servisler.OnizlemeServisi.SayfalarAsync(
+            id, db, depo, kok);
+        if (hataO != null) return Hata(400, hataO.Kod, hataO.Mesaj);
+
+        // Dilek disi sayfalar: kapak (hep) + ithaf (varsa) + kapanis (varsa)
+        var ithafVar = !string.IsNullOrWhiteSpace(eser.IthafMetni) || eser.IthafGorseli != null;
+        var kapanisVar = !string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.KapanisGorseli != null;
+        var dilekDisi = 1 + (ithafVar ? 1 : 0) + (kapanisVar ? 1 : 0);
+        var gercekDilekSayfa = sayfalar!.Count - dilekDisi;
+
+        return Results.Json(new
+        {
+            olcum_kullanilabilir = yerlesim.Kullanilabilir,
+            not = yerlesim.Not,
+            dilek_sayisi = eser.Dilekler.Count,
+            paketleyici_sayfa = yerlesim.Sayfalar.Count,
+            gercek_sayfa = gercekDilekSayfa,
+            toplam_sayfa = sayfalar.Count,
+            dilek_disi_sayfa = dilekDisi,
+            tutuyor = yerlesim.Kullanilabilir && yerlesim.Sayfalar.Count == gercekDilekSayfa,
+            sayfalar = yerlesim.Sayfalar.Select(s => new
+            {
+                no = s.No,
+                dilek = s.DilekIndeksleri.Count,
+                dolu = Math.Round(s.DoluYukseklik, 1),
+                bos = Math.Round(s.BosYukseklik, 1),
+            }),
+        });
+    }
 
     // Cope at (soft delete - geri alinabilir)
     private static async Task<IResult> DefterCopeAt(Guid id, HttpContext ctx, BiAniBirakDbContext db)
