@@ -38,6 +38,11 @@ public static class BaskiServisi
     private const string BaslikFont = "Fraunces Basli";
     private const string GovdeFont = "Inter Govde";
 
+    // YEDEK FONT: govde fontunda bulunmayan karakterler (emoji) buradan cizilir.
+    // Varliklar/Fontlar/NotoEmoji-Regular.ttf - Hazirla() zaten tum .ttf'leri
+    // kaydeder, ayri kayit koduna gerek yoktur.
+    private const string EmojiFont = "Noto Emoji";
+
     private static bool _hazir;
     private static readonly object _kilit = new();
 
@@ -402,7 +407,7 @@ public static class BaskiServisi
             if (!string.IsNullOrWhiteSpace(eser.IthafMetni))
             {
                 sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.IthafMetni)
-                    .FontFamily(GovdeFont).FontSize(11).LineHeight(1.8f)
+                    .FontFamily(GovdeFont, EmojiFont).FontSize(11).LineHeight(1.8f)
                     .FontColor(MurekkepYumusak).Italic(italik);
                 sutun.Item().Height(22);
             }
@@ -599,8 +604,9 @@ public static class BaskiServisi
                 kart.Item().Height(13);
             }
 
+            // EMOJI: davetli metninde beklenir -> yedek font zinciri.
             kart.Item().AlignCenter().Text(MesajBicimle(d.Mesaj))
-                .FontFamily(GovdeFont).FontSize(10.5f).LineHeight(1.72f)
+                .FontFamily(GovdeFont, EmojiFont).FontSize(10.5f).LineHeight(1.72f)
                 .FontColor(MurekkepYumusak).Italic(italik);
 
             kart.Item().Height(10);
@@ -639,7 +645,7 @@ public static class BaskiServisi
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni))
             {
                 sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.KapanisMetni)
-                    .FontFamily(GovdeFont).FontSize(11).LineHeight(1.8f)
+                    .FontFamily(GovdeFont, EmojiFont).FontSize(11).LineHeight(1.8f)
                     .FontColor(MurekkepYumusak).Italic(italik);
                 sutun.Item().Height(28);
             }
