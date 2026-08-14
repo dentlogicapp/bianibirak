@@ -583,6 +583,29 @@ public static class BaskiServisi
         return kirpik + ".";
     }
 
+    // ---- C-1 PAYLASIMI (yeni mantik yok, var olan hesap disariya acildi) ----
+
+    // Fotografin kart icindeki olcusu. Kart cizimi (DilekKarti) ve olcum
+    // (KartSigarMi / SayfaPaketleyici) AYNI sonucu gormek zorundadir.
+    internal static (float G, float Y) FotoOlcusu(int g, int y)
+    {
+        var yon = YonBul(g, y);
+        var (azamiG, azamiY) = yon switch
+        {
+            Yon.Dikey => (198f, 232f),
+            Yon.Kare => (216f, 216f),
+            _ => (268f, 182f),
+        };
+        return Olcule(g, y, azamiG, azamiY);
+    }
+
+    // Basimda uygulanan metin bicimi (ani sonu noktalama). Olcum, CIZILEN
+    // metnin aynisini gormeli.
+    internal static string MetinBicimle(string? mesaj) => MesajBicimle(mesaj);
+
+    // A5 tasarim puntosunda sayfa ic yuksekligi (paketleyicinin doldurdugu alan).
+    internal static float SayfaIcerikYuksekligiA5 => SayfaIcerikYuksekligi;
+
     private static bool KartSigarMi(Dilek d)
     {
         var yukseklik = 0f;
