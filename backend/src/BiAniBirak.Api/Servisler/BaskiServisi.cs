@@ -493,17 +493,21 @@ public static class BaskiServisi
     {
         kap.AlignMiddle().Column(sutun =>
         {
-            foreach (var i in plan.DilekIndeksleri)
+            foreach (var parca in plan.Parcalar)
             {
+                var i = parca.DilekIndeksi;
                 if (i < 0 || i >= eser.Dilekler.Count) continue;
                 var d = eser.Dilekler[i];
 
                 // Kart bolunmezligi ESKISI GIBI: sigan kart ShowEntire alir,
                 // sigmayan (cok uzun dilek) akisa birakilir - QuestPDF'i
                 // DocumentLayoutException ile cokertmemek icin.
+                // Bolunmus parca ShowEntire ALMAZ: zaten sayfayi doldurmak
+                // uzere olculdu, kilit koymak QuestPDF'i cokertebilir.
+                var bolunmus = parca.DevamEdiyor || parca.DevamiDir;
                 var oge = sutun.Item().PaddingBottom(16);
-                if (KartSigarMi(d)) oge = oge.ShowEntire();
-                oge.Element(c => DilekKarti(c, d, eser));
+                if (!bolunmus && KartSigarMi(d)) oge = oge.ShowEntire();
+                oge.Element(c => DilekKarti(c, d, eser, parca));
             }
         });
     }
@@ -730,10 +734,22 @@ public static class BaskiServisi
     // Fotograf, metin ve imza AYNI cercevede durur; okuyan hangi fotografin hangi
     // dilege ait oldugunu DUSUNMEZ, gorur. Fotografsiz dilek cercevesiz akar -
     // sayfa gereksiz kutularla dolmaz, tipografi kendi basina tasir.
-    private static void DilekKarti(IContainer kap, Dilek d, EserVerisi eser)
+    // parca: kart SAYFAYA SIGMADIGI icin bolundugunde hangi bolumun cizilecegi.
+    // null ise kart butun halinde cizilir (normal durum).
+    //
+    // Ayri bir "parcali kart cizici" YAZILMADI: iki cizici kacinilmaz olarak
+    // ayrisirdi (birine ozellik eklenir, otekine unutulur ve bolunmus dilek
+    // butun olandan farkli gorunurdu). Tek cizici, kosullu bolumler.
+    private static void DilekKarti(
+        IContainer kap, Dilek d, EserVerisi eser,
+        SayfaPaketleyici.KartParcasi? parca = null)
     {
         var italik = eser.Tema == "zarif";
-        var fotoVar = d.Foto != null;
+        // Fotograf yalniz ILK parcada; imza blogu yalniz SON parcada.
+        // Bir dilek iki kez imzalanmis gibi durmamalidir.
+        var fotoVar = d.Foto != null && (parca?.FotoGoster ?? true);
+        var imzaVar = parca?.ImzaGoster ?? true;
+        var metin = parca?.Metin ?? MesajBicimle(d.Mesaj);
 
         // HER DILEK KENDI KARTINDA - fotografli ya da fotografsiz fark etmez.
         //
@@ -745,6 +761,15 @@ public static class BaskiServisi
 
         govde.Column(kart =>
         {
+            // DEVAM SAYFASI ISARETI - okur nerede kaldigini kaybetmesin.
+            if (parca?.DevamiDir == true)
+            {
+                kart.Item().AlignCenter().Text("…devamı")
+                    .FontFamily(GovdeFont).FontSize(7.5f).FontColor(YaldizSolgun)
+                    .Italic();
+                kart.Item().Height(8);
+            }
+
             if (fotoVar)
             {
                 // BUYUK ve orana sadik. Dikey kare yukseklige, yatay kare genislige
@@ -765,30 +790,42 @@ public static class BaskiServisi
             // EMOJI: davetli metninde beklenir -> yedek font zinciri.
             // Davetli metni: emoji GORUNTU olarak satir ici gomulur.
             kart.Item().AlignCenter().Element(c =>
-                EmojiliMetin(c, MesajBicimle(d.Mesaj), 10.5f, 1.72f, italik));
+                EmojiliMetin(c, metin, 10.5f, 1.72f, italik));
 
             kart.Item().Height(10);
 
-            // IMZA BLOGU - ayracla metinden ayrilir; kime ait oldugu NET
-            kart.Item().Element(c => Ayrac(c, eser.Tema, 34));
-            kart.Item().Height(8);
-
-            kart.Item().AlignCenter().Text(d.DavetliAd)
-                .FontFamily(BaslikFont).FontSize(10.5f).FontColor(Sarap);
-
-            if (!string.IsNullOrWhiteSpace(d.Iliski))
+            // DEVAMI VAR ISARETI - imza yerine gecer: dilek burada BITMIYOR.
+            if (parca?.DevamEdiyor == true)
             {
-                kart.Item().Height(3);
-                kart.Item().AlignCenter().Text(d.Iliski)
-                    .FontFamily(GovdeFont).FontSize(7.8f).FontColor(Ikincil)
-                    .LetterSpacing(0.05f);
+                kart.Item().AlignRight().Text("devamı var…")
+                    .FontFamily(GovdeFont).FontSize(7.5f).FontColor(YaldizSolgun)
+                    .Italic();
             }
 
-            if (eser.TarihGoster)
+            // IMZA BLOGU - ayracla metinden ayrilir; kime ait oldugu NET.
+            // Yalniz SON parcada cizilir.
+            if (imzaVar)
             {
-                kart.Item().Height(3);
-                kart.Item().AlignCenter().Text(TarihMetni(d.Birakilma))
-                    .FontFamily(GovdeFont).FontSize(6.8f).FontColor(YaldizSolgun);
+                kart.Item().Element(c => Ayrac(c, eser.Tema, 34));
+                kart.Item().Height(8);
+
+                kart.Item().AlignCenter().Text(d.DavetliAd)
+                    .FontFamily(BaslikFont).FontSize(10.5f).FontColor(Sarap);
+
+                if (!string.IsNullOrWhiteSpace(d.Iliski))
+                {
+                    kart.Item().Height(3);
+                    kart.Item().AlignCenter().Text(d.Iliski)
+                        .FontFamily(GovdeFont).FontSize(7.8f).FontColor(Ikincil)
+                        .LetterSpacing(0.05f);
+                }
+
+                if (eser.TarihGoster)
+                {
+                    kart.Item().Height(3);
+                    kart.Item().AlignCenter().Text(TarihMetni(d.Birakilma))
+                        .FontFamily(GovdeFont).FontSize(6.8f).FontColor(YaldizSolgun);
+                }
             }
         });
     }

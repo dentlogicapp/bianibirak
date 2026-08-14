@@ -59,11 +59,25 @@ public static class SayfaPaketleyici
     // bozar; 20, "yakin komsu" hissini korurken bosluklari kapatmaya yeter.
     private const int PencereBoyu = 20;
 
+    // "…devami var" / "…devami" satiri (ince, italik) - bolunmus kartin isareti.
+    private const float DevamSatiri = 20f;
+
     // ---- SONUC TIPLERI ----
+
+    // Bir kartin sayfadaki parcasi. Normal dilek TEK parcadir; sayfaya sigmayan
+    // uzun dilek CUMLE SINIRINDA bolunur ve birden cok parca olur.
+    public sealed record KartParcasi(
+        int DilekIndeksi,
+        string Metin,
+        bool FotoGoster,   // fotograf yalniz ILK parcada
+        bool ImzaGoster,   // imza blogu yalniz SON parcada
+        bool DevamEdiyor,  // altta ince "devami var" satiri
+        bool DevamiDir);   // ustte ince "devami" satiri
 
     public sealed record SayfaPlani(
         int No,
         IReadOnlyList<int> DilekIndeksleri,
+        IReadOnlyList<KartParcasi> Parcalar,
         float DoluYukseklik,
         float BosYukseklik);
 
@@ -103,10 +117,23 @@ public static class SayfaPaketleyici
             for (var i = 0; i < dilekler.Count; i++)
                 yukseklikler[i] = KartYuksekligi(dilekler[i], olcu);
 
-            // 2) Yerlesim
+            // 2) SAYFAYA SIGMAYAN DILEKLER - cumle sinirinda bolunur.
+            //
+            // Onceden bu kartlar QuestPDF'in akisina birakiliyordu ve sayfa CUMLE
+            // ORTASINDAN kesiliyordu (canlida: 474pt'lik iki kart). Olcum artik
+            // kesin oldugu icin kesme noktasini BIZ secebiliyoruz.
+            var parcaliDilekler = new Dictionary<int, List<KartParcasi>>();
+            for (var i = 0; i < dilekler.Count; i++)
+            {
+                if (yukseklikler[i] <= sayfaYuksekligi) continue;
+                var parcalar = CumleSinirindaBol(i, dilekler[i], olcu, sayfaYuksekligi);
+                if (parcalar.Count > 1) parcaliDilekler[i] = parcalar;
+            }
+
+            // 3) Yerlesim
             var sabitKume = sabitler ?? new HashSet<int>();
             var sayfalar = akilli
-                ? PencereliYerlesim(yukseklikler, sayfaYuksekligi, sabitKume)
+                ? PencereliYerlesim(yukseklikler, sayfaYuksekligi, sabitKume, parcaliDilekler.Keys.ToHashSet())
                 : SiraliYerlesim(yukseklikler, sayfaYuksekligi);
 
             // 3) Sira degisti mi? (dilekler ardisik gelmiyorsa evet)
@@ -121,9 +148,29 @@ public static class SayfaPaketleyici
             var no = 1;
             foreach (var sayfa in sayfalar)
             {
+                // Sayfada BOLUNMUS bir dilek varsa, onun her parcasi kendi sayfasini
+                // alir: bir dilegin devami baska bir dilekle ayni sayfada karismaz.
+                var bolunmus = sayfa.FirstOrDefault(i => parcaliDilekler.ContainsKey(i), -1);
+                if (bolunmus >= 0 && sayfa.Count == 1)
+                {
+                    foreach (var parca in parcaliDilekler[bolunmus])
+                    {
+                        esleme[bolunmus] = esleme.TryGetValue(bolunmus, out var v) ? v : no;
+                        planlar.Add(new SayfaPlani(
+                            no, new[] { bolunmus }, new[] { parca }, sayfaYuksekligi, 0f));
+                        no++;
+                    }
+                    continue;
+                }
+
                 var dolu = sayfa.Sum(i => yukseklikler[i]);
+                var tekParcalar = sayfa
+                    .Select(i => new KartParcasi(
+                        i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false))
+                    .ToList();
                 foreach (var i in sayfa) esleme[i] = no;
-                planlar.Add(new SayfaPlani(no, sayfa, dolu, Math.Max(0f, sayfaYuksekligi - dolu)));
+                planlar.Add(new SayfaPlani(no, sayfa, tekParcalar, dolu,
+                    Math.Max(0f, sayfaYuksekligi - dolu)));
                 no++;
             }
 
@@ -185,7 +232,8 @@ public static class SayfaPaketleyici
     // Sayfa doldurulurken, kalan bosluga en iyi oturan dilek YAKIN PENCEREDEN
     // secilir. Sabitlenmis dilek sirasi geldiginde MUTLAKA o konur - kullanicinin
     // elle verdigi karar her seyin onundedir.
-    private static List<List<int>> PencereliYerlesim(float[] h, float H, ISet<int> sabitler)
+    private static List<List<int>> PencereliYerlesim(
+        float[] h, float H, ISet<int> sabitler, ISet<int> bolunmusler)
     {
         var kalan = Enumerable.Range(0, h.Length).ToList();
         var sayfalar = new List<List<int>>();
@@ -206,6 +254,11 @@ public static class SayfaPaketleyici
                 kalan.RemoveAt(0);
                 suAnki.Add(bas);
                 dolu += h[bas];
+                // Bolunmus dilek KENDI sayfalarini alir - yanina baska dilek gelmez.
+                if (bolunmusler.Contains(bas))
+                {
+                    sayfalar.Add(suAnki); suAnki = new List<int>(); dolu = 0f;
+                }
                 continue;
             }
 
@@ -250,6 +303,104 @@ public static class SayfaPaketleyici
 
         if (suAnki.Count > 0) sayfalar.Add(suAnki);
         return sayfalar;
+    }
+
+    // ---- CUMLE SINIRINDA BOLME ----
+    //
+    // Sayfaya sigmayan dilek, CUMLE bittigi yerden bolunur. Bir ani defterinde
+    // cumle ortasindan kesilen metin, okuru cumleyi bastan kurmaya zorlar; kagitta
+    // bu bir kusurdur. Devami olan sayfa altta "…devami var", devam sayfasi ustte
+    // "…devami" ile isaretlenir - okur nerede kaldigini KAYBETMEZ.
+    //
+    // Fotograf yalniz ILK parcada, imza blogu yalniz SON parcada gorunur:
+    // bir dilek iki kez imzalanmis gibi durmamalidir.
+    private static List<KartParcasi> CumleSinirindaBol(
+        int indeks, BaskiServisi.Dilek d, FontOlcusu olcu, float H)
+    {
+        var metin = BaskiServisi.MetinBicimle(d.Mesaj);
+        var parcalar = new List<KartParcasi>();
+
+        // Ilk sayfada metne kalan yer: fotograf + dolgu + "devami var" satiri dusulur.
+        var fotoYuksekligi = 0f;
+        if (d.Foto != null)
+        {
+            var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik);
+            fotoYuksekligi = fy + FotoMat * 2 + FotoAltBosluk;
+        }
+
+        var kalanMetin = metin;
+        var ilk = true;
+
+        // Guvenlik siniri: her tur metni KISALTMAK zorunda; kisaltamiyorsa dongu biter.
+        for (var tur = 0; tur < 50 && kalanMetin.Length > 0; tur++)
+        {
+            var ustPay = KartDolgu * 2 + KartArasi
+                         + (ilk ? fotoYuksekligi : DevamSatiri);
+            // Son parca olabilir mi? (imza sigiyorsa)
+            var sonPayi = ImzaBlogu;
+            var devamPayi = DevamSatiri;
+
+            // Once "bu parca SON olabilir mi" denenir - bolmemek her zaman yegdir.
+            if (MetinYuksekligi(kalanMetin, olcu) + ustPay + sonPayi <= H)
+            {
+                parcalar.Add(new KartParcasi(
+                    indeks, kalanMetin, ilk, true, false, !ilk));
+                return parcalar;
+            }
+
+            var kullanilabilir = H - ustPay - devamPayi;
+            var kesme = KesmeNoktasi(kalanMetin, olcu, kullanilabilir);
+            if (kesme <= 0 || kesme >= kalanMetin.Length)
+            {
+                // Bolunemedi (tek dev cumle): oldugu gibi birak, QuestPDF akista boler.
+                parcalar.Add(new KartParcasi(indeks, kalanMetin, ilk, true, false, !ilk));
+                return parcalar;
+            }
+
+            parcalar.Add(new KartParcasi(
+                indeks, kalanMetin[..kesme].TrimEnd(), ilk, false, true, !ilk));
+            kalanMetin = kalanMetin[kesme..].TrimStart();
+            ilk = false;
+        }
+
+        if (kalanMetin.Length > 0)
+            parcalar.Add(new KartParcasi(indeks, kalanMetin, false, true, false, true));
+
+        return parcalar;
+    }
+
+    // Verilen yukseklige sigan EN UZUN metin parcasinin bitis konumu.
+    // Once CUMLE sinirlari denenir; hicbiri sigmazsa kelime sinirina duser.
+    private static int KesmeNoktasi(string metin, FontOlcusu olcu, float kullanilabilir)
+    {
+        if (kullanilabilir <= 0) return 0;
+
+        // Cumle sinirlari: . ! ? … ardindan bosluk gelen konumlar.
+        var sinirlar = new List<int>();
+        for (var i = 0; i < metin.Length - 1; i++)
+        {
+            var c = metin[i];
+            if (c is '.' or '!' or '?' or '\u2026' && char.IsWhiteSpace(metin[i + 1]))
+                sinirlar.Add(i + 1);
+        }
+
+        var enIyi = 0;
+        foreach (var sinir in sinirlar)
+        {
+            if (MetinYuksekligi(metin[..sinir], olcu) <= kullanilabilir) enIyi = sinir;
+            else break;
+        }
+        if (enIyi > 0) return enIyi;
+
+        // Cumle siniri sigmadi: kelime sinirina dus (tek uzun cumle durumu).
+        var sonBosluk = 0;
+        for (var i = 0; i < metin.Length; i++)
+        {
+            if (!char.IsWhiteSpace(metin[i])) continue;
+            if (MetinYuksekligi(metin[..i], olcu) <= kullanilabilir) sonBosluk = i;
+            else break;
+        }
+        return sonBosluk;
     }
 
     // ---- TEK KARTIN YUKSEKLIGI ----
