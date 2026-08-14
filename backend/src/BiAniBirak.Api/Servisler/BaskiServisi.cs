@@ -492,6 +492,39 @@ public static class BaskiServisi
     // A5 icerik yuksekligi: 210mm - 18mm ust - 16mm alt = 176mm; altbilgi ~26pt.
     private const float SayfaIcerikYuksekligi = 176f * 72f / 25.4f - 26f;
 
+    // ---- ANI SONU OTOMATIK NOKTALAMA (editoryel bicimlendirme) ----
+    //
+    // Bir defter sayfasinda noktalamasiz biten cumle, YARIM BIRAKILMIS gorunur.
+    // Davetli telefonda hizlica yazar ve noktayi cogu zaman koymaz; ekranda bu
+    // dogaldir, KAGITTA degildir. Baskiya hazir bir eserde her ani TAMAMLANMIS
+    // durmalidir - fark kucuk, hissi buyuk.
+    //
+    // VERI DEGISMEZ: bu bicimlendirme yalniz BASIMDA uygulanir; davetlinin
+    // yazdigi metin veritabaninda oldugu gibi durur. Yazilani degistirmeyiz,
+    // yalnizca esere dokerken editoryel bicim veririz - ve karar geri alinabilir.
+    //
+    // EKLEMEDIGIMIZ DURUMLAR (eklemek YANLIS olurdu):
+    //   - Zaten noktalama var (. ! ? ... : ; ,)
+    //   - Kapanis tirnagi/parantezi ile bitiyor: "...sozu." ya da (bir not)
+    //     Icinde zaten noktalama olabilir; disina nokta koymak cift olur.
+    //   - Emoji/sembol ile bitiyor: kalp ya da alkis ardina nokta tuhaf durur.
+    //   - Metin bos.
+    private static string MesajBicimle(string? mesaj)
+    {
+        if (string.IsNullOrWhiteSpace(mesaj)) return mesaj ?? string.Empty;
+
+        var kirpik = mesaj.TrimEnd();
+        var son = kirpik[^1];
+
+        // Harf ya da rakamla bitmiyorsa DOKUNMA. Bu tek kosul noktalamayi,
+        // tirnagi, parantezi, emojiyi ve sembolleri birlikte kapsar - uzun bir
+        // "yasakli karakter" listesi tutmaktan hem daha kisa hem daha guvenlidir
+        // (listeye yazmayi unuttugumuz bir sembol yanlis nokta uretmez).
+        if (!char.IsLetterOrDigit(son)) return kirpik;
+
+        return kirpik + ".";
+    }
+
     private static bool KartSigarMi(Dilek d)
     {
         var yukseklik = 0f;
@@ -518,7 +551,9 @@ public static class BaskiServisi
         // Ortalama karakter genisligi ~5pt (serif, 10.5 punto).
         var karakterSatir = Math.Max(20f, satirGenislik / 5.0f);
         var satirlar = 0;
-        foreach (var parca in (d.Mesaj ?? string.Empty).Replace("\r\n", "\n").Split('\n'))
+        // Olcum, CIZILEN metnin aynisini gormeli (bkz. MesajBicimle) - yoksa
+        // eklenen nokta bir satir tasirdiginda tahmin kayar.
+        foreach (var parca in MesajBicimle(d.Mesaj).Replace("\r\n", "\n").Split('\n'))
             satirlar += Math.Max(1, (int)Math.Ceiling(parca.Length / karakterSatir));
         yukseklik += satirlar * 18.1f;
 
@@ -564,7 +599,7 @@ public static class BaskiServisi
                 kart.Item().Height(13);
             }
 
-            kart.Item().AlignCenter().Text(d.Mesaj)
+            kart.Item().AlignCenter().Text(MesajBicimle(d.Mesaj))
                 .FontFamily(GovdeFont).FontSize(10.5f).LineHeight(1.72f)
                 .FontColor(MurekkepYumusak).Italic(italik);
 
