@@ -45,6 +45,8 @@ public static class BaskiServisi
     // sorunu da kokten cozer - font cozumlemesi devreye HIC girmez.
 
     private static bool _hazir;
+    // Paketleyici olcumu icin font dizini (Hazirla sirasinda doldurulur).
+    private static string _fontDizin = string.Empty;
     private static readonly object _kilit = new();
 
     public static void Hazirla(string kokDizin)
@@ -56,6 +58,7 @@ public static class BaskiServisi
             QuestPDF.Settings.License = LicenseType.Community;
 
             var fontDizin = Path.Combine(kokDizin, "Varliklar", "Fontlar");
+            _fontDizin = fontDizin;
             if (Directory.Exists(fontDizin))
             {
                 foreach (var yol in Directory.GetFiles(fontDizin, "*.ttf"))
@@ -200,11 +203,40 @@ public static class BaskiServisi
                 });
             }
 
-            kapsayici.Page(sayfa =>
+            // ---- DILEK SAYFALARI ----
+            //
+            // C-2: sayfa kirma karari artik BIZDE (SayfaPaketleyici). Kazanc sayfa
+            // SAYISI degil (olcum kanitladi: her sayfaya zaten tek kart siğiyor),
+            // sayfa ICI YERLESIMI: kart artik dikey ORTALANIR.
+            //
+            // Onceden butun dilekler tek akista diziliyordu; kart sayfanin USTUNE
+            // yapisik kaliyor, kalan bosluk (kimi sayfada %76'sı) hep ALTTA
+            // birikiyordu. Bir ani defterinde bu, sayfanin yarim kalmis gorunmesidir.
+            //
+            // GERI DONUS YOLU: paketleyici calismazsa (olcum kurulamadi, taraf
+            // gruplamasi) ESKI AKIS aynen kullanilir - defter her kosulda uretilir.
+            var dilekPlani = DilekSayfaPlani(eser);
+            if (dilekPlani != null)
             {
-                SayfaKur(sayfa, eser, altbilgi: true, bo);
-                sayfa.Content().Scale(bo.Olcek).Element(k => Dilekler(k, eser));
-            });
+                foreach (var sp in dilekPlani.Sayfalar)
+                {
+                    var buSayfa = sp; // kapanis degiskeni: dongu degiskeni yakalanmaz
+                    kapsayici.Page(sayfa =>
+                    {
+                        SayfaKur(sayfa, eser, altbilgi: true, bo);
+                        sayfa.Content().Scale(bo.Olcek)
+                            .Element(k => DilekSayfasi(k, eser, buSayfa));
+                    });
+                }
+            }
+            else
+            {
+                kapsayici.Page(sayfa =>
+                {
+                    SayfaKur(sayfa, eser, altbilgi: true, bo);
+                    sayfa.Content().Scale(bo.Olcek).Element(k => Dilekler(k, eser));
+                });
+            }
 
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni) || eser.KapanisGorseli != null)
             {
@@ -434,6 +466,48 @@ public static class BaskiServisi
     }
 
     // ---------------- DILEKLER ----------------
+    // Dilek sayfalarinin plani. null donerse ESKI AKIS kullanilir.
+    private static SayfaPaketleyici.Yerlesim? DilekSayfaPlani(EserVerisi eser)
+    {
+        // TARAF GRUPLAMASI HENUZ KAPSAM DISI: o modda araya bolum basliklari ve
+        // bolum gorselleri giriyor; paketleyici onlari bilmiyor, sayfa hesabi
+        // kayardi. C-3'te (siralama) birlikte ele alinacak.
+        if (eser.GruplamaTipi == "taraf") return null;
+        if (string.IsNullOrEmpty(_fontDizin)) return null;
+        if (eser.Dilekler.Count == 0) return null;
+
+        var yerlesim = SayfaPaketleyici.Paketle(
+            eser.Dilekler, _fontDizin, SayfaIcerikYuksekligi);
+
+        return yerlesim.Kullanilabilir && yerlesim.Sayfalar.Count > 0 ? yerlesim : null;
+    }
+
+    // TEK DILEK SAYFASI - optik denge.
+    //
+    // Dikey ortalamayi QuestPDF'in kendi hizalamasi yapar (AlignMiddle), bizim
+    // hesapladigimiz bosluk degeriyle DEGIL. Sebep: olcum birkac punto sapsa bile
+    // denge bozulmaz - kart her kosulda sayfanin ortasinda durur. Sayiyla itmek,
+    // olcum hatasini gorunur bir kaymaya cevirirdi.
+    private static void DilekSayfasi(
+        IContainer kap, EserVerisi eser, SayfaPaketleyici.SayfaPlani plan)
+    {
+        kap.AlignMiddle().Column(sutun =>
+        {
+            foreach (var i in plan.DilekIndeksleri)
+            {
+                if (i < 0 || i >= eser.Dilekler.Count) continue;
+                var d = eser.Dilekler[i];
+
+                // Kart bolunmezligi ESKISI GIBI: sigan kart ShowEntire alir,
+                // sigmayan (cok uzun dilek) akisa birakilir - QuestPDF'i
+                // DocumentLayoutException ile cokertmemek icin.
+                var oge = sutun.Item().PaddingBottom(16);
+                if (KartSigarMi(d)) oge = oge.ShowEntire();
+                oge.Element(c => DilekKarti(c, d, eser));
+            }
+        });
+    }
+
     private static void Dilekler(IContainer kap, EserVerisi eser)
     {
         var bloklar = new List<(string? Baslik, List<Dilek> Dilekler)>();

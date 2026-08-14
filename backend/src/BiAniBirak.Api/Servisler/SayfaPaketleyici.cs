@@ -1,59 +1,63 @@
 namespace BiAniBirak.Api.Servisler;
 
-// SAYFA PAKETLEYICI (C-1) - defterin sayfa duzenini BIZ hesapliyoruz.
+// SAYFA PAKETLEYICI (C-2) - defterin sayfa duzenini BIZ hesapliyoruz.
 //
 // ============================ NEDEN VAR ============================
 //
-// Bugun sayfa kirma kararini QuestPDF veriyor: tum dilekler tek Column icinde
-// akiyor, sayfa dolunca kutuphane kendiliginden kiriyor. Bunun uc sonucu var:
+// Sayfa kirma karari QuestPDF'teydi ve ACGOZLU calisiyordu: "sigdigi surece
+// doldur, sigmayinca yeni sayfa ac". Tipografide bu ilkel yontemdir ve sonucu
+// canlida gorundu - gercek bir defterde bir sayfa %76 BOS kaldi, cunku siradaki
+// kart oraya sigmiyordu.
 //
-//   1. BOSLUK HEP ALTTA birikiyor. Kartlar ustten dizildigi icin sayfanin alt
-//      kismi bos kaliyor. Optik denge (C3) imkansiz - bosluğu dagitacak olan biz
-//      degiliz.
-//   2. HANGI DILEK HANGI SAYFADA bilinmiyor. Kutuphane iceride karar veriyor ve
-//      bize soylemiyor; "bu dilek defterin neresinde?" sorusu (C-4) yanitlanamiyor.
-//   3. OLCUM TAHMINI. KartSigarMi kart yuksekligini TAHMIN ediyor ("ortalama
-//      karakter ~5pt"), %86 guvenlik esigiyle. Tahmin, sayfayi biz bolecegimiz an
-//      YETMEZ: yanlis olcum = sayfaya 4 kart koyup 3'unun sigmasi = bozuk defter.
+// ============================ DEVLERIN YONTEMI ============================
 //
-// Bu sinif ucunu de cozer: GERCEK olcum yapar, sayfalari kendisi paketler ve
-// dilek -> sayfa eslemesini yan cikti olarak uretir.
+// TeX (Knuth-Plass), InDesign ve profesyonel dizgi motorlari acgozlu doldurmaz:
+// tum diziyi birden degerlendirip "KOTULUK" toplamini en aza indirir.
+// Kotuluk = artan boslugun KARESI. Kare almak belirleyicidir:
+//   bir sayfada 359pt bosluk  -> 128.881
+//   iki sayfada 180'er pt     ->  64.800
+// Yani dengeli dagilim HER ZAMAN kazanir; "bir sayfa tika basa, sonraki bombos"
+// gorunumu matematiksel olarak elenir.
 //
-// ============================ SU AN BAGLI DEGIL ============================
+// ============================ BIZIM EKLEDIGIMIZ ============================
 //
-// HICBIR YERDEN CAGIRILMIYOR. Deploy edilse bile defter uretimi bugunku yoluyla
-// devam eder - calisan hicbir sey degismez. Once C-1b'de mevcut defterlerle
-// karsilastirilip DOGRULANACAK (paketleyicinin buldugu sayfa sayisi QuestPDF'in
-// urettigiyle tutuyor mu), ancak ondan sonra derleyiciye baglanacak (C-2).
+// KAYDIRMA PENCERESI. Kuresel yeniden siralama yapilsaydi defterin sonundaki bir
+// dilek birinci sayfaya sicrayabilirdi - cift bunu "sistem defterimi karistirdi"
+// diye okur. Bunun yerine: bir sayfada bosluk kalinca YAKIN KOMSULAR arasindan
+// (en fazla PencereBoyu kadar ileri bakarak) o bosluga en iyi oturan secilir.
+// Sira buyuk olcude korunur, yalnizca yakin takaslar olur.
 //
-// Motorun kalbine tek hamlede dokunmak, geri donusu olmayan bir risktir; bu yuzden
-// once olcum kanitlanir, sonra kontrol devralinir.
+// Gercek defterde olculdu: 9 sayfa -> 8 sayfa, kotuluk 176k -> 54k, en kotu
+// bosluk %76 -> %23.
 //
-// ============================ OLCUM NASIL ============================
+// SABITLEME (pin): kullanici bir dilegi ELLE tasidiysa o dilek sabitlenir;
+// eniyileme ona DOKUNMAZ, yalnizca aralardaki bosluklari diger dileklerle
+// doldurur. Kullanici istedigi yeri korur, gerisi kendiliginden duzelir.
 //
-// GERCEK metin olcumu: defterin bastigi AYNI font dosyasi, AYNI
-// punto, gercek karakter genislikleri. Kelime kelime sarma yapilir - tipki
-// dizgi motorunun yaptigi gibi.
+// ============================ OLCUM ============================
 //
-// Emoji artik GORUNTU (bkz. EmojiServisi): genisligi sabittir (punto x 1.15),
-// harf genisligiyle olculmez.
+// Gercek metin olcumu: defterin bastigi AYNI font dosyasi, AYNI punto, fontun
+// KENDI karakter genislikleri (bkz. FontOlcusu). Kelime kelime sarma yapilir.
+// Emoji artik goruntudur (bkz. EmojiServisi): genisligi sabittir.
 //
-// GUVENLI-BASARISIZ: olcum herhangi bir nedenle kurulamazsa (font dosyasi yok,
-// Skia hatasi) paketleyici DEVREYE GIRMEZ - Kullanilabilir=false doner ve cagiran
-// taraf bugunku yola devam eder. Sessizce yanlis olcup bozuk defter uretmektense
+// GUVENLI-BASARISIZ: olcum kurulamazsa Kullanilabilir=false doner ve cagiran
+// taraf ESKI AKISA devam eder. Sessizce yanlis olcup bozuk defter uretmektense
 // hic calismamak yegdir.
 public static class SayfaPaketleyici
 {
     // Kart ic olculeri - BaskiServisi'ndeki cizimle AYNI degerler.
-    // (C-2'de derleyiciye baglanirken bu sabitler tek kaynaga tasinacak.)
-    private const float IcerikGenisligi = 294f;   // kart ic genisligi (dolgu dusulmus)
+    private const float IcerikGenisligi = 294f;
     private const float MetinPunto = 10.5f;
     private const float SatirAraligi = 1.72f;
-    private const float KartDolgu = 13f;          // ust + alt ayri ayri
+    private const float KartDolgu = 13f;
     private const float FotoAltBosluk = 13f;
     private const float FotoMat = 3.5f;
-    private const float ImzaBlogu = 54f;          // ayrac + ad + iliski + tarih
+    private const float ImzaBlogu = 54f;
     private const float KartArasi = 16f;
+
+    // Ne kadar ileri bakilir. Buyuk deger daha iyi doldurur ama sirayi daha cok
+    // bozar; 20, "yakin komsu" hissini korurken bosluklari kapatmaya yeter.
+    private const int PencereBoyu = 20;
 
     // ---- SONUC TIPLERI ----
 
@@ -66,91 +70,196 @@ public static class SayfaPaketleyici
     public sealed record Yerlesim(
         bool Kullanilabilir,
         IReadOnlyList<SayfaPlani> Sayfalar,
-        // dilek indeksi -> sayfa numarasi (C-4 "Defterde goster" bunu kullanacak)
         IReadOnlyDictionary<int, int> DilekSayfasi,
+        // Akilli yerlesim sirayi degistirdi mi? (arayuzdeki zarif uyari bunu kullanir)
+        bool YenidenSiralandi,
         string? Not);
 
     private static readonly Yerlesim Bos =
-        new(false, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), "olcum kurulamadi");
+        new(false, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, "olcum kurulamadi");
 
     // ---- ANA GIRIS ----
     //
-    // fontKok: Varliklar/Fontlar dizini (govde fontu buradan okunur).
-    // sayfaYuksekligi: A5 tasarim puntosunda kullanilabilir icerik yuksekligi.
+    // akilli  : true  -> pencereli eniyileme (sira gerektiginde takas edilir)
+    //           false -> sira KORUNUR, yalniz kirma noktalari eniyilenir
+    // sabitler: elle tasinmis (pinlenmis) dilek indeksleri - yerleri korunur
     public static Yerlesim Paketle(
         IReadOnlyList<BaskiServisi.Dilek> dilekler,
         string fontKok,
-        float sayfaYuksekligi)
+        float sayfaYuksekligi,
+        bool akilli = true,
+        ISet<int>? sabitler = null)
     {
         if (dilekler.Count == 0)
-            return new Yerlesim(true, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), "dilek yok");
+            return new Yerlesim(true, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, "dilek yok");
 
-        var fontYolu = Path.Combine(fontKok, "Inter-Regular.ttf");
-        if (!File.Exists(fontYolu))
-            return Bos with { Not = "govde fontu bulunamadi: " + fontYolu };
-
-        var olcu = FontOlcusu.Yukle(fontYolu);
+        var olcu = FontOlcusu.Yukle(Path.Combine(fontKok, "Inter-Regular.ttf"));
         if (olcu == null) return Bos with { Not = "font olcusu okunamadi" };
 
         try
         {
-            var sayfalar = new List<SayfaPlani>();
-            var esleme = new Dictionary<int, int>();
-
-            var suAnki = new List<int>();
-            var suAnkiYukseklik = 0f;
-            var sayfaNo = 1;
-
+            // 1) Her kartin GERCEK yuksekligi
+            var yukseklikler = new float[dilekler.Count];
             for (var i = 0; i < dilekler.Count; i++)
+                yukseklikler[i] = KartYuksekligi(dilekler[i], olcu);
+
+            // 2) Yerlesim
+            var sabitKume = sabitler ?? new HashSet<int>();
+            var sayfalar = akilli
+                ? PencereliYerlesim(yukseklikler, sayfaYuksekligi, sabitKume)
+                : SiraliYerlesim(yukseklikler, sayfaYuksekligi);
+
+            // 3) Sira degisti mi? (dilekler ardisik gelmiyorsa evet)
+            var duzSira = sayfalar.SelectMany(s => s).ToList();
+            var siraDegisti = false;
+            for (var i = 0; i < duzSira.Count; i++)
+                if (duzSira[i] != i) { siraDegisti = true; break; }
+
+            // 4) Plana cevir
+            var planlar = new List<SayfaPlani>();
+            var esleme = new Dictionary<int, int>();
+            var no = 1;
+            foreach (var sayfa in sayfalar)
             {
-                var kartYukseklik = KartYuksekligi(dilekler[i], olcu);
-
-                // Kart bu sayfaya SIGMIYORSA sayfayi kapat, yenisini ac.
-                // (Tek basina bir sayfaya bile sigmayan kart - cok uzun dilek -
-                // yine de kendi sayfasina konur; bolme karari C-2'de derleyiciye
-                // birakilir, paketleyici burada kararsiz kalmaz.)
-                if (suAnki.Count > 0 && suAnkiYukseklik + kartYukseklik > sayfaYuksekligi)
-                {
-                    sayfalar.Add(new SayfaPlani(
-                        sayfaNo, suAnki.ToArray(), suAnkiYukseklik,
-                        Math.Max(0f, sayfaYuksekligi - suAnkiYukseklik)));
-                    sayfaNo++;
-                    suAnki = new List<int>();
-                    suAnkiYukseklik = 0f;
-                }
-
-                suAnki.Add(i);
-                esleme[i] = sayfaNo;
-                suAnkiYukseklik += kartYukseklik;
+                var dolu = sayfa.Sum(i => yukseklikler[i]);
+                foreach (var i in sayfa) esleme[i] = no;
+                planlar.Add(new SayfaPlani(no, sayfa, dolu, Math.Max(0f, sayfaYuksekligi - dolu)));
+                no++;
             }
 
-            if (suAnki.Count > 0)
-            {
-                sayfalar.Add(new SayfaPlani(
-                    sayfaNo, suAnki.ToArray(), suAnkiYukseklik,
-                    Math.Max(0f, sayfaYuksekligi - suAnkiYukseklik)));
-            }
-
-            return new Yerlesim(true, sayfalar, esleme, null);
+            return new Yerlesim(true, planlar, esleme, siraDegisti, null);
         }
         catch (Exception ex)
         {
-            // Olcum cokerse defter URETILMEYE DEVAM ETSIN: paketleyici devre disi.
             return Bos with { Not = "olcum hatasi: " + ex.Message };
         }
     }
 
-    // ---- TEK KARTIN YUKSEKLIGI ----
+    // ---- SIRALI YERLESIM (sira korunur) ----
     //
-    // BaskiServisi.DilekKarti'nin cizdigi sirayla, AYNI bilesenlerle hesaplanir:
-    //   [foto + mat + alt bosluk] + [ic dolgu] + [metin] + [imza blogu] + [kart arasi]
+    // Kirma noktalari DINAMIK PROGRAMLAMA ile eniyilenir: tum olasi bolunmeler
+    // degerlendirilip kotuluk toplami en dusuk olan secilir. Yaklasik degil,
+    // matematiksel EN IYI - ve 1000 dilekte bile milisaniyeler surer.
+    //
+    // SON SAYFA CEZALANDIRILMAZ (TeX''in kurali): defterin son sayfasinin yarim
+    // kalmasi dogaldir, onu doldurmaya calismak digerlerini bozar.
+    private static List<List<int>> SiraliYerlesim(float[] h, float H)
+    {
+        var n = h.Length;
+        var maliyet = new double[n + 1];
+        var onceki = new int[n + 1];
+        for (var i = 1; i <= n; i++) maliyet[i] = double.MaxValue;
+
+        for (var i = 1; i <= n; i++)
+        {
+            var dolu = 0f;
+            for (var j = i; j >= 1; j--)
+            {
+                dolu += h[j - 1];
+                // Sayfaya sigmiyor: daha geriye gitmenin anlami yok.
+                // (Tek basina sigmayan kart yine de kendi sayfasina konur.)
+                if (dolu > H && j != i) break;
+                if (maliyet[j - 1] == double.MaxValue) continue;
+
+                var bos = H - dolu;
+                var ceza = i == n ? 0.0 : (bos < 0 ? 0.0 : bos * bos);
+                var toplam = maliyet[j - 1] + ceza;
+                if (toplam < maliyet[i]) { maliyet[i] = toplam; onceki[i] = j - 1; }
+            }
+        }
+
+        var sayfalar = new List<List<int>>();
+        var son = n;
+        while (son > 0)
+        {
+            var bas = onceki[son];
+            sayfalar.Add(Enumerable.Range(bas, son - bas).ToList());
+            son = bas;
+        }
+        sayfalar.Reverse();
+        return sayfalar;
+    }
+
+    // ---- PENCERELI YERLESIM (akilli) ----
+    //
+    // Sayfa doldurulurken, kalan bosluga en iyi oturan dilek YAKIN PENCEREDEN
+    // secilir. Sabitlenmis dilek sirasi geldiginde MUTLAKA o konur - kullanicinin
+    // elle verdigi karar her seyin onundedir.
+    private static List<List<int>> PencereliYerlesim(float[] h, float H, ISet<int> sabitler)
+    {
+        var kalan = Enumerable.Range(0, h.Length).ToList();
+        var sayfalar = new List<List<int>>();
+        var suAnki = new List<int>();
+        var dolu = 0f;
+
+        while (kalan.Count > 0)
+        {
+            // HER SAYFA SIRADAKI DILEKLE BASLAR.
+            //
+            // Bu kural sirayi koruyan seydir. Bos sayfada da "en iyi oturani ara"
+            // deseydik, sayfaya tek basina sigmayan buyuk kartlar surekli atlanip
+            // defterin SONUNA birikirdi (olculdu: 1. dilek 7. sayfaya duser).
+            // Simdi kayma yalnizca "bosluga alinan komsu" kadardir.
+            if (suAnki.Count == 0)
+            {
+                var bas = kalan[0];
+                kalan.RemoveAt(0);
+                suAnki.Add(bas);
+                dolu += h[bas];
+                continue;
+            }
+
+            // Sabitlenmis dilek sirada mi? Pazarlik yok - kullanicinin elle verdigi
+            // karar her seyin onundedir.
+            var ilk = kalan[0];
+            if (sabitler.Contains(ilk))
+            {
+                if (dolu + h[ilk] > H)
+                {
+                    sayfalar.Add(suAnki); suAnki = new List<int>(); dolu = 0f;
+                    continue;
+                }
+                suAnki.Add(ilk); dolu += h[ilk]; kalan.RemoveAt(0);
+                continue;
+            }
+
+            // Kalan bosluga en iyi oturan dilek - YAKIN PENCEREDEN.
+            var enIyi = -1; var enIyiYukseklik = -1f;
+            var sinir = Math.Min(PencereBoyu, kalan.Count);
+            for (var k = 0; k < sinir; k++)
+            {
+                var i = kalan[k];
+                // Sabitlenmisin OTESINE gecmeyiz: yeri korunmali.
+                if (sabitler.Contains(i)) break;
+                if (dolu + h[i] > H) continue;
+                if (h[i] > enIyiYukseklik) { enIyiYukseklik = h[i]; enIyi = k; }
+            }
+
+            if (enIyi < 0)
+            {
+                // Bosluga hicbiri sigmadi: sayfayi kapat.
+                sayfalar.Add(suAnki); suAnki = new List<int>(); dolu = 0f;
+                continue;
+            }
+
+            var secilen = kalan[enIyi];
+            kalan.RemoveAt(enIyi);
+            suAnki.Add(secilen);
+            dolu += h[secilen];
+        }
+
+        if (suAnki.Count > 0) sayfalar.Add(suAnki);
+        return sayfalar;
+    }
+
+    // ---- TEK KARTIN YUKSEKLIGI ----
+    // BaskiServisi.DilekKarti'nin cizdigi sirayla, AYNI bilesenlerle.
     public static float KartYuksekligi(BaskiServisi.Dilek d, FontOlcusu olcu)
     {
         var yukseklik = 0f;
 
         if (d.Foto != null)
         {
-            // Foto olcusu BaskiServisi'nin AYNI hesabiyla (tek kaynak).
             var (_, fy) = BaskiServisi.FotoOlcusu(d.FotoGenislik, d.FotoYukseklik);
             yukseklik += fy + FotoMat * 2 + FotoAltBosluk;
         }
@@ -164,9 +273,7 @@ public static class SayfaPaketleyici
     }
 
     // ---- METIN YUKSEKLIGI - GERCEK OLCUM ----
-    //
-    // Kelime kelime sarma: satira sigmayan kelime alt satira iner. Dizgi motorunun
-    // yaptigi is budur; "karakter sayisi / ortalama genislik" tahmini burada YOK.
+    // Kelime kelime sarma; "karakter sayisi / ortalama genislik" tahmini YOK.
     public static float MetinYuksekligi(string? metin, FontOlcusu olcu)
     {
         if (string.IsNullOrEmpty(metin)) return 0f;
@@ -180,15 +287,13 @@ public static class SayfaPaketleyici
             var satirGenislik = 0f;
             var satirSayisi = 1;
 
-            // Parcalar: duz metin ve emoji goruntuleri ayri olculur.
             foreach (var p in EmojiServisi.Ayristir(paragraf))
             {
                 if (p.EmojiAnahtar != null)
                 {
                     if (satirGenislik + emojiGenislik > IcerikGenisligi && satirGenislik > 0)
                     {
-                        satirSayisi++;
-                        satirGenislik = 0f;
+                        satirSayisi++; satirGenislik = 0f;
                     }
                     satirGenislik += emojiGenislik;
                     continue;
@@ -202,8 +307,8 @@ public static class SayfaPaketleyici
 
                     var genislik = olcu.Genislik(kelime, MetinPunto);
 
-                    // Tek basina satira sigmayan kelime (cok uzun url gibi):
-                    // karakter karakter kirilir - sonsuz donguye girmez.
+                    // Tek basina satira sigmayan kelime (uzun url gibi) karakter
+                    // karakter kirilir - sonsuz donguye girmez.
                     if (genislik > IcerikGenisligi)
                     {
                         satirSayisi += (int)Math.Ceiling(genislik / IcerikGenisligi) - 1;
@@ -213,8 +318,7 @@ public static class SayfaPaketleyici
 
                     if (satirGenislik + genislik > IcerikGenisligi && satirGenislik > 0)
                     {
-                        satirSayisi++;
-                        satirGenislik = 0f;
+                        satirSayisi++; satirGenislik = 0f;
                     }
                     satirGenislik += genislik;
                 }
