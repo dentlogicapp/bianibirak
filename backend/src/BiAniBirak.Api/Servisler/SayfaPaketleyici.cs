@@ -73,6 +73,21 @@ public static class SayfaPaketleyici
     // esiktir; altina inmek kaliteyi satmak olur.
     private static readonly float[] OlcekAdaylari = { 1.00f, 0.95f, 0.90f, 0.85f };
 
+    // BOLME ESIGI - kart ancak ANLAMLI olcude tastiginda bolunur.
+    //
+    // CANLIDA YAKALANDI: 474.4pt'lik kartlar 473pt'lik sayfaya karsi "sigmiyor"
+    // sayilip ikiye bolundu ve defter 8 sayfadan 10 sayfaya CIKTI. Oysa fark 1.4pt,
+    // yani sayfanin BINDE UCU - ve gercekte siğiyorlardi.
+    //
+    // Olcumumuzde kerning/ligatur hesaba katilmaz; bu ~%1 belirsizlik demektir
+    // (bilincli bir sadelik, bkz. FontOlcusu). Dolayisiyla olcum sonucu sayfa
+    // yuksekligine COK YAKINSA bolmek, gurultuye tepki vermektir.
+    //
+    // %3 pay: olcum belirsizliginin uc katı. Bunun altindaki tasmalar QuestPDF'in
+    // akisina birakilir (orada sorunsuz otururlar); ustundekiler gercekten uzun
+    // dileklerdir ve cumle sinirinda bolunmeyi hak eder.
+    private const float BolmeEsigi = 1.03f;
+
     // ---- SONUC TIPLERI ----
 
     // Bir kartin sayfadaki parcasi. Normal dilek TEK parcadir; sayfaya sigmayan
@@ -179,7 +194,7 @@ public static class SayfaPaketleyici
             var parcaliDilekler = new Dictionary<int, List<KartParcasi>>();
             for (var i = 0; i < dilekler.Count; i++)
             {
-                if (yukseklikler[i] <= sayfaYuksekligi) continue;
+                if (yukseklikler[i] <= sayfaYuksekligi * BolmeEsigi) continue;
                 var parcalar = CumleSinirindaBol(i, dilekler[i], olcu, sayfaYuksekligi, secilenOlcek);
                 if (parcalar.Count > 1) parcaliDilekler[i] = parcalar;
             }
