@@ -5,11 +5,10 @@
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
 > repodan; bu dosya "neden / ne kararlaştırıldı / sırada ne var" hafızasıdır.
 
-**Son güncelleme: 2026-08-10** — **E (Denetim / Canlı Akış enterprise) KAPANDI.** Bu turda:
-okunurluk katmanı (kayıtlı JSON → Türkçe ayrıntı), **eşler arası izolasyonun denetim ekranında
-zorunlu kılınması** (canlıda yakalanan sızıntı), özne dili (Sen / eşinin adı), toplulaştırma,
-filtre + arama, keyset sayfalama, **katmanlı saklama** (rutin 30 gün / kalıcı iz 2 yıl) ve
-CSV dışa aktarım. Ayrıntı Bölüm 3'te; alınan dersler 86-89.
+**Son güncelleme: 2026-08-14** — **B (baskıya hazır menü düzeni) ✅**, **İLAVE (anı sonu
+noktalama) ✅** ve büyük bir **BASKI KALİTESİ turu**: önizleme canlı senkronu, **renkli emoji
+mimarisi** (font değil görüntü), tofu kalkanı, Türkçe büyük harf, **PDF metin katmanı onarımı**.
+Sıradaki: **C-1 SayfaPaketleyici**. Ayrıntı Bölüm 3'te; dersler 90-96.
 
 Canlı: **https://www.bianibirak.com** (eski `bianibirak.dentlogicapp.com` → 301 yönlendirme)
 
@@ -411,6 +410,70 @@ ayraç zorunlu.
 
 ---
 
+### `[2026-08-11 → 08-14]` B + İLAVE + BASKI KALİTESİ TURU ✅
+
+**B — Baskıya hazır defter menü düzeni** ✅ Sekmeler: **Defterin** (varsayılan) · **Dilekler** ·
+**Çerçeve**. İlk açılışta kullanıcı ESERİNİ görür, sonra düzenler (önce gurur, sonra kurgu).
+"Defterin"de sağ sütun kapanır, ızgara tek kolona düşer, sayfa çevirme defteri tam genişlikte
+yukarı çıkar. **Blok taşınmadı** - görünürlük sekmeye bağlandı (1200 satırlık kritik dosyada
+kes-yapıştır, kazancı olmayan en büyük risktir).
+
+**İLAVE — Anı sonu otomatik noktalama** ✅ Metin harf/rakamla bitiyorsa nokta eklenir; noktalama,
+tırnak, parantez, emoji ile bitiyorsa dokunulmaz (tek koşul, uzun "yasaklı karakter" listesinden
+hem kısa hem güvenli). **Veri değişmez** - yalnız basımda editöryel biçim. Ölçüm de aynı metni
+görür (yoksa eklenen nokta satır taşırıp tahmini kaydırırdı).
+
+**ÖNİZLEME CANLI SENKRONU** ✅ Dilek sırası/çerçeve/tema değişince sayfa çevirme defteri
+donuyordu; indirilen PDF ise DOĞRUYDU (sunucu güncel, ekran eski). İki katman:
+- **Sürüm damgası:** sunucuya başarılı her yazımdan sonra sayaç artar, önizleme yeniden çeker.
+  Stale-while-revalidate (eski sayfa ekranda kalır) + 600 ms sus (ok tuşuna üst üste basınca
+  tek üretim) + sayfa kırpma (dilek çıkınca boş sayfada kalma).
+- **ASIL KUSUR — tarayıcı önbelleği:** sayfa görüntüleri SABİT adresten geliyordu
+  (`/onizleme/0.png`); tarayıcı aynı URL'yi sunucuya sormaz. Sunucunun zaten hesapladığı
+  **içerik parmak izi** URL'ye eklendi (`?s=<iz>`): içerik aynıysa önbellek çalışır (hızlı),
+  değiştiyse URL değişir ve güncel görüntü iner. **Ders 90.**
+- **Bonus:** tazeleme sırasında kâğıdın köşesinde "Defterin güncelleniyor" nabzı.
+
+**RENKLİ EMOJİ — FONT DEĞİL GÖRÜNTÜ** ✅ (`Servisler/EmojiServisi.cs` + 3720 Twemoji PNG)
+Yolculuk ve her adımın gerekçesi:
+1. Emoji "tofu" (siyah kutu) basılıyordu - gövde fontu (Inter) emoji taşımıyor.
+2. Tek renk Noto Emoji yedek fontu denendi → kontur çizimler, sepya sayfada ucuz durdu.
+   Ayrıca `FallbackFontFamily` QuestPDF 2024.12'de YOK (doğrulanmamış API kullanıldı - **Ders 91**);
+   doğrusu `FontFamily(GovdeFont, EmojiFont)` (params dizi).
+3. **Karar: emoji GÖRÜNTÜ olarak basılır.** Font çözümlemesi devreye hiç girmez → harf kaybı,
+   kutu, COLR/CBDT güvenilmezliği riski YOK. Twemoji (CC-BY 4.0), 72px **RGBA** PNG.
+   Palet moduna sıkıştırma DENENDİ ve geri alındı: palet+alfa SkiaSharp'ta güvenilmez.
+4. Ayrıştırma: en uzundan kısaya eşleme - bayrak, ten tonu, ZWJ aile dizileri **tek parça**;
+   FE0F'li ve FE0F'siz iki aday denenir (Twemoji adlandırma kuralı). ASCII karakterlerin
+   emoji karşılığı YOK, harf/rakam asla emoji sanılmaz.
+5. **ASIL KUSUR — varlıklar yayına kopyalanmıyordu:** `csproj` yalnız `Fontlar\*.ttf` taşıyordu,
+   `Varliklar\Emoji` imajda hiç oluşmuyordu. Servis klasörü bulamayınca metni dokunmadan
+   geçiriyordu. **Ders 92.**
+6. **TOFU KALKANI (kalıcı kural):** bir karakter emoji aralığındaysa ama görseli yoksa
+   **hiç basılmaz**. Twemoji 15, Unicode 16 emojilerini kapsamıyor - onlar tofu basıyordu ve
+   her yıl yenileri eklenecekti. Aralık kuralı bugün var olmayanı da kapsar. **Ders 93.**
+7. **Ölçüm:** emoji görsel olduğu için ~2.4 harf genişliğinde; metin uzunluğundan sayınca dar
+   tahmin edilip emoji yoğun dilek sayfayı taşırıyordu (kart çerçevesi oluşmuyordu). Ölçüme
+   emoji payı eklendi.
+
+**TÜRKÇE BÜYÜK HARF** ✅ Kapakta "NİŞANıMıZ" yazıyordu - `ToUpperInvariant` İngilizce kuralla
+çalışır. `tr-TR` kültürüne çekildi → "NİŞANIMIZ".
+
+**PDF METİN KATMANI ONARIMI** ✅ Kopyala-yapıştır ve aramada harfler düşüyordu
+("Başkasının" → "Başasının", "Bi Anı Bırak" → "Bi Aı Bırak"). **Görselde sorun yoktu** - metin
+katmanında NUL vardı.
+- **Kök neden:** Fraunces'ın `rvrn` (zorunlu varyasyon alternatifleri) özelliği harfleri `.alt`
+  biçimleriyle değiştiriyor; `.alt` gliflerinin **cmap karşılığı yok**, PDF ters eşlemesi NUL yazıyor.
+  Regular/SemiBold: **h, m, n, s, &** · İtalik: **b, d, h, k, l, v, w, &** (kapak italik olduğu için
+  oradaki "k" kayboluyordu).
+- **Çözüm:** `.alt` çizimleri taban harflere **kalıcı işlendi**, `rvrn`/`ss01` kaldırıldı.
+  Koordinat düzeyinde doğrulandı: **çizim ve genişlikler birebir aynı** → sayfada hiçbir görsel
+  değişiklik yok, yalnız eşleme düzeldi.
+- **Kanıt:** yeni PDF'te belge genelinde **sıfır NUL**; "Başkasının & Defteri", "Bi Anı Bırak",
+  "Deneme Altı" tam kopyalanıyor ve aranabiliyor. **Ders 94.**
+
+---
+
 ---
 
 ## 4. BEKLEYEN İŞLER — ONAYLI, KODLAMA SIRASINDA `[2026-07-25 kararları]`
@@ -475,7 +538,7 @@ isimler/tarih, vektörel (kayıpsız), matbaaya doğrudan gönder. Bonuslar (hep
 - **Reddedilenler:** NFC etiket, kişiye özel QR (izolasyon eş düzeyinde — Musa teyit etti),
   masa numarası bazlı ayrı kodlar.
 
-### B) Baskıya Hazır Defter menü düzeni `[onaylı]`
+### B) Baskıya Hazır Defter menü düzeni ✅ **TAMAMLANDI [2026-08-11]** (ayrıntı Bölüm 3)
 Tamamen frontend, tek dosya (`baskiya-hazir-defter/page.tsx`), backend akışına dokunulmaz.
 - "Defterin" bloğu (sayfa çevirme) sekmelerin dışından çıkarılır; artık yalnız varsayılan
   sekmede görünür ve daha yukarı çıkar.
@@ -484,24 +547,46 @@ Tamamen frontend, tek dosya (`baskiya-hazir-defter/page.tsx`), backend akışın
   · **Dilekler** (seçim, sıra) · **Çerçeve** (kapak, ithaf, kapanış).
 - İlk açılışta "Defterin" açılır → kullanıcı önce eserini görür, sonra düzenler.
 
-### C) Akıllı Sıralama + sayfa düzeni `[onaylı]` — EN BÜYÜK/RİSKLİ
-`DefterDerleyici`'ye dokunur (PDF motorunun kalbi). İki AYRI katman:
-1. **Sıralama** — akıllı · kendi sıram · taraflara göre · kronolojik (varsayılan: **Akıllı**).
-2. **Paketleyici (sayfalama)** — her sıralamanın ALTINDA çalışır; sırayı değiştirmez, nereden
-   böleceğine ve boşluğu nasıl dağıtacağına karar verir.
+### C) Akıllı Sıralama + sayfa düzeni `[onaylı]` — EN BÜYÜK/RİSKLİ · SIRADA
 
-Bonuslar (onaylı):
-- **C1** Ölçüm tek kaynaktan — dileği PDF'i basan aynı motorla ölç (`DefterKarti`), yoksa
-  önizleme yalan söyler.
-- **C2** Bölünme yasağı + tek istisna: tam sayfadan uzun dilek cümle sınırında bölünür,
-  ikinci sayfada ince "…devamı".
-- **C3** **Optik denge: boşluk eşit dağıtılır** (asıl kalite farkı — *"defter içeriğinin
-  boşluklarının tüm sayfalarda görsel uyum içinde otomatik doldurulması"* talebi budur).
-- **C4** Dul satır kontrolü: bölüm başlığı sayfa sonunda yalnız kalmaz.
-- **C5** Çift sayfa dengesi — **İLK TURDA ÇIKARILDI** (karmaşık; C1-C4 sorunun %90'ını çözer).
-- **Risk azaltma:** önce ölçüm+paketleyici AYRI sınıf kurulur, sonra derleyici bağlanır.
+**MOTOR HARİTASI `[2026-08-14 çıkarıldı]`** — kod okunarak doğrulandı:
+- `DefterDerleyici` sayfalama YAPMAZ; yalnız veriyi toplar (dilekler, görseller, kurasyon).
+  Sayfaları bölen yer **`BaskiServisi`**tir - ve o da bölmüyor: tüm dilekler tek `Column`
+  içinde akıyor, **sayfa kırma kararını QuestPDF veriyor**.
+- **C2 (bölünme yasağı) ZATEN VAR:** her kart `ShowEntire()`; sığmayan kart (5000 karakterlik
+  dilek) bu kilidi alırsa QuestPDF tüm defteri çökertirdi, o yüzden `KartSigarMi` ile önce
+  ölçülüp sığmıyorsa bilinçli olarak bölünmeye bırakılıyor. (Cümle sınırında bölme + "…devamı"
+  kısmı yok.)
+- **C4 (dul satır) KISMEN VAR:** bölüm başlığı `ShowEntire()` ile sarılı.
+- **C1 (ölçüm) YOK - asıl kusur:** `KartSigarMi` yüksekliği TAHMİN ediyor ("ortalama karakter
+  ~5pt", "satır ~18.1pt"), %86 güvenlik eşiğiyle. Emoji payı eklendi ama temel hâlâ tahmin.
+- **C3 (optik denge) YOK:** boşluk her zaman sayfanın ALTINDA birikiyor.
+- **Bonus 2 (dilek→sayfa) İMKÂNSIZ:** hangi dileğin hangi sayfaya düştüğünü kimse bilmiyor.
 
-### İLAVE) Anı sonu otomatik noktalama `[2026-07-25, onaylı]`
+**C'nin gerçek işi: sayfalama kararını QuestPDF'ten geri almak.** O zaman C3 mümkün olur
+(boşluğu biz dağıtırız), Bonus 2 mümkün olur (eşlemeyi biz üretiriz), C1 zorunlu olur
+(bölmek için doğru ölçmek şart). **C1 olmadan C3 yapılamaz** - yanlış ölçüm = sayfaya 4 kart
+koyup 3'ünün sığması = bozuk defter.
+
+**RİSK:** bugün çalışan bir motor var (PDF doğru, önizleme doğru, çökme koruması var).
+Sayfalamayı devralmak bu güvenliği bizim üstlenmemiz demektir; yanlış ölçüm
+`DocumentLayoutException` → hem indirme hem önizleme çöker.
+
+**Aşamalar `[onaylı]`:**
+- **C-1** `SayfaPaketleyici` ayrı sınıf: GERÇEK ölçüm (tahmin değil), sayfalara bölme,
+  `dilek → sayfa` eşlemesi. **Hiçbir yerden çağrılmaz** - deploy edilse bile davranış değişmez.
+- **C-1b** Doğrulama: mevcut defterlerle karşılaştır (paketleyicinin sayfa sayısı QuestPDF'inkiyle
+  tutuyor mu). Kanıt görülmeden bağlanmaz.
+- **C-2** Derleyici paketleyiciyi kullanır + **C3 optik denge**. Asıl değişim, tek başına geri alınabilir.
+- **C-3** Sıralama seçenekleri (akıllı · kendi sıram · taraflara göre · kronolojik).
+- **C-4** **Bonus 2:** Dilekler listesinden "Defterde göster" → o sayfaya atlama. Eşleme,
+  paketleyicinin doğal yan çıktısıdır; ayrıca hesaplanmaz.
+
+Bonuslar: **C1** ölçüm tek kaynaktan · **C2** bölünme yasağı + cümle sınırı istisnası ·
+**C3** optik denge (boşluk eşit dağıtılır - *"sayfa boşluklarının görsel uyumla doldurulması"*) ·
+**C4** dul satır kontrolü. **C5** çift sayfa dengesi - ilk turda çıkarıldı.
+
+### İLAVE) Anı sonu otomatik noktalama ✅ **TAMAMLANDI [2026-08-12]** (ayrıntı Bölüm 3)
 Anıların bittiği anda noktalama işareti yoksa otomatik NOKTA konur. Defter görsel bütünlüğü için.
 Derleme aşamasında metin normalizasyonu (`DefterDerleyici` / kürasyon çıktısı). **Konum:** C ile
 aynı aile (defter görsel bütünlüğü); C'nin bir alt kalemi olarak ya da bağımsız hızlı iş.
@@ -559,6 +644,8 @@ nabız sayaçları ✅ · silinen defter bildirim şeffaflığı ✅
 
 **BİTEN (2026-08-10):** **E** denetim/akış enterprise ✅ (E1-a, E2, E3, E4 + katmanlı saklama, E5;
 E1-b bekliyor, E6 eklenmedi) · eşler arası izolasyon kapatıldı 🔴
+**BİTEN (2026-08-14):** **B** menü düzeni ✅ · **İLAVE** noktalama ✅ · önizleme canlı senkronu ✅ ·
+renkli emoji + tofu kalkanı ✅ · Türkçe büyük harf ✅ · PDF metin katmanı ✅
 
 **SIRADA:**
 
@@ -779,6 +866,37 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
     olarak yazıldı (`'x' + [char]13`), PowerShell hesaplamadı, marker'a yalnız ilk parça bağlandı
     ve yama "zaten uygulanmış" sanıp atladı - koruma ters çalıştı. Marker DAİMA tek parça düz
     metin olmalı; koruma mekanizmasının kendisi de doğrulanmalı.
+
+
+**Baskı kalitesi turundan `[2026-08-14]`:**
+90. **Aynı URL'den gelen içerik değişmiş olabilir - tarayıcı bunu bilmez.** Sürüm damgası
+    sunucuyu tazeliyordu ama görüntüler sabit adresten geldiği için tarayıcı kendi
+    önbelleğinden veriyordu. Çözüm "cache busting" değil **içerik adresleme**: adres,
+    içeriğin kimliğidir (`?s=<parmak izi>`). İçerik aynıysa önbellek çalışır, değiştiyse
+    URL değişir.
+91. **DOĞRULANMAMIŞ API KULLANMA.** `FallbackFontFamily` QuestPDF 2024.12'de yok; build
+    üç satırda kırıldı. Bir metodu hatırlıyor olmak, o sürümde var olduğu anlamına gelmez -
+    önce paket sürümü okunur, sonra yazılır. (Aynı sebeple `.Svg()` vektör emoji yolu,
+    daha zarif olmasına rağmen SEÇİLMEDİ: doğrulanamıyordu.)
+92. **Yeni bir VARLIK türü eklendiğinde kopyalama kuralı da güncellenir.** `csproj` yalnız
+    `Fontlar\*.ttf` taşıyordu; 3720 emoji PNG repoda vardı, imajda yoktu. Geliştirmede
+    çalışan şey yayında SESSİZCE yok oldu - ve servis "bulamazsam dokunma" davranışı
+    yüzünden hata bile vermedi. Yeni varlık = csproj + imaj doğrulaması.
+93. **Dış veri kümeleri eskir; kural ona göre yazılır.** Twemoji 15, Unicode 16 emojilerini
+    kapsamıyor ve her yıl yenileri çıkacak. "Listede olanı çiz, olmayanı metne düşür" kuralı
+    her yıl yeni tofu üretirdi. Doğrusu: **emoji aralığındaysa ve görseli yoksa HİÇ BASMA.**
+    Bugün var olmayanı da kapsayan kural, bakım gerektirmez.
+94. **Görsel doğru olması metin katmanının doğru olduğu anlamına gelmez.** PDF'te harfler
+    doğru çiziliyordu ama kopyalama/aramada NUL çıkıyordu (`rvrn` → `.alt` glifleri, cmap
+    karşılığı yok). Bir "baskıya hazır" belgede metin katmanı da üründür: matbaa ön kontrolü,
+    arama, erişilebilirlik ona bakar. **Çözüm görünümü bozmadan yapılabilir:** alternatif
+    çizimleri taban gliflere işleyip özelliği kaldırmak (koordinat düzeyinde doğrulandı).
+95. **Elimdeki dosya kopyası ESKİ olabilir - anchor daima DİSKTEN doğrulanır.** Üç tur üst
+    üste aynı dosyaya yanlış anchor yazdım (girinti farklı, bileşen ayrılmış, satır değişmiş).
+    Büyük ve çok bileşenli dosyalarda yama yazmadan önce güncel hâli istenir.
+96. **Kullanıcıya "hangisi bozuk?" diye sormak çözüm değildir.** Tek bir bozuk emojiyi
+    düzeltmek yerine TÜM seti denetlemek (3720 PNG anomali taraması) gerçek kuralı ortaya
+    çıkardı. Kullanıcı örnek verir; kök nedeni ve kapsamı BEN bulurum.
 
 ---
 
