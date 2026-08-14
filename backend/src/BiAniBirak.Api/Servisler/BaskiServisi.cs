@@ -38,10 +38,11 @@ public static class BaskiServisi
     private const string BaslikFont = "Fraunces Basli";
     private const string GovdeFont = "Inter Govde";
 
-    // YEDEK FONT: govde fontunda bulunmayan karakterler (emoji) buradan cizilir.
-    // Varliklar/Fontlar/NotoEmoji-Regular.ttf - Hazirla() zaten tum .ttf'leri
-    // kaydeder, ayri kayit koduna gerek yoktur.
-    private const string EmojiFont = "Noto Emoji";
+    // EMOJI ARTIK FONTLA DEGIL GORUNTUYLE basilir (bkz. EmojiServisi).
+    // Emoji fontu (Noto Emoji) KALDIRILDI: tek renk kontur cizimler sepya bir
+    // defter sayfasinda ucuz duruyordu; renkli emoji fontlari (COLR/CBDT) ise
+    // QuestPDF/SkiaSharp PDF ciktisinda guvenilir degil. Goruntu yolu her iki
+    // sorunu da kokten cozer - font cozumlemesi devreye HIC girmez.
 
     private static bool _hazir;
     private static readonly object _kilit = new();
@@ -63,6 +64,8 @@ public static class BaskiServisi
                     QuestPDF.Drawing.FontManager.RegisterFont(akis);
                 }
             }
+            // Emoji goruntu kumesi (Varliklar/Emoji/*.png) - bir kez taranir.
+            EmojiServisi.Hazirla(kokDizin);
             _hazir = true;
         }
     }
@@ -341,6 +344,17 @@ public static class BaskiServisi
     }
 
     // ---------------- KAPAK ----------------
+    // TURKCE BUYUK HARF - ToUpperInvariant KULLANILMAZ.
+    //
+    // Invariant kultur Ingilizce kuralla calisir: "i" -> "I" (noktasiz) yerine
+    // "i" olarak KALIR ve "NIŞANıMıZ" gibi bir sonuc uretir (canlida yakalandi,
+    // kapakta). Turkcede "i" -> "İ", "ı" -> "I" olmalidir.
+    private static readonly System.Globalization.CultureInfo TurkceKultur =
+        new("tr-TR");
+
+    private static string TurkceBuyuk(string? metin) =>
+        string.IsNullOrEmpty(metin) ? string.Empty : metin.ToUpper(TurkceKultur);
+
     private static void Kapak(IContainer kap, EserVerisi eser)
     {
         var italik = eser.Tema == "zarif";
@@ -370,7 +384,7 @@ public static class BaskiServisi
 
             sutun.Item().Height(11);
 
-            sutun.Item().AlignCenter().Text(eser.KapakAltBaslik.ToUpperInvariant())
+            sutun.Item().AlignCenter().Text(TurkceBuyuk(eser.KapakAltBaslik))
                 .FontFamily(GovdeFont).FontSize(8).FontColor(Ikincil).LetterSpacing(0.24f);
 
             sutun.Item().Height(48);
@@ -406,9 +420,8 @@ public static class BaskiServisi
 
             if (!string.IsNullOrWhiteSpace(eser.IthafMetni))
             {
-                sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.IthafMetni)
-                    .FontFamily(GovdeFont, EmojiFont).FontSize(11).LineHeight(1.8f)
-                    .FontColor(MurekkepYumusak).Italic(italik);
+                sutun.Item().PaddingHorizontal(6).AlignCenter().Element(c =>
+                    EmojiliMetin(c, eser.IthafMetni, 11f, 1.8f, italik));
                 sutun.Item().Height(22);
             }
 
@@ -514,6 +527,46 @@ public static class BaskiServisi
     //     Icinde zaten noktalama olabilir; disina nokta koymak cift olur.
     //   - Emoji/sembol ile bitiyor: kalp ya da alkis ardina nokta tuhaf durur.
     //   - Metin bos.
+    // ---- EMOJILI METIN ----
+    //
+    // Metni duz parcalara ve emoji goruntulerine ayirip satir ici dizer. Emoji
+    // yoksa davranis duz Text() ile AYNIDIR - fazladan maliyet olusmaz.
+    //
+    // Boyut: emoji yuksekligi punto x 1.15 (harf govdesinden bir tik buyuk -
+    // goz onu metnin parcasi olarak okur, yamali durmaz). PaddingBottom negatif:
+    // goruntu taban cizgisine oturur, satir icinde yukari kacmaz.
+    private static void EmojiliMetin(
+        IContainer kap, string? metin, float punto, float satirAraligi, bool italik)
+    {
+        kap.Text(t =>
+        {
+            t.AlignCenter();
+            t.DefaultTextStyle(x => x
+                .FontFamily(GovdeFont).FontSize(punto).LineHeight(satirAraligi)
+                .FontColor(MurekkepYumusak).Italic(italik));
+
+            foreach (var p in EmojiServisi.Ayristir(metin))
+            {
+                if (p.EmojiAnahtar == null)
+                {
+                    if (!string.IsNullOrEmpty(p.Metin)) t.Span(p.Metin);
+                    continue;
+                }
+
+                var veri = EmojiServisi.Goruntu(p.EmojiAnahtar);
+                // Bulunamayan emoji SESSIZCE atlanir: yeni cikmis bir emoji
+                // yuzunden defterin uretilememesi kabul edilemez.
+                if (veri == null) continue;
+
+                t.Element()
+                    .PaddingBottom(-punto * 0.14f)
+                    .Width(punto * 1.15f)
+                    .Height(punto * 1.15f)
+                    .Image(veri).FitArea();
+            }
+        });
+    }
+
     private static string MesajBicimle(string? mesaj)
     {
         if (string.IsNullOrWhiteSpace(mesaj)) return mesaj ?? string.Empty;
@@ -605,9 +658,9 @@ public static class BaskiServisi
             }
 
             // EMOJI: davetli metninde beklenir -> yedek font zinciri.
-            kart.Item().AlignCenter().Text(MesajBicimle(d.Mesaj))
-                .FontFamily(GovdeFont, EmojiFont).FontSize(10.5f).LineHeight(1.72f)
-                .FontColor(MurekkepYumusak).Italic(italik);
+            // Davetli metni: emoji GORUNTU olarak satir ici gomulur.
+            kart.Item().AlignCenter().Element(c =>
+                EmojiliMetin(c, MesajBicimle(d.Mesaj), 10.5f, 1.72f, italik));
 
             kart.Item().Height(10);
 
@@ -644,9 +697,8 @@ public static class BaskiServisi
         {
             if (!string.IsNullOrWhiteSpace(eser.KapanisMetni))
             {
-                sutun.Item().PaddingHorizontal(6).AlignCenter().Text(eser.KapanisMetni)
-                    .FontFamily(GovdeFont, EmojiFont).FontSize(11).LineHeight(1.8f)
-                    .FontColor(MurekkepYumusak).Italic(italik);
+                sutun.Item().PaddingHorizontal(6).AlignCenter().Element(c =>
+                    EmojiliMetin(c, eser.KapanisMetni, 11f, 1.8f, italik));
                 sutun.Item().Height(28);
             }
 
