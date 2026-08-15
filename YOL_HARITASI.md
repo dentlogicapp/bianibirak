@@ -5,12 +5,41 @@
 > öğrenilen dersler. Her önemli karardan sonra güncellenir. Güncel kod durumu daima
 > repodan; bu dosya "neden / ne kararlaştırıldı / sırada ne var" hafızasıdır.
 
-**Son güncelleme: 2026-08-14** — **B (baskıya hazır menü düzeni) ✅**, **İLAVE (anı sonu
-noktalama) ✅** ve büyük bir **BASKI KALİTESİ turu**: önizleme canlı senkronu, **renkli emoji
-mimarisi** (font değil görüntü), tofu kalkanı, Türkçe büyük harf, **PDF metin katmanı onarımı**.
-Sıradaki: **C-1 SayfaPaketleyici**. Ayrıntı Bölüm 3'te; dersler 90-96.
+**Son güncelleme: 2026-08-15** — **C-2 tamamlandı** (eniyilemeli sayfa yerleşimi, optik
+denge, cümle sınırında bölme, esneklik, taşma yasağı) ve **C-3a/b** (sabitleme + tek sayfa
+tercihleri, veri katmanı, API, yerleşim analiz ucu). Ayrıca **Bölüm 0.0: KIRMIZI ÇİZGİ —
+tahminle ilerlemek yasak**. Sırada C-3c arayüz. Ayrıntı Bölüm 3; dersler 97-101.
 
 Canlı: **https://www.bianibirak.com** (eski `bianibirak.dentlogicapp.com` → 301 yönlendirme)
+
+---
+
+## 0.0 KIRMIZI ÇİZGİ — TAHMİNLE İLERLEMEK YASAK `[2026-08-15, Musa'nın kararı]`
+
+> Bu kural her oturumda, her turda geçerlidir. İhlali, yapılan işin kalitesinden
+> bağımsız olarak **başarısızlıktır**.
+
+**Kural:** Bir kusurun sebebi ÖLÇÜLMEDEN düzeltme yazılmaz. "Muhtemelen şu",
+"büyük olasılıkla bu", "sanırım şuradan" ile başlayan hiçbir cümle bir yamaya
+dönüşemez.
+
+**Neden bu kadar sert:** 14-15 Ağustos'ta emoji ve sayfa yerleşimi turlarında
+üst üste **dört yanlış teşhis** yapıldı (palet PNG, ShowEntire, font klasörü
+boş sanma, sabitleme). Her biri makul görünüyordu, her biri deploy edildi, hiçbiri
+sorunu çözmedi. Kaybedilen: yarım günden fazla ve Musa'nın güveni. Asıl sebep
+(planın taşan sayfa içermesi) ancak VERİ istendiğinde ortaya çıktı.
+
+**Uygulama — düzeltme yazmadan önce:**
+1. Belirti değil, **ölçüm**: hangi sayı neyi söylüyor? (uç çıktısı, SQL, log, dosya listesi)
+2. Elde kanıt yoksa **komut istenir**, kod yazılmaz.
+3. Çıktı **dikkatle okunur** — `total 912` satırı "klasör dolu" demektir;
+   yanlış okuyup üstüne teşhis kurmak, tahminin kendisidir.
+4. Kanıt tek bir mekanizmayı işaret etmiyorsa, **ayırt edici ölçüm** istenir.
+5. Yamanın yorumuna "canlıda yakalandı: <ölçüm>" yazılır — gerekçe koda gömülür.
+
+**Ayrıca:** doğrulanmamış API kullanılmaz (Ders 91), anchor daima diskten
+doğrulanır (Ders 95), kullanıcıya "hangisi bozuk?" diye sorulmaz — kök neden ve
+kapsam mühendisin işidir (Ders 96).
 
 ---
 
@@ -474,6 +503,46 @@ katmanında NUL vardı.
 
 ---
 
+### `[2026-08-14 → 08-15]` C — SAYFA YERLEŞİM MOTORU ✅ (C-1, C-2, C-3a/b)
+
+**C-1 `SayfaPaketleyici` + `FontOlcusu`** — sayfa kırma kararı QuestPDF'ten alındı.
+- **Gerçek ölçüm:** TTF'nin `head`/`hhea`/`hmtx`/`cmap` tabloları doğrudan okunuyor;
+  kelime kelime sarma. Bugünkü "ortalama karakter ~5pt" tahmini yok. **Doğrulandı:**
+  aynı algoritma Python'da yazılıp fontTools ile karşılaştırıldı, 54 karakterde sıfır fark.
+- **SkiaSharp KULLANILMADI:** paket projede doğrudan yok (QuestPDF geçişli açmıyor), elle
+  eklemek sürüm çakışması riski taşırdı. Dış bağımlılık sıfır.
+- **C-1b doğrulama ucu:** paketleyicinin sayfa sayısı, QuestPDF'in gerçekten ürettiğiyle
+  karşılaştırıldı → **tutuyor: true**. Kanıt görülmeden derleyiciye bağlanmadı.
+
+**C-2 yerleşim** — ölçülen kazanç: **9 sayfa → 8**, kötülük 176k → 42k, en kötü boşluk %76 → %23.
+- **Eniyileme:** sıralı modda dinamik programlama (TeX kuralı: son sayfa cezalandırılmaz);
+  akıllı modda **kaydırma penceresi** — sayfa sıradaki dilekle başlar, kalan boşluk yakın
+  komşulardan doldurulur. Küresel karıştırma reddedildi: defterin sonundaki dilek birinci
+  sayfaya sıçrarsa çift bunu "sistem defterimi karıştırdı" diye okur.
+- **Optik denge:** kart dikey ortalanır. Dikey hizalamayı QuestPDF yapar, bizim sayımız
+  değil — ölçüm birkaç punto sapsa bile denge bozulmaz.
+- **Cümle sınırında bölme:** uzun dilek cümle bittiği yerden bölünür; "devamı var…" /
+  "…devamı" işaretleri; fotoğraf ilk parçada, imza son parçada. **Bölme eşiği %3** —
+  ölçüm belirsizliği (~%1) yüzünden binde üçlük taşmada bölmek gürültüye tepkidir.
+- **Esneklik (glue):** fotoğraf ölçeği 1.00/0.95/0.90/0.85 denenir, en iyisi seçilir;
+  kazanç yoksa 1.00'da kalır. Ölçek defterin tamamı için tek → fotoğraflar tutarlı.
+  **Tipografiye asla dokunulmaz.**
+- **TAŞMA YASAĞI `[en pahalı ders]`:** paketleyici, dolduramayacağı sayfa planlayamaz.
+  474.4pt kartlar 473pt sayfalara konunca QuestPDF taşanı sonraki sayfaya aktardı ve
+  8 sayfalık plan 10 sayfa PDF üretti. Artık sayfayı aşan kartın fotoğrafı zorunlu olarak
+  (fark edilmeyecek ölçüde) küçültülür. **Ders 97.**
+
+**C-3a/b tercihler** — `Sabit`, `TekSayfa`, `AkilliDuzen` sütunları; motor ve API bağlandı.
+- **Otomatik sabitleme LCS ile:** elle taşınan dilek sabitlenir. İlk sürüm "sırası değişen
+  her öğeyi" sabitliyordu; tek dilek taşındığında sonraki hepsi kaydığı için 9 dileğin 9'u
+  sabitlendi ve eniyileme durdu (8→10 sayfa). En uzun ortak alt dizi ile artık yalnız
+  **gerçekten taşınan** sabitleniyor. **Ders 98.**
+- **Yerleşim analiz ucu** (`/kurasyon/yerlesim`): hangi dilek hangi sayfada, hangisi taşıyor,
+  hangisinin tek sayfaya sığdırma çaresi var. **Ayrı uç** — hesap tüm fotoğrafları diskten
+  okuyor, `KurasyonGetir`'e konulsa stüdyo her açılışta ağırlaşırdı.
+
+---
+
 ---
 
 ## 4. BEKLEYEN İŞLER — ONAYLI, KODLAMA SIRASINDA `[2026-07-25 kararları]`
@@ -547,7 +616,7 @@ Tamamen frontend, tek dosya (`baskiya-hazir-defter/page.tsx`), backend akışın
   · **Dilekler** (seçim, sıra) · **Çerçeve** (kapak, ithaf, kapanış).
 - İlk açılışta "Defterin" açılır → kullanıcı önce eserini görür, sonra düzenler.
 
-### C) Akıllı Sıralama + sayfa düzeni `[onaylı]` — EN BÜYÜK/RİSKLİ · SIRADA
+### C) Akıllı Sıralama + sayfa düzeni ✅ **MOTOR TAMAMLANDI [2026-08-15]** — arayüz (C-3c) sırada
 
 **MOTOR HARİTASI `[2026-08-14 çıkarıldı]`** — kod okunarak doğrulandı:
 - `DefterDerleyici` sayfalama YAPMAZ; yalnız veriyi toplar (dilekler, görseller, kurasyon).
@@ -647,11 +716,18 @@ E1-b bekliyor, E6 eklenmedi) · eşler arası izolasyon kapatıldı 🔴
 **BİTEN (2026-08-14):** **B** menü düzeni ✅ · **İLAVE** noktalama ✅ · önizleme canlı senkronu ✅ ·
 renkli emoji + tofu kalkanı ✅ · Türkçe büyük harf ✅ · PDF metin katmanı ✅
 
+**BİTEN (2026-08-15):** **C-1/C-2/C-3a/C-3b** ✅ — sayfa yerleşim motoru: gerçek ölçüm,
+eniyilemeli yerleşim, optik denge, cümle sınırında bölme, esneklik, taşma yasağı,
+sabitleme + tek sayfa tercihleri, API ve yerleşim analiz ucu.
+
 **SIRADA:**
+1. **C-3c ARAYÜZ** — "Akıllı sayfa düzeni" anahtarı + zarif uyarı ("sayfaların dengeli
+   dolması için bazı dileklerin sırası değiştirildi") + 📌 sabit rozeti + **"Tek sayfaya
+   sığdır"** düğmesi (YALNIZ `tek_sayfa_caresi` olanlarda) + her dileğin sayfa numarası
+2. **C-4** dilekten sayfaya atlama ("Defterde göster") — eşleme hazır
+3. **B2** çift sayfa dengesi (kitap açıldığında sol/sağ doluluk yakın)
 
 **Sonra:**
-2. **B** baskıya hazır menü düzeni (küçük, frontend, tek dosya)
-3. **C** akıllı sıralama + sayfa düzeni (C1-C4) + **İLAVE** anı sonu noktalama (büyük, PDF motoru)
 4. **A** salon karekod seti (A1-A5 bonuslarıyla)
 
 **FAZ 3 — davetli deneyimi (tek blok):**
@@ -897,6 +973,26 @@ mail — İYS/6563 gereği pazarlama maili YOK. **Ardından:** günlük özet ma
 96. **Kullanıcıya "hangisi bozuk?" diye sormak çözüm değildir.** Tek bir bozuk emojiyi
     düzeltmek yerine TÜM seti denetlemek (3720 PNG anomali taraması) gerçek kuralı ortaya
     çıkardı. Kullanıcı örnek verir; kök nedeni ve kapsamı BEN bulurum.
+
+
+**C turundan `[2026-08-15]` — pahalı öğrenilen:**
+97. **Bir plan, uygulanamıyorsa geçersizdir.** Paketleyici 8 sayfa planladı, PDF 10 çıktı;
+    çünkü planda yüksekliği sayfayı aşan sayfalar vardı (`bos: 0`). Bir yerleşim motorunun
+    ilk değişmezi şudur: **dolduramayacağın sayfayı planlama.** Çıktıyı üreten katman
+    (QuestPDF) sessizce düzeltmeye çalışır ve plan ile gerçek ayrışır.
+98. **"Kaydırma" ile "taşıma" aynı şey değildir.** Elle sıralamada, taşınan öğeden sonraki
+    her öğenin indeksi değişir. "İndeksi değişeni sabitle" kuralı 9 öğenin 9'unu sabitledi
+    ve eniyilemeyi tamamen durdurdu. Gerçekten taşınanı bulmak için **en uzun ortak alt
+    dizi** (diff araçlarının yöntemi) kullanılır.
+99. **Teşhis aracı, ürünle AYNI girdileri kullanmazsa yalan söyler.** Doğrulama ucu
+    paketleyiciyi tercihleri geçirmeden çağırıyordu; gerçek PDF tercihlerle üretiliyordu.
+    `tutuyor` değeri anlamsızlaştı ve teşhisi saatlerce yanlış yöne çekti.
+100. **Konsol çıktısı DİKKATLE okunur.** `ls -la | head -3` çıktısındaki `total 912`
+    satırı klasörün dolu olduğunu söylüyordu; ben ilk üç satırda dosya görmeyip "font
+    klasörü boş" teşhisi kurdum. Yanlış okunan bir çıktı, tahminin en sinsi biçimidir.
+101. **Eşik değerleri ölçüm belirsizliğinden büyük olmalı.** Ölçümde ~%1 sapma varken
+    binde üçlük bir farka göre karar vermek (kartı bölmek) gürültüye tepki vermektir.
+    Pay bırakılır; bu yüzden bölme eşiği %3.
 
 ---
 
