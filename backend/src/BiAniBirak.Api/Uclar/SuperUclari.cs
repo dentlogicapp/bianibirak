@@ -724,10 +724,15 @@ public static class SuperUclari
 
         // 2) Paketleyicinin hesabi
         var fontKok = System.IO.Path.Combine(kok, "Varliklar", "Fontlar");
+        // TERCIHLER DE GECIRILIR: yoksa teshis, gercek PDF'den FARKLI bir
+        // yerlesim olcer ve "tutuyor" degeri anlamsizlasir (canlida yakalandi).
         var yerlesim = BiAniBirak.Api.Servisler.SayfaPaketleyici.Paketle(
             eser!.Dilekler,
             fontKok,
-            BiAniBirak.Api.Servisler.BaskiServisi.SayfaIcerikYuksekligiA5);
+            BiAniBirak.Api.Servisler.BaskiServisi.SayfaIcerikYuksekligiA5,
+            eser.AkilliDuzen,
+            eser.Sabitler,
+            eser.TekSayfalar);
 
         // 3) QuestPDF'in GERCEKTEN urettigi sayfa sayisi (onizleme ile ayni belge)
         var (sayfalar, hataO) = await BiAniBirak.Api.Servisler.OnizlemeServisi.SayfalarAsync(

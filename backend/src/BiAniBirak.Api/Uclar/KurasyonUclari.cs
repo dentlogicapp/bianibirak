@@ -655,22 +655,55 @@ public static class KurasyonUclari
             .Where(o => o.KurasyonId == kurasyon.Id)
             .ToListAsync();
 
-        // OTOMATIK SABITLEME - kullanicidan fazladan bir tiklama istemeyiz.
+        // OTOMATIK SABITLEME - yalnizca GERCEKTEN TASINAN dilek sabitlenir.
         //
-        // Cift bir dilegi ELLE tasidiysa, akilli sayfa duzeni onu geri
-        // oynatmamalidir; yoksa "tasidim ama yerinde durmuyor" hissi olusur ve
-        // sistem kullaniciyla yarisiyormus gibi gorunur. Tasinan dilek burada
-        // sessizce SABITLENIR: karari kullanici verdi, biz koruyoruz.
+        // CANLIDA YAKALANDI: once "sirasi degisen her ogeyi sabitle" denmisti.
+        // Ama tek bir dilek tasindiginda ondan SONRAKI butun dilekler kayar;
+        // sonuc: 9 dilegin 9'u da sabitlendi, eniyilemeye yer kalmadi ve defter
+        // 8 sayfadan 10 sayfaya cikti. Kaydirma, tasima DEGILDIR.
+        //
+        // Dogrusu: eski ve yeni sirayi karsilastirip EN UZUN ORTAK ALT DIZIYI
+        // bulmak. Ortak dizide olmayanlar, kullanicinin elle tuttugu oğelerdir.
+        // (Ayni yontem "diff" araclarinin degisen satiri bulmasinda kullanilir.)
+        var eskiSira = ogeler.OrderBy(o => o.Sira).Select(o => o.KatkiId).ToArray();
+        var ortak = OrtakDizi(eskiSira, istek.KatkiIdler);
+
         for (var i = 0; i < istek.KatkiIdler.Length; i++)
         {
             var oge = ogeler.FirstOrDefault(o => o.KatkiId == istek.KatkiIdler[i]);
             if (oge == null) continue;
-            if (oge.Sira != i) oge.Sabit = true; // yeri DEGISTI -> elle tasindi
+            // Ortak dizide DEGILSE kullanici onu bilerek tasidi -> sabitle.
+            if (!ortak.Contains(oge.KatkiId)) oge.Sabit = true;
             oge.Sira = i;
         }
         await db.SaveChangesAsync();
 
         return Results.Json(new { ok = true });
+    }
+
+    // EN UZUN ORTAK ALT DIZI (LCS) - iki siralamada YERINDE KALAN ogeler.
+    //
+    // Bunun disinda kalanlar "tasinmis" sayilir. Klasik dinamik programlama;
+    // dilek sayisi yuzler mertebesinde oldugu icin maliyeti onemsizdir.
+    private static HashSet<Guid> OrtakDizi(Guid[] eski, Guid[] yeni)
+    {
+        var n = eski.Length; var m = yeni.Length;
+        var dp = new int[n + 1, m + 1];
+        for (var i = n - 1; i >= 0; i--)
+            for (var j = m - 1; j >= 0; j--)
+                dp[i, j] = eski[i] == yeni[j]
+                    ? dp[i + 1, j + 1] + 1
+                    : Math.Max(dp[i + 1, j], dp[i, j + 1]);
+
+        var ortak = new HashSet<Guid>();
+        int a = 0, b = 0;
+        while (a < n && b < m)
+        {
+            if (eski[a] == yeni[b]) { ortak.Add(eski[a]); a++; b++; }
+            else if (dp[a + 1, b] >= dp[a, b + 1]) a++;
+            else b++;
+        }
+        return ortak;
     }
 
     // Mirasi TAMAMLA - Kuzey Yildizi metrigi (Belge 01).
