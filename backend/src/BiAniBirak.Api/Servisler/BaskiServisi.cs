@@ -514,11 +514,14 @@ public static class BaskiServisi
                 // Kart bolunmezligi ESKISI GIBI: sigan kart ShowEntire alir,
                 // sigmayan (cok uzun dilek) akisa birakilir - QuestPDF'i
                 // DocumentLayoutException ile cokertmemek icin.
-                // Bolunmus parca ShowEntire ALMAZ: zaten sayfayi doldurmak
-                // uzere olculdu, kilit koymak QuestPDF'i cokertebilir.
-                var bolunmus = parca.DevamEdiyor || parca.DevamiDir;
+                // ShowEntire KULLANILMAZ (paketleyici modu).
+                //
+                // Kilit, kart sigmadiginda onu sonraki sayfaya iter ve geride
+                // BOS SAYFA birakir - canlida 8 sayfalik plan 10 sayfa PDF uretti.
+                // Sayfa kirma karari artik BIZDE: bu sayfada yalnizca paketleyicinin
+                // sectigi kartlar var, bolunme ihtimali zaten yok. Olcum sinirinda
+                // kalan kart dogal akisa duser - bos sayfa birakmadan.
                 var oge = sutun.Item().PaddingBottom(16);
-                if (!bolunmus && KartSigarMi(d)) oge = oge.ShowEntire();
                 oge.Element(c => DilekKarti(c, d, eser, parca));
             }
         });
