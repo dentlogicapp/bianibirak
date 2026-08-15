@@ -550,6 +550,11 @@ public static class SemaKurucu
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaUyari14Gonderildi" boolean NOT NULL DEFAULT false;
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaUyari3Gonderildi" boolean NOT NULL DEFAULT false;
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaEdildi" boolean NOT NULL DEFAULT false;
+
+        -- C-3: akilli sayfa duzeni tercihleri (varsayilanlar mevcut davranisi korur)
+        ALTER TABLE kurasyonlar ADD COLUMN IF NOT EXISTS "AkilliDuzen" boolean NOT NULL DEFAULT true;
+        ALTER TABLE kurasyon_ogeleri ADD COLUMN IF NOT EXISTS "Sabit" boolean NOT NULL DEFAULT false;
+        ALTER TABLE kurasyon_ogeleri ADD COLUMN IF NOT EXISTS "TekSayfa" boolean NOT NULL DEFAULT false;
         ALTER TABLE etkinlikler ADD COLUMN IF NOT EXISTS "ImhaZamani" timestamptz NULL;
 
         -- VIP KALICI SAKLAMA (Bolum 4-I): ozel gunden itibaren TOPLAM yasam suresi (gun).

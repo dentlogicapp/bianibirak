@@ -139,7 +139,8 @@ public static class SayfaPaketleyici
         string fontKok,
         float sayfaYuksekligi,
         bool akilli = true,
-        ISet<int>? sabitler = null)
+        IReadOnlySet<int>? sabitler = null,
+        IReadOnlySet<int>? tekSayfalar = null)
     {
         if (dilekler.Count == 0)
             return new Yerlesim(true, Array.Empty<SayfaPlani>(), new Dictionary<int, int>(), false, 1f,
@@ -153,7 +154,8 @@ public static class SayfaPaketleyici
             // 1) ESNEKLIK ARAMASI - her olcek adayi icin bir kez yerlesim kurulur,
             // en iyisi secilir. Kazanc yoksa olcek 1.0'da KALIR: gereksiz yere
             // fotograf kucultmeyiz.
-            var sabitKumeOn = sabitler ?? new HashSet<int>();
+            var sabitKumeOn = (ISet<int>)(sabitler?.ToHashSet() ?? new HashSet<int>());
+            var tekSayfaKume = tekSayfalar ?? (IReadOnlySet<int>)new HashSet<int>();
             float[] yukseklikler = Array.Empty<float>();
             List<List<int>> sayfalar = new();
             var secilenOlcek = 1f;
@@ -163,7 +165,15 @@ public static class SayfaPaketleyici
             {
                 var y = new float[dilekler.Count];
                 for (var i = 0; i < dilekler.Count; i++)
-                    y[i] = KartYuksekligi(dilekler[i], olcu, olcek);
+                {
+                    // TEK SAYFAYA SIGDIR secili dilek: kendi olcegi hesaplanir.
+                    // Kullanicinin ACIK tercihi oldugu icin defterin genel olceginden
+                    // ayrilmasi kabul edilir - karari o verdi, biz uyguluyoruz.
+                    var kartOlcek = tekSayfaKume.Contains(i)
+                        ? TekSayfaOlcegi(dilekler[i], olcu, sayfaYuksekligi, olcek)
+                        : olcek;
+                    y[i] = KartYuksekligi(dilekler[i], olcu, kartOlcek);
+                }
 
                 var s = akilli
                     ? PencereliYerlesim(y, sayfaYuksekligi, sabitKumeOn, new HashSet<int>())
@@ -200,7 +210,7 @@ public static class SayfaPaketleyici
             }
 
             // 3) Bolunmus dilekler kendi sayfalarini alacak sekilde yerlesimi tazele.
-            var sabitKume = sabitler ?? new HashSet<int>();
+            var sabitKume = (ISet<int>)(sabitler?.ToHashSet() ?? new HashSet<int>());
             if (parcaliDilekler.Count > 0)
             {
                 sayfalar = akilli
@@ -256,7 +266,10 @@ public static class SayfaPaketleyici
                 var dolu = sayfa.Sum(i => yukseklikler[i]);
                 var tekParcalar = sayfa
                     .Select(i => new KartParcasi(
-                        i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false, secilenOlcek))
+                        i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false,
+                        tekSayfaKume.Contains(i)
+                            ? TekSayfaOlcegi(dilekler[i], olcu, sayfaYuksekligi, secilenOlcek)
+                            : secilenOlcek))
                     .ToList();
                 foreach (var i in sayfa) esleme[i] = no;
                 planlar.Add(new SayfaPlani(no, sayfa, tekParcalar, dolu,
@@ -393,6 +406,21 @@ public static class SayfaPaketleyici
 
         if (suAnki.Count > 0) sayfalar.Add(suAnki);
         return sayfalar;
+    }
+
+    // Bir kartin TEK SAYFAYA sigmasi icin gereken fotograf olcegi.
+    // Makul sinirda (OlcekAdaylari) sigmiyorsa defterin genel olcegi doner -
+    // zorlamayiz; sigmayan dilek cumle sinirinda bolunur.
+    private static float TekSayfaOlcegi(
+        BaskiServisi.Dilek d, FontOlcusu olcu, float H, float varsayilan)
+    {
+        if (d.Foto == null) return varsayilan;
+        foreach (var olcek in OlcekAdaylari)
+        {
+            if (olcek > varsayilan) continue;
+            if (KartYuksekligi(d, olcu, olcek) <= H) return olcek;
+        }
+        return varsayilan;
     }
 
     // ---- CUMLE SINIRINDA BOLME ----

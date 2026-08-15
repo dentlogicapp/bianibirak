@@ -28,6 +28,13 @@ public class Kurasyon
     // Defterde tarih gosterilsin mi? (dilek altinda "12 Temmuz 2026")
     public bool TarihGoster { get; set; } = true;
 
+    // AKILLI SAYFA DUZENI: sayfalarin dengeli dolmasi icin dilekler gerektiginde
+    // yakin komsulariyla yer degistirir (bkz. SayfaPaketleyici). Kapatilirsa sira
+    // BIREBIR korunur, yalnizca kirma noktalari eniyilenir.
+    //
+    // Varsayilan ACIK: cift bir sey secmeden de defteri en iyi haliyle gorur.
+    public bool AkilliDuzen { get; set; } = true;
+
     // Durum: "taslak" | "tamamlandi" (tamamlandi = Kuzey Yildizi metrigi)
     public string Durum { get; set; } = "taslak";
     public DateTimeOffset? TamamlanmaZamani { get; set; }

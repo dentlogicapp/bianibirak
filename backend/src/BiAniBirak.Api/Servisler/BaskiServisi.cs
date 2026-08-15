@@ -100,7 +100,14 @@ public static class BaskiServisi
         Gorsel? KapakGorseli,
         Gorsel? IthafGorseli,
         Gorsel? KapanisGorseli,
-        IReadOnlyList<Gorsel> BolumGorselleri);
+        IReadOnlyList<Gorsel> BolumGorselleri,
+        // ---- C-3 SAYFA DUZENI TERCIHLERI ----
+        // Varsayilanlar mevcut davranisi korur; eski cagri noktalari bozulmaz.
+        bool AkilliDuzen = true,
+        // Elle tasinmis (sabitlenmis) dilek indeksleri - eniyileme dokunmaz.
+        IReadOnlySet<int>? Sabitler = null,
+        // "Tek sayfaya sigdir" secilen dilek indeksleri - fotografi kucultulur.
+        IReadOnlySet<int>? TekSayfalar = null);
 
     // ---------------- OLCU MANTIGI ----------------
     private enum Yon { Yatay, Kare, Dikey }
@@ -477,7 +484,12 @@ public static class BaskiServisi
         if (eser.Dilekler.Count == 0) return null;
 
         var yerlesim = SayfaPaketleyici.Paketle(
-            eser.Dilekler, _fontDizin, SayfaIcerikYuksekligi);
+            eser.Dilekler,
+            _fontDizin,
+            SayfaIcerikYuksekligi,
+            eser.AkilliDuzen,
+            eser.Sabitler,
+            eser.TekSayfalar);
 
         return yerlesim.Kullanilabilir && yerlesim.Sayfalar.Count > 0 ? yerlesim : null;
     }

@@ -560,6 +560,7 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.KapanisMetni).HasColumnName("KapanisMetni");
             e.Property(x => x.GruplamaTipi).HasColumnName("GruplamaTipi").IsRequired();
             e.Property(x => x.TarihGoster).HasColumnName("TarihGoster");
+            e.Property(x => x.AkilliDuzen).HasColumnName("AkilliDuzen").HasDefaultValue(true);
             e.Property(x => x.Durum).HasColumnName("Durum").IsRequired();
             e.Property(x => x.TamamlanmaZamani).HasColumnName("TamamlanmaZamani");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
@@ -579,6 +580,8 @@ public class BiAniBirakDbContext : DbContext
             e.Property(x => x.Dahil).HasColumnName("Dahil");
             e.Property(x => x.Sira).HasColumnName("Sira");
             e.Property(x => x.BolumBasligi).HasColumnName("BolumBasligi");
+            e.Property(x => x.Sabit).HasColumnName("Sabit").HasDefaultValue(false);
+            e.Property(x => x.TekSayfa).HasColumnName("TekSayfa").HasDefaultValue(false);
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.HasIndex(x => new { x.KurasyonId, x.KatkiId }).IsUnique();
             e.HasIndex(x => new { x.KurasyonId, x.Sira });

@@ -17,5 +17,15 @@ public class KurasyonOgesi
     // Ozel bolum basligi (GruplamaTipi = "bolum" ise kullanilir)
     public string? BolumBasligi { get; set; }
 
+    // SABITLEME: cift bu dilegi ELLE tasidi. Akilli sayfa duzeni ona DOKUNMAZ;
+    // yalnizca cevresindeki bosluklari diger dileklerle doldurur. Kullanicinin
+    // elle verdigi karar, eniyilemenin onundedir.
+    public bool Sabit { get; set; }
+
+    // TEK SAYFAYA SIGDIR: iki sayfaya tasan bir dilek icin cift, fotografin
+    // bir miktar kucultulmesini SECEBILIR. Yaziya asla dokunulmaz; kucultme
+    // yalniz bu kartta ve yalnizca kullanici istediginde uygulanir.
+    public bool TekSayfa { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

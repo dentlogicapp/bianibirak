@@ -120,6 +120,8 @@ public static class DefterDerleyici
                 o => o.KatkiId, k => k.Id,
                 (o, k) => new
                 {
+                    o.Sabit,
+                    o.TekSayfa,
                     k.DavetliAd,
                     k.DavetliIliski,
                     k.Mesaj,
@@ -191,6 +193,15 @@ public static class DefterDerleyici
                 d.DavetliAd, d.DavetliIliski, d.Mesaj, d.KaynakEs, d.CreatedAt, foto, fg, fy));
         }
 
+        // C-3: sayfa duzeni tercihleri - dilek SIRASINDAKI indekslerle.
+        var sabitIndeksler = new HashSet<int>();
+        var tekSayfaIndeksler = new HashSet<int>();
+        for (var i = 0; i < dilekler.Count; i++)
+        {
+            if (dilekler[i].Sabit) sabitIndeksler.Add(i);
+            if (dilekler[i].TekSayfa) tekSayfaIndeksler.Add(i);
+        }
+
         BaskiServisi.Hazirla(icerikKoku);
 
         var eser = new BaskiServisi.EserVerisi(
@@ -207,7 +218,10 @@ public static class DefterDerleyici
             KapakGorseli: kapakG,
             IthafGorseli: ithafG,
             KapanisGorseli: kapanisG,
-            BolumGorselleri: bolumG);
+            BolumGorselleri: bolumG,
+            AkilliDuzen: kurasyon.AkilliDuzen,
+            Sabitler: sabitIndeksler,
+            TekSayfalar: tekSayfaIndeksler);
 
         return (new EserVeri(eser, kurasyon, dilekler.Count), null);
     }
