@@ -88,6 +88,8 @@ public record KullaniciSilIstek(string? Teyit);
 
 // ---- KURASYON (Asama 6) ----
 
+// AkilliDuzen: sayfalarin dengeli dolmasi icin dilekler yakin komsulariyla
+// yer degistirebilir. Kapaliyken sira BIREBIR korunur.
 public record KurasyonGuncelleIstek(
     string? Tema,
     string? KapakBaslik,
@@ -96,9 +98,21 @@ public record KurasyonGuncelleIstek(
     string? IthafMetni,
     string? KapanisMetni,
     string? GruplamaTipi,
-    bool? TarihGoster);
+    bool? TarihGoster,
+    // AKILLI SAYFA DUZENI: sayfalarin dengeli dolmasi icin dilekler yakin
+    // komsulariyla yer degistirebilir. Kapaliyken sira BIREBIR korunur.
+    bool? AkilliDuzen);
 
-public record OgeGuncelleIstek(bool? Dahil, string? BolumBasligi);
+// Sabit: dilek elle tasindi, akilli duzen ona dokunmasin.
+// TekSayfa: iki sayfaya tasan dilegi fotografi kuculterek tek sayfaya sigdir.
+public record OgeGuncelleIstek(
+    bool? Dahil,
+    string? BolumBasligi,
+    // Sabit: dilek elle tasindi - akilli duzen ona dokunmaz.
+    bool? Sabit,
+    // TekSayfa: iki sayfaya tasan dilegi, fotografi bir miktar kuculterek
+    // tek sayfaya sigdir. Yaziya ASLA dokunulmaz.
+    bool? TekSayfa);
 
 public record SiralaIstek(Guid[]? KatkiIdler);
 

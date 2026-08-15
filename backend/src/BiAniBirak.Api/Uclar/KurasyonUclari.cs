@@ -26,6 +26,9 @@ public static class KurasyonUclari
         app.MapPut("/api/etkinlik/aktif/kurasyon/oge/{katkiId:guid}", OgeGuncelle).RequireAuthorization();
         app.MapPost("/api/etkinlik/aktif/kurasyon/sirala", Sirala).RequireAuthorization();
         app.MapPost("/api/etkinlik/aktif/kurasyon/tamamla", Tamamla).RequireAuthorization();
+        // C-3: sayfa yerlesim analizi (hangi dilek hangi sayfada, tasan var mi,
+        // tek sayfaya sigdirma caresi var mi). Agir hesap - AYRI uc.
+        app.MapGet("/api/etkinlik/aktif/kurasyon/yerlesim", Yerlesim).RequireAuthorization();
         app.MapGet("/api/etkinlik/aktif/kurasyon/defter.pdf", DefterPdf).RequireAuthorization();
 
         // ONIZLEME - PDF DEGIL, GORUNTU.
@@ -453,6 +456,7 @@ public static class KurasyonUclari
             kapanis_metni = kurasyon.KapanisMetni,
             gruplama_tipi = kurasyon.GruplamaTipi,
             tarih_goster = kurasyon.TarihGoster,
+            akilli_duzen = kurasyon.AkilliDuzen,
             durum = kurasyon.Durum,
             tamamlanma_zamani = kurasyon.TamamlanmaZamani,
             // Baglam (onizleme icin)
@@ -462,6 +466,71 @@ public static class KurasyonUclari
             etkinlik_tarihi = etkinlik.EtkinlikTarihi,
             ogeler,
             gorseller,
+        });
+    }
+
+    // SAYFA YERLESIM ANALIZI (C-3).
+    //
+    // Arayuz sunlari BUNDAN ogrenir:
+    //   - hangi dilek hangi sayfada (C-4 "Defterde goster")
+    //   - hangi dilek iki sayfaya tasiyor
+    //   - hangisi fotografi kucultulerek tek sayfaya SIGDIRILABILIR
+    //   - akilli duzen sirayi degistirdi mi (zarif uyari bunu kullanir)
+    //
+    // Isleyemeyecek bir dugme gostermemek icin bu bilgi SARTTIR: "Tek sayfaya
+    // sigdir" dugmesi yalnizca caresi olan dileklerde cikar.
+    private static async Task<IResult> Yerlesim(
+        HttpContext ctx, BiAniBirakDbContext db,
+        DepolamaServisi depo, IWebHostEnvironment ortam)
+    {
+        if (!KullaniciKimligi(ctx, out var kullaniciId))
+            return Hata(401, "ERISIM_YOK", "Oturum bulunamadı.");
+        var (ok, etkinlikId, _) = await AktifTenant(ctx, db, kullaniciId);
+        if (!ok)
+            return Hata(403, "ERISIM_YOK", "Aktif etkinlik yok veya bu etkinliğe üye değilsin.");
+
+        var kok = ortam.ContentRootPath;
+        var (eser, hata) = await DefterDerleyici.EserVerisiAsync(etkinlikId, db, depo, kok);
+        if (hata != null) return Hata(400, hata.Kod, hata.Mesaj);
+
+        var yerlesim = SayfaPaketleyici.Paketle(
+            eser!.Dilekler,
+            Path.Combine(kok, "Varliklar", "Fontlar"),
+            BaskiServisi.SayfaIcerikYuksekligiA5,
+            eser.AkilliDuzen,
+            eser.Sabitler,
+            eser.TekSayfalar);
+
+        // Dilek indeksi -> KatkiId. Eser verisi, ogelerin Sira'sina gore
+        // kuruldugu icin siralar birebir ortusur.
+        var kurasyon = await db.Kurasyonlar.AsNoTracking()
+            .FirstOrDefaultAsync(k => k.EtkinlikId == etkinlikId);
+        if (kurasyon == null)
+            return Hata(404, "KURASYON_BULUNAMADI", "Önce kürasyon stüdyosunu aç.");
+
+        var katkiIdler = await db.KurasyonOgeleri.AsNoTracking()
+            .Where(o => o.KurasyonId == kurasyon.Id && o.Dahil)
+            .OrderBy(o => o.Sira)
+            .Select(o => o.KatkiId)
+            .ToListAsync();
+
+        object Kart(int i) => new
+        {
+            katki_id = i < katkiIdler.Count ? katkiIdler[i] : (Guid?)null,
+            sayfa = yerlesim.DilekSayfasi.TryGetValue(i, out var s) ? s : 0,
+            // Tasiyor mu? (birden cok parcasi varsa iki sayfaya boluniyor)
+            tasiyor = yerlesim.Sayfalar.Count(p => p.Parcalar.Any(x => x.DilekIndeksi == i)) > 1,
+            // Fotografi kucultulerek tek sayfaya sigar mi?
+            tek_sayfa_caresi = yerlesim.TekSayfaCaresi.ContainsKey(i),
+        };
+
+        return Results.Json(new
+        {
+            kullanilabilir = yerlesim.Kullanilabilir,
+            yeniden_siralandi = yerlesim.YenidenSiralandi,
+            foto_olcek = yerlesim.FotoOlcek,
+            sayfa_sayisi = yerlesim.Sayfalar.Count,
+            dilekler = Enumerable.Range(0, eser.Dilekler.Count).Select(Kart),
         });
     }
 
@@ -508,6 +577,7 @@ public static class KurasyonUclari
         if (istek.IthafMetni != null) kurasyon.IthafMetni = istek.IthafMetni.Trim();
         if (istek.KapanisMetni != null) kurasyon.KapanisMetni = istek.KapanisMetni.Trim();
         if (istek.TarihGoster.HasValue) kurasyon.TarihGoster = istek.TarihGoster.Value;
+        if (istek.AkilliDuzen.HasValue) kurasyon.AkilliDuzen = istek.AkilliDuzen.Value;
 
         kurasyon.UpdatedAt = DateTimeOffset.UtcNow;
         await Denetim(db, etkinlikId, kullaniciId, "KURASYON_GUNCELLENDI", kurasyon.Id,
@@ -548,6 +618,9 @@ public static class KurasyonUclari
         if (istek.BolumBasligi != null)
             oge.BolumBasligi = string.IsNullOrWhiteSpace(istek.BolumBasligi)
                 ? null : istek.BolumBasligi.Trim();
+        // C-3 SAYFA DUZENI TERCIHLERI
+        if (istek.Sabit.HasValue) oge.Sabit = istek.Sabit.Value;
+        if (istek.TekSayfa.HasValue) oge.TekSayfa = istek.TekSayfa.Value;
 
         await db.SaveChangesAsync();
         return Results.Json(new { ok = true });
@@ -582,11 +655,18 @@ public static class KurasyonUclari
             .Where(o => o.KurasyonId == kurasyon.Id)
             .ToListAsync();
 
-        // Gelen sirayla yeniden numaralandir (atomik)
+        // OTOMATIK SABITLEME - kullanicidan fazladan bir tiklama istemeyiz.
+        //
+        // Cift bir dilegi ELLE tasidiysa, akilli sayfa duzeni onu geri
+        // oynatmamalidir; yoksa "tasidim ama yerinde durmuyor" hissi olusur ve
+        // sistem kullaniciyla yarisiyormus gibi gorunur. Tasinan dilek burada
+        // sessizce SABITLENIR: karari kullanici verdi, biz koruyoruz.
         for (var i = 0; i < istek.KatkiIdler.Length; i++)
         {
             var oge = ogeler.FirstOrDefault(o => o.KatkiId == istek.KatkiIdler[i]);
-            if (oge != null) oge.Sira = i;
+            if (oge == null) continue;
+            if (oge.Sira != i) oge.Sabit = true; // yeri DEGISTI -> elle tasindi
+            oge.Sira = i;
         }
         await db.SaveChangesAsync();
 
