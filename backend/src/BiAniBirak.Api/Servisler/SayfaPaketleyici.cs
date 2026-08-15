@@ -157,6 +157,9 @@ public static class SayfaPaketleyici
             var sabitKumeOn = (ISet<int>)(sabitler?.ToHashSet() ?? new HashSet<int>());
             var tekSayfaKume = tekSayfalar ?? (IReadOnlySet<int>)new HashSet<int>();
             float[] yukseklikler = Array.Empty<float>();
+            // Her kartin NIHAI fotograf olcegi (tasma caresi uygulanmis hali).
+            var kartOlcekleri = new float[dilekler.Count];
+            var secilenOlcekler = new float[dilekler.Count];
             List<List<int>> sayfalar = new();
             var secilenOlcek = 1f;
             var enIyiPuan = double.MaxValue;
@@ -172,7 +175,36 @@ public static class SayfaPaketleyici
                     var kartOlcek = tekSayfaKume.Contains(i)
                         ? TekSayfaOlcegi(dilekler[i], olcu, sayfaYuksekligi, olcek)
                         : olcek;
-                    y[i] = KartYuksekligi(dilekler[i], olcu, kartOlcek);
+
+                    var h = KartYuksekligi(dilekler[i], olcu, kartOlcek);
+
+                    // ---- DEGISMEZ KURAL: HICBIR SAYFA TASMAZ ----
+                    //
+                    // CANLIDA YAKALANDI: 474.4pt olculen iki kart 473pt'lik sayfalara
+                    // konuldu ("bos: 0"). QuestPDF tasan icerigi bir SONRAKI sayfaya
+                    // aktarir; 8 sayfalik plan 10 sayfa PDF uretti. Yani plan gecersizdi:
+                    // paketleyici, dolduramayacagi bir sayfa planlamamalidir.
+                    //
+                    // Care zaten elimizde: ESNEKLIK. Kart sayfayi BIRAZ asiyorsa
+                    // fotografi fark edilmeyecek olcude kucultulur ve sigar. Bu,
+                    // kullanicinin "tek sayfaya sigdir" tercihiyle ayni mekanizmadir -
+                    // ama burada bir SECIM degil, ZORUNLULUKTUR: aksi hali bos/tasan
+                    // sayfa demektir.
+                    //
+                    // Makul sinirda (%85) sigmiyorsa dokunulmaz: o dilek gercekten
+                    // uzundur ve cumle sinirinda bolunmeyi hak eder.
+                    if (h > sayfaYuksekligi)
+                    {
+                        var care = TekSayfaOlcegi(dilekler[i], olcu, sayfaYuksekligi, kartOlcek);
+                        if (care < kartOlcek)
+                        {
+                            kartOlcek = care;
+                            h = KartYuksekligi(dilekler[i], olcu, kartOlcek);
+                        }
+                    }
+
+                    y[i] = h;
+                    kartOlcekleri[i] = kartOlcek;
                 }
 
                 var s = akilli
@@ -193,6 +225,7 @@ public static class SayfaPaketleyici
                 {
                     enIyiPuan = puan; secilenOlcek = olcek;
                     yukseklikler = y; sayfalar = s;
+                    Array.Copy(kartOlcekleri, secilenOlcekler, kartOlcekleri.Length);
                 }
             }
 
@@ -267,9 +300,7 @@ public static class SayfaPaketleyici
                 var tekParcalar = sayfa
                     .Select(i => new KartParcasi(
                         i, BaskiServisi.MetinBicimle(dilekler[i].Mesaj), true, true, false, false,
-                        tekSayfaKume.Contains(i)
-                            ? TekSayfaOlcegi(dilekler[i], olcu, sayfaYuksekligi, secilenOlcek)
-                            : secilenOlcek))
+                        secilenOlcekler[i] > 0 ? secilenOlcekler[i] : secilenOlcek))
                     .ToList();
                 foreach (var i in sayfa) esleme[i] = no;
                 planlar.Add(new SayfaPlani(no, sayfa, tekParcalar, dolu,
